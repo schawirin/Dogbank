@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
     tags: ["v*.*.*"]
-  workflow_dispatch: {}   # permite rodar manualmente
+  workflow_dispatch: {}
 
 env:
   BACKEND_IMAGE: schawirin/dogbank-backend
@@ -27,29 +27,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ===== (opcional) validar Quality Gate também no push =====
+      # (opcional) validar Quality Gate também no push
       - name: Upload Java coverage (se existir)
         run: |
           if [ -f ./dogbank/target/site/jacoco/jacoco.xml ]; then
             npx -y @datadog/datadog-ci@latest coverage upload --format=jacoco ./dogbank/target/site/jacoco/jacoco.xml
           fi
-        env: { DD_API_KEY: ${{ secrets.DD_API_KEY }}, DD_SITE: ${{ secrets.DD_SITE }} }
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          DD_SITE: ${{ secrets.DD_SITE }}
 
       - name: Upload Frontend coverage (se existir)
         run: |
           if [ -f ./dogbank-frontend/coverage/lcov.info ]; then
             npx -y @datadog/datadog-ci@latest coverage upload --format=lcov ./dogbank-frontend/coverage/lcov.info
           fi
-        env: { DD_API_KEY: ${{ secrets.DD_API_KEY }}, DD_SITE: ${{ secrets.DD_SITE }} }
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          DD_SITE: ${{ secrets.DD_SITE }}
 
       - name: Evaluate Datadog Quality Gates
-        run: npx -y @datadog/datadog-ci@latest gate evaluate --timeout 120
+        run: npx -y @datadog/datadog-ci@latest gate evaluate --timeout 120 # opcional: --fail-on-empty
         env:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
           DD_APP_KEY: ${{ secrets.DD_APP_KEY }}
           DD_SITE: ${{ secrets.DD_SITE }}
 
-      # ===== Docker Hub login + buildx =====
+      # Docker Hub login + buildx
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - name: Login to Docker Hub

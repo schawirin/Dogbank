@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ===== Backend (Java + Maven + JaCoCo) =====
+      # Backend Java (JaCoCo)
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
@@ -22,7 +22,7 @@ jobs:
         working-directory: ./dogbank
         run: mvn -B -q test jacoco:report
 
-      # ===== Frontend (Node + coverage) opcional =====
+      # Frontend (opcional)
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -36,7 +36,7 @@ jobs:
             npm test -- --coverage || true
           fi
 
-      # ===== Datadog: cobertura + gates =====
+      # Enviar cobertura
       - name: Upload Java coverage (JaCoCo XML)
         run: npx -y @datadog/datadog-ci@latest coverage upload --format=jacoco ./dogbank/target/site/jacoco/jacoco.xml
         env:
@@ -52,8 +52,9 @@ jobs:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
           DD_SITE: ${{ secrets.DD_SITE }}
 
+      # Avaliar Quality Gates (falha PR se violar regra)
       - name: Evaluate Datadog Quality Gates
-        run: npx -y @datadog/datadog-ci@latest gate evaluate --timeout 120
+        run: npx -y @datadog/datadog-ci@latest gate evaluate --timeout 120 # opcional: --fail-on-empty
         env:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
           DD_APP_KEY: ${{ secrets.DD_APP_KEY }}
