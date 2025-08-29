@@ -1,0 +1,71 @@
+name: quality-gate
+on: [pull_request]
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ===== Backend (Java + Maven + JaCoCo) =====
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Build & Test backend (JaCoCo)
+        working-directory: ./dogbank
+        run: mvn -B -q test jacoco:report
+
+      # ===== Frontend (Node + coverage) opcional =====
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Test frontend with coverage (se existir)
+        working-directory: ./dogbank-frontend
+        run: |
+          if [ -f package.json ]; then
+            npm ci
+            npm test -- --coverage || true
+          fi
+
+      # ===== Datadog: enviar cobertura + avaliar gates =====
+      - name: Install datadog-ci
+        run: npm i -g @datadog/datadog-ci
+
+      - name: Upload Java coverage (JaCoCo XML)
+        run: datadog-ci coverage upload --format=jacoco ./dogbank/target/site/jacoco/jacoco.xml
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          DD_SITE: ${{ secrets.DD_SITE }}
+
+      - name: Upload Frontend coverage (LCOV) se existir
+        run: |
+          if [ -f ./dogbank-frontend/coverage/lcov.info ]; then
+            datadog-ci coverage upload --format=lcov ./dogbank-frontend/coverage/lcov.info
+          fi
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          DD_SITE: ${{ secrets.DD_SITE }}
+
+      # (Opcional) Subir achados SAST/SCA via SARIF (ex.: Semgrep/CodeQL):
+      # - name: Upload SARIF to Datadog
+      #   run: datadog-ci sarif upload path/results.sarif
+      #   env:
+      #     DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      #     DD_APP_KEY: ${{ secrets.DD_APP_KEY }}
+      #     DD_SITE: ${{ secrets.DD_SITE }}
+
+      - name: Evaluate Datadog Quality Gates
+        run: datadog-ci gate evaluate --verbose
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          DD_APP_KEY: ${{ secrets.DD_APP_KEY }}
+          DD_SITE: ${{ secrets.DD_SITE }}
