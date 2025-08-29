@@ -149,9 +149,9 @@ CPF: 12345678915
 
 Senha: 123456
 
-Nome: Julia Medina
+Nome: itadori yuki
 
-Chave PIX: julia.medina@gmail.com
+Chave PIX: itadori.yuki@gmail.com
 
 🐛 Cenários simulados de erro (PIX)
 
