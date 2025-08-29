@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+  <Appenders>
+    <Console name="Console" target="SYSTEM_OUT">
+      <JsonLayout compact="true" eventEol="true" />
+    </Console>
+  </Appenders>
+  <Loggers>
+    <!-- Logger customizado, se desejar -->
+    <Logger name="com.dogbank" level="info" additivity="false">
+      <AppenderRef ref="Console"/>
+    </Logger>
+    <Root level="error">
+      <AppenderRef ref="Console"/>
+    </Root>
+  </Loggers>
+</Configuration>

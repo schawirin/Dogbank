@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dogbank
+  labels:
+    name: dogbank
+    environment: production
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dogbank-config
+  namespace: dogbank
+data:
+  # Database configuration
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "dogbank"
+  
+  # Spring profiles
+  SPRING_PROFILES_ACTIVE: "kubernetes"
+  
+  # JVM settings
+  JAVA_OPTS: "-Xms256m -Xmx512m -XX:+UseG1GC -XX:+UseContainerSupport"
+  
+  # Service URLs
+  AUTH_SERVICE_URL: "http://auth-service:8088"
+  ACCOUNT_SERVICE_URL: "http://account-service:8089"
+  TRANSACTION_SERVICE_URL: "http://transaction-service:8084"
+  BANCOCENTRAL_SERVICE_URL: "http://bancocentral-service:8085"
+  INTEGRATION_SERVICE_URL: "http://integration-service:8082"
+  NOTIFICATION_SERVICE_URL: "http://notification-service:8083"
+  
+  # Banco Central API
+  BANCOCENTRAL_API_URL: "http://bancocentral-service:8085/api/bancocentral/pix/validate"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dogbank-secrets
+  namespace: dogbank
+type: Opaque
+data:
+  # Base64 encoded values
+  # echo -n 'dogbank' | base64
+  DB_USER: ZG9nYmFuaw==
+  # echo -n 'dog1234' | base64  
+  DB_PASSWORD: ZG9nMTIzNA==
+  # echo -n 'jwt-secret-key-change-in-production' | base64
+  JWT_SECRET: and0LXNlY3JldC1rZXktY2hhbmdlLWluLXByb2R1Y3Rpb24=
+
