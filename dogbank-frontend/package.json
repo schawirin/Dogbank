@@ -17,9 +17,9 @@
   },
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.10",
-    "autoprefixer": "^10.4.14",
-    "postcss": "^8.4.21",
-    "tailwindcss": "^3.2.7"
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17"
   },
   "scripts": {
     "start": "export NODE_OPTIONS=--openssl-legacy-provider && react-scripts start",
