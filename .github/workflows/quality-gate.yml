@@ -32,16 +32,13 @@ jobs:
         working-directory: ./dogbank-frontend
         run: |
           if [ -f package.json ]; then
-            npm ci
+            if [ -f package-lock.json ]; then npm ci; else npm install; fi
             npm test -- --coverage || true
           fi
 
-      # ===== Datadog: enviar cobertura + avaliar gates =====
-      - name: Install datadog-ci
-        run: npm i -g @datadog/datadog-ci
-
+      # ===== Datadog: cobertura + gates =====
       - name: Upload Java coverage (JaCoCo XML)
-        run: datadog-ci coverage upload --format=jacoco ./dogbank/target/site/jacoco/jacoco.xml
+        run: npx -y @datadog/datadog-ci@latest coverage upload --format=jacoco ./dogbank/target/site/jacoco/jacoco.xml
         env:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
           DD_SITE: ${{ secrets.DD_SITE }}
@@ -49,22 +46,14 @@ jobs:
       - name: Upload Frontend coverage (LCOV) se existir
         run: |
           if [ -f ./dogbank-frontend/coverage/lcov.info ]; then
-            datadog-ci coverage upload --format=lcov ./dogbank-frontend/coverage/lcov.info
+            npx -y @datadog/datadog-ci@latest coverage upload --format=lcov ./dogbank-frontend/coverage/lcov.info
           fi
         env:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
           DD_SITE: ${{ secrets.DD_SITE }}
 
-      # (Opcional) Subir achados SAST/SCA via SARIF (ex.: Semgrep/CodeQL):
-      # - name: Upload SARIF to Datadog
-      #   run: datadog-ci sarif upload path/results.sarif
-      #   env:
-      #     DD_API_KEY: ${{ secrets.DD_API_KEY }}
-      #     DD_APP_KEY: ${{ secrets.DD_APP_KEY }}
-      #     DD_SITE: ${{ secrets.DD_SITE }}
-
       - name: Evaluate Datadog Quality Gates
-        run: datadog-ci gate evaluate --verbose
+        run: npx -y @datadog/datadog-ci@latest gate evaluate --timeout 120
         env:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
           DD_APP_KEY: ${{ secrets.DD_APP_KEY }}
