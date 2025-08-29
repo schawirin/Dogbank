@@ -52,7 +52,7 @@ data:
         status VARCHAR(20) DEFAULT 'CONCLUIDA'
     );
     INSERT INTO usuarios (cpf, senha, nome, email, chave_pix) VALUES
-    ('12345678915','123456','Julia Medina','julia.medina@email.com','julia.pix@email.com'),
+    ('12345678915','123456','yuki itadori','yuki.itadori@email.com','yuki.pix@email.com'),
     ('98765432101','123456','Pedro Silva','pedro.silva@email.com','pedro.pix@email.com'),
     ('45678912302','123456','João Santos','joao.santos@email.com','joao.pix@email.com'),
     ('78912345603','123456','Emiliano Costa','emiliano.costa@email.com','emiliano.pix@email.com'),
