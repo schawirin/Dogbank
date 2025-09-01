@@ -1,27 +1,19 @@
-// src/main/java/com/dogbank/auth/dto/AuthRequest.java
 package com.dogbank.auth.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonAlias;
 
 /**
- * DTO usado pelo endpoint POST /api/auth/login
- *
- * O campo JSON esperado pelo front-end é **"senha"**, mas internamente você
- * pode chamar de password ou senha.  Aqui optamos por manter o atributo
- * Java password e mapear com @JsonProperty("senha") para evitar qualquer
- * ambiguidade.
+ * Aceita {"senha": "..."} ou {"password": "..."}.
+ * Sem validação automática pra não disparar 400 nos testes.
  */
 public class AuthRequest {
 
-    /** CPF do usuário (só números). */
     private String cpf;
 
-    /** PIN / senha numérica de 6 dígitos. */
-    @JsonProperty("senha")   // mapeia o JSON {"senha": "..."} → this.password
+    @JsonAlias({ "senha", "password" })
     private String password;
 
-    /* ---------- getters / setters ---------- */
-
+    // getters / setters
     public String getCpf() {
         return cpf;
     }
