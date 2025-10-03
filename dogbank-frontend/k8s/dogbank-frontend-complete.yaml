@@ -62,7 +62,7 @@ spec:
     spec:
       containers:
       - name: dogbank-frontend
-        image: schawirin/dogbank-frontend:v1.3
+        image: schawirin/dogbank-frontend:latest
         imagePullPolicy: Always
         ports:
         - name: http
