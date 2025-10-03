@@ -1,7 +1,5 @@
 package com.dogbank.bancocentral.config;
 
-package com.dogbank.[NOME_DO_MODULO].config;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
