@@ -2,8 +2,10 @@ package com.dogbank.transaction;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.ComponentScan;
 
-@SpringBootApplication(scanBasePackages = {
+@SpringBootApplication
+@ComponentScan(basePackages = {
     "com.dogbank.transaction", 
     "com.dogbank.account", 
     "com.dogbank.auth"
