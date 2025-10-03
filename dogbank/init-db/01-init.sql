@@ -2,10 +2,10 @@
 -- Criar extensões necessárias
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Configurações de performance
+-- Configurações de performance3w
 ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements';
 ALTER SYSTEM SET max_connections = 200;
-ALTER SYSTEM SET shared_buffers = '256MB';
+ALTER SYSTEM SET shared_buffers = '256MB';S
 ALTER SYSTEM SET effective_cache_size = '1GB';
 ALTER SYSTEM SET maintenance_work_mem = '64MB';
 ALTER SYSTEM SET checkpoint_completion_target = 0.9;

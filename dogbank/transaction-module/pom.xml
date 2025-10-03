@@ -58,6 +58,11 @@
       <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
 
+    <dependency>
+     <groupId>org.springframework.boot</groupId>
+     <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+
     <!-- Dependência para acessar AccountRepository e Account entity do account-module -->
     <dependency>
       <groupId>com.dogbank</groupId>

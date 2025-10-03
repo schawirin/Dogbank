@@ -33,6 +33,11 @@
       </exclusions>
     </dependency>
 
+    <dependency>
+     <groupId>org.springframework.boot</groupId>
+     <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+
     <!-- Log4j2 para logging, mantendo a consistência com os outros módulos -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
