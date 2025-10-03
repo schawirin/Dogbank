@@ -12,9 +12,9 @@ metadata:
   namespace: production
 type: Opaque
 data:
-  POSTGRES_USER: ZG9nYmFuaw==      # dogbank
-  POSTGRES_PASSWORD: ZG9nMTIzNA==  # dog1234
-  POSTGRES_DB: ZG9nYmFuaw==        # dogbank
+  POSTGRES_USER: ZG9nYmFuaw==
+  POSTGRES_PASSWORD: ZG9nMTIzNA==
+  POSTGRES_DB: ZG9nYmFuaw==
 
 ---
 apiVersion: v1
@@ -72,12 +72,11 @@ kind: Deployment
 metadata:
   name: postgres
   namespace: production
-  labels:
-    app: postgres
 spec:
   replicas: 1
   selector:
-    matchLabels: { app: postgres }
+    matchLabels:
+      app: postgres
   template:
     metadata:
       labels:
@@ -85,22 +84,24 @@ spec:
         admission.datadoghq.com/enabled: "false"
     spec:
       containers:
-        - name: postgres
-          image: postgres:15
-          ports: [ { containerPort: 5432 } ]
-          envFrom:
-            - secretRef: { name: dogbank-postgres-secret }
-          volumeMounts:
-            - { name: postgres-storage, mountPath: /var/lib/postgresql/data }
-            - { name: init-script,       mountPath: /docker-entrypoint-initdb.d }
-          resources:
-            requests: { memory: "256Mi", cpu: "100m" }
-            limits:   { memory: "512Mi", cpu: "300m" }
-      volumes:
+      - name: postgres
+        image: postgres:15
+        ports:
+        - containerPort: 5432
+        envFrom:
+        - secretRef:
+            name: dogbank-postgres-secret
+        volumeMounts:
         - name: postgres-storage
-          emptyDir: {}
+          mountPath: /var/lib/postgresql/data
         - name: init-script
-          configMap: { name: postgres-init-script }
+          mountPath: /docker-entrypoint-initdb.d
+      volumes:
+      - name: postgres-storage
+        emptyDir: {}
+      - name: init-script
+        configMap:
+          name: postgres-init-script
 
 ---
 apiVersion: v1
@@ -109,49 +110,83 @@ metadata:
   name: postgres
   namespace: production
 spec:
-  selector: { app: postgres }
-  ports: [ { port: 5432, targetPort: 5432 } ]
-  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
 
-# ---------------- auth ----------------
 ---
+# AUTH - porta 8088
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: auth-module
+  name: auth
   namespace: production
   labels:
-    app: auth-module
+    app: auth
+    tier: backend
     tags.datadoghq.com/env: production
-    tags.datadoghq.com/service: auth-module
+    tags.datadoghq.com/service: auth
     tags.datadoghq.com/version: v1
 spec:
   replicas: 1
-  selector: { matchLabels: { app: auth-module } }
+  selector:
+    matchLabels:
+      app: auth
   template:
     metadata:
       labels:
-        app: auth-module
+        app: auth
+        tier: backend
         tags.datadoghq.com/env: production
-        tags.datadoghq.com/service: auth-module
+        tags.datadoghq.com/service: auth
         tags.datadoghq.com/version: v1
         admission.datadoghq.com/enabled: "true"
+      annotations:
+        ad.datadoghq.com/auth.logs: '[{"source":"java","service":"auth"}]'
     spec:
       containers:
-        - name: auth-module
-          image: schawirin/dogbank-auth-service:latest
-          imagePullPolicy: Always
-          ports: [ { containerPort: 8080 } ]
-          env:
-            - { name: DD_LOGS_INJECTION, value: "true" }
-            - { name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/dogbank" }
-            - name: SPRING_DATASOURCE_USERNAME
-              valueFrom: { secretKeyRef: { name: dogbank-postgres-secret, key: POSTGRES_USER } }
-            - name: SPRING_DATASOURCE_PASSWORD
-              valueFrom: { secretKeyRef: { name: dogbank-postgres-secret, key: POSTGRES_PASSWORD } }
-          resources:
-            requests: { memory: "256Mi", cpu: "100m" }
-            limits:   { memory: "512Mi", cpu: "300m" }
+      - name: auth
+        image: schawirin/dogbank-auth-service:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8088
+        env:
+        - name: DD_LOGS_INJECTION
+          value: "true"
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres:5432/dogbank"
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_USER
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_PASSWORD
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8088
+          initialDelaySeconds: 90
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8088
+          initialDelaySeconds: 60
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
 
 ---
 apiVersion: v1
@@ -160,216 +195,170 @@ metadata:
   name: auth-service
   namespace: production
 spec:
-  selector: { app: auth-module }
-  ports: [ { port: 8088, targetPort: 8080 } ]
-  type: ClusterIP
+  selector:
+    app: auth
+  ports:
+  - name: http
+    port: 8088
+    targetPort: 8088
 
-# ---------------- account ----------------
 ---
+# ACCOUNTS - porta 8089
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: account-module
+  name: accounts
   namespace: production
   labels:
-    app: account-module
+    app: accounts
+    tier: backend
     tags.datadoghq.com/env: production
-    tags.datadoghq.com/service: account-module
-    tags.datadoghq.com/version: v1
-spec:
-  replicas: 1
-  selector: { matchLabels: { app: account-module } }
-  template:
-    metadata:
-      labels:
-        app: account-module
-        tags.datadoghq.com/env: production
-        tags.datadoghq.com/service: account-module
-        tags.datadoghq.com/version: v1
-        admission.datadoghq.com/enabled: "true"
-    spec:
-      containers:
-        - name: account-module
-          image: schawirin/dogbank-account-service:latest
-          imagePullPolicy: Always
-          ports: [ { containerPort: 8080 } ]
-          env:
-            - { name: DD_LOGS_INJECTION, value: "true" }
-            - { name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/dogbank" }
-            - name: SPRING_DATASOURCE_USERNAME
-              valueFrom: { secretKeyRef: { name: dogbank-postgres-secret, key: POSTGRES_USER } }
-            - name: SPRING_DATASOURCE_PASSWORD
-              valueFrom: { secretKeyRef: { name: dogbank-postgres-secret, key: POSTGRES_PASSWORD } }
-          resources:
-            requests: { memory: "256Mi", cpu: "100m" }
-            limits:   { memory: "512Mi", cpu: "300m" }
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: account-service
-  namespace: production
-spec:
-  selector: { app: account-module }
-  ports: [ { port: 8089, targetPort: 8080 } ]
-  type: ClusterIP
-
-# ---------------- integration ----------------
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: integration-module
-  namespace: production
-  labels:
-    app: integration-module
-    tags.datadoghq.com/env: production
-    tags.datadoghq.com/service: integration-module
-    tags.datadoghq.com/version: v1
-spec:
-  replicas: 1
-  selector: { matchLabels: { app: integration-module } }
-  template:
-    metadata:
-      labels:
-        app: integration-module
-        tags.datadoghq.com/env: production
-        tags.datadoghq.com/service: integration-module
-        tags.datadoghq.com/version: v1
-        admission.datadoghq.com/enabled: "true"
-    spec:
-      containers:
-        - name: integration-module
-          image: schawirin/dogbank-integration-service:latest
-          imagePullPolicy: Always
-          ports: [ { containerPort: 8080 } ]
-          env:
-            - { name: DD_LOGS_INJECTION, value: "true" }
-            - { name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/dogbank" }
-            - name: SPRING_DATASOURCE_USERNAME
-              valueFrom: { secretKeyRef: { name: dogbank-postgres-secret, key: POSTGRES_USER } }
-            - name: SPRING_DATASOURCE_PASSWORD
-              valueFrom: { secretKeyRef: { name: dogbank-postgres-secret, key: POSTGRES_PASSWORD } }
-          resources:
-            requests: { memory: "256Mi", cpu: "100m" }
-            limits:   { memory: "512Mi", cpu: "300m" }
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: integration-service
-  namespace: production
-spec:
-  selector: { app: integration-module }
-  ports: [ { port: 8082, targetPort: 8080 } ]
-  type: ClusterIP
-
-# ---------------- notification ----------------
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: notification-module
-  namespace: production
-  labels:
-    app: notification-module
-    tags.datadoghq.com/env: production
-    tags.datadoghq.com/service: notification-module
-    tags.datadoghq.com/version: v1
-spec:
-  replicas: 1
-  selector: { matchLabels: { app: notification-module } }
-  template:
-    metadata:
-      labels:
-        app: notification-module
-        tags.datadoghq.com/env: production
-        tags.datadoghq.com/service: notification-module
-        tags.datadoghq.com/version: v1
-        admission.datadoghq.com/enabled: "true"
-    spec:
-      containers:
-        - name: notification-module
-          image: schawirin/dogbank-notification-service:latest
-          imagePullPolicy: Always
-          ports: [ { containerPort: 8080 } ]
-          env:
-            - { name: DD_LOGS_INJECTION, value: "true" }
-            - { name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/dogbank" }
-            - name: SPRING_DATASOURCE_USERNAME
-              valueFrom: { secretKeyRef: { name: dogbank-postgres-secret, key: POSTGRES_USER } }
-            - name: SPRING_DATASOURCE_PASSWORD
-              valueFrom: { secretKeyRef: { name: dogbank-postgres-secret, key: POSTGRES_PASSWORD } }
-          resources:
-            requests: { memory: "256Mi", cpu: "100m" }
-            limits:   { memory: "512Mi", cpu: "300m" }
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: notification-service
-  namespace: production
-spec:
-  selector: { app: notification-module }
-  ports: [ { port: 8083, targetPort: 8080 } ]
-  type: ClusterIP
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: bancocentral-module
-  namespace: production
-  labels:
-    app: bancocentral-module
-    tags.datadoghq.com/env: production
-    tags.datadoghq.com/service: bancocentral-module
+    tags.datadoghq.com/service: accounts
     tags.datadoghq.com/version: v1
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: bancocentral-module
+      app: accounts
   template:
     metadata:
       labels:
-        app: bancocentral-module
+        app: accounts
+        tier: backend
         tags.datadoghq.com/env: production
-        tags.datadoghq.com/service: bancocentral-module
+        tags.datadoghq.com/service: accounts
         tags.datadoghq.com/version: v1
         admission.datadoghq.com/enabled: "true"
+      annotations:
+        ad.datadoghq.com/accounts.logs: '[{"source":"java","service":"accounts"}]'
     spec:
       containers:
-        - name: bancocentral-module
-          image: schawirin/dogbank-bancocentral-service:latest
-          imagePullPolicy: Always
-          ports:
-            - containerPort: 8080
-          env:
-            - name: DD_LOGS_INJECTION
-              value: "true"
-            - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://postgres:5432/dogbank"
-            - name: SPRING_DATASOURCE_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: dogbank-postgres-secret
-                  key: POSTGRES_USER
-            - name: SPRING_DATASOURCE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: dogbank-postgres-secret
-                  key: POSTGRES_PASSWORD
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "100m"
-            limits:
-              memory: "512Mi"
-              cpu: "300m"
+      - name: accounts
+        image: schawirin/dogbank-account-service:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8089
+        env:
+        - name: DD_LOGS_INJECTION
+          value: "true"
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres:5432/dogbank"
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_USER
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_PASSWORD
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8089
+          initialDelaySeconds: 90
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8089
+          initialDelaySeconds: 60
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: accounts-service
+  namespace: production
+spec:
+  selector:
+    app: accounts
+  ports:
+  - name: http
+    port: 8089
+    targetPort: 8089
+
+---
+# BANCOCENTRAL - porta 8085
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bancocentral
+  namespace: production
+  labels:
+    app: bancocentral
+    tier: backend
+    tags.datadoghq.com/env: production
+    tags.datadoghq.com/service: bancocentral
+    tags.datadoghq.com/version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bancocentral
+  template:
+    metadata:
+      labels:
+        app: bancocentral
+        tier: backend
+        tags.datadoghq.com/env: production
+        tags.datadoghq.com/service: bancocentral
+        tags.datadoghq.com/version: v1
+        admission.datadoghq.com/enabled: "true"
+      annotations:
+        ad.datadoghq.com/bancocentral.logs: '[{"source":"java","service":"bancocentral"}]'
+    spec:
+      containers:
+      - name: bancocentral
+        image: schawirin/dogbank-bancocentral-service:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8085
+        env:
+        - name: DD_LOGS_INJECTION
+          value: "true"
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres:5432/dogbank"
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_USER
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_PASSWORD
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8085
+          initialDelaySeconds: 90
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8085
+          initialDelaySeconds: 60
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
 
 ---
 apiVersion: v1
@@ -379,65 +368,272 @@ metadata:
   namespace: production
 spec:
   selector:
-    app: bancocentral-module
+    app: bancocentral
   ports:
-    - port: 8085
-      targetPort: 8080
-  type: ClusterIP
+  - name: http
+    port: 8085
+    targetPort: 8085
 
-# ---------------- transaction ----------------
 ---
+# TRANSACTIONS - porta 8084
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: transaction-module
+  name: transactions
   namespace: production
   labels:
-    app: transaction-module
+    app: transactions
+    tier: backend
     tags.datadoghq.com/env: production
-    tags.datadoghq.com/service: transaction-module
+    tags.datadoghq.com/service: transactions
     tags.datadoghq.com/version: v1
 spec:
   replicas: 1
-  selector: { matchLabels: { app: transaction-module } }
+  selector:
+    matchLabels:
+      app: transactions
   template:
     metadata:
       labels:
-        app: transaction-module
+        app: transactions
+        tier: backend
         tags.datadoghq.com/env: production
-        tags.datadoghq.com/service: transaction-module
+        tags.datadoghq.com/service: transactions
         tags.datadoghq.com/version: v1
         admission.datadoghq.com/enabled: "true"
+      annotations:
+        ad.datadoghq.com/transactions.logs: '[{"source":"java","service":"transactions"}]'
     spec:
       containers:
-        - name: transaction-module
-          image: schawirin/dogbank-transaction-service:latest
-          imagePullPolicy: Always
-          ports: [ { containerPort: 8080 } ]
-          env:
-            - { name: DD_LOGS_INJECTION, value: "true" }
-            - { name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/dogbank" }
-            - name: SPRING_DATASOURCE_USERNAME
-              valueFrom: { secretKeyRef: { name: dogbank-postgres-secret, key: POSTGRES_USER } }
-            - name: SPRING_DATASOURCE_PASSWORD
-              valueFrom: { secretKeyRef: { name: dogbank-postgres-secret, key: POSTGRES_PASSWORD } }
-            - name: ACCOUNT_SERVICE_URL
-              value: "http://account-service.production.svc.cluster.local:8089/api/accounts"
-            - name: AUTH_SERVICE_URL
-              value: "http://auth-service.production.svc.cluster.local:8088/api/users"
-            - name: BANCOCENTRAL_API_URL
-              value: "http://bancocentral-service.production.svc.cluster.local:8085/api/bancocentral/pix/validate"
-          resources:
-            requests: { memory: "256Mi", cpu: "100m" }
-            limits:   { memory: "512Mi", cpu: "300m" }
+      - name: transactions
+        image: schawirin/dogbank-transaction-service:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8084
+        env:
+        - name: DD_LOGS_INJECTION
+          value: "true"
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres:5432/dogbank"
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_USER
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_PASSWORD
+        - name: ACCOUNT_SERVICE_URL
+          value: "http://accounts-service:8089"
+        - name: AUTH_SERVICE_URL
+          value: "http://auth-service:8088"
+        - name: BANCOCENTRAL_API_URL
+          value: "http://bancocentral-service:8085"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8084
+          initialDelaySeconds: 90
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8084
+          initialDelaySeconds: 60
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: transaction-service
+  name: transactions-service
   namespace: production
 spec:
-  selector: { app: transaction-module }
-  ports: [ { port: 8084, targetPort: 8080 } ]
-  type: ClusterIP
+  selector:
+    app: transactions
+  ports:
+  - name: http
+    port: 8084
+    targetPort: 8084
+
+---
+# INTEGRATION - porta 8082
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: integration
+  namespace: production
+  labels:
+    app: integration
+    tier: backend
+    tags.datadoghq.com/env: production
+    tags.datadoghq.com/service: integration
+    tags.datadoghq.com/version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: integration
+  template:
+    metadata:
+      labels:
+        app: integration
+        tier: backend
+        tags.datadoghq.com/env: production
+        tags.datadoghq.com/service: integration
+        tags.datadoghq.com/version: v1
+        admission.datadoghq.com/enabled: "true"
+      annotations:
+        ad.datadoghq.com/integration.logs: '[{"source":"java","service":"integration"}]'
+    spec:
+      containers:
+      - name: integration
+        image: schawirin/dogbank-integration-service:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8082
+        env:
+        - name: DD_LOGS_INJECTION
+          value: "true"
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres:5432/dogbank"
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_USER
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_PASSWORD
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8082
+          initialDelaySeconds: 90
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8082
+          initialDelaySeconds: 60
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: integration-service
+  namespace: production
+spec:
+  selector:
+    app: integration
+  ports:
+  - name: http
+    port: 8082
+    targetPort: 8082
+
+---
+# NOTIFICATIONS - porta 8083
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notifications
+  namespace: production
+  labels:
+    app: notifications
+    tier: backend
+    tags.datadoghq.com/env: production
+    tags.datadoghq.com/service: notifications
+    tags.datadoghq.com/version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notifications
+  template:
+    metadata:
+      labels:
+        app: notifications
+        tier: backend
+        tags.datadoghq.com/env: production
+        tags.datadoghq.com/service: notifications
+        tags.datadoghq.com/version: v1
+        admission.datadoghq.com/enabled: "true"
+      annotations:
+        ad.datadoghq.com/notifications.logs: '[{"source":"java","service":"notifications"}]'
+    spec:
+      containers:
+      - name: notifications
+        image: schawirin/dogbank-notification-service:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8083
+        env:
+        - name: DD_LOGS_INJECTION
+          value: "true"
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres:5432/dogbank"
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_USER
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_PASSWORD
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8083
+          initialDelaySeconds: 90
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8083
+          initialDelaySeconds: 60
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notifications-service
+  namespace: production
+spec:
+  selector:
+    app: notifications
+  ports:
+  - name: http
+    port: 8083
+    targetPort: 8083
