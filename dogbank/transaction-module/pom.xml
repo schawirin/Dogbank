@@ -21,56 +21,40 @@
   </properties>
 
   <dependencies>
-    <!-- Spring Boot Starter Web para APIs REST -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
-
-    <!-- Spring Boot Starter WebFlux (opcional: para chamadas reativas, se necessário) -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-webflux</artifactId>
     </dependency>
-
-    <!-- Spring Boot Starter Data JPA -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-data-jpa</artifactId>
     </dependency>
-
-    <!-- PostgreSQL Driver -->
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
       <scope>runtime</scope>
     </dependency>
-
-    <!-- Spring Boot Starter Log4j2 -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-log4j2</artifactId>
     </dependency>
-
-    <!-- Spring Boot Starter Validation -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
-
     <dependency>
-     <groupId>org.springframework.boot</groupId>
-     <artifactId>spring-boot-starter-security</artifactId>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
     </dependency>
-
-    <!-- Dependência para acessar AccountRepository e Account entity do account-module -->
     <dependency>
       <groupId>com.dogbank</groupId>
       <artifactId>account-module</artifactId>
       <version>1.0-SNAPSHOT</version>
     </dependency>
-
-    <!-- Dependência para acessar UserRepository e User entity do auth-module, excluindo Logback -->
     <dependency>
       <groupId>com.dogbank</groupId>
       <artifactId>auth-module</artifactId>
@@ -82,14 +66,11 @@
         </exclusion>
       </exclusions>
     </dependency>
-
-    <!-- Dependência para acessar o módulo do Banco Central (fake) -->
     <dependency>
       <groupId>com.dogbank</groupId>
       <artifactId>bancocentral-module</artifactId>
-      <version>1.0-SNAPSHOT</version>   </dependency>
-
-    <!-- Spring Boot Starter Test para testes -->
+      <version>1.0-SNAPSHOT</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
@@ -99,7 +80,6 @@
 
   <build>
     <plugins>
-      <!-- Plugin do Spring Boot -->
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
@@ -114,7 +94,6 @@
           <mainClass>com.dogbank.transaction.TransactionModuleApplication</mainClass>
         </configuration>
       </plugin>
-      <!-- Maven Compiler Plugin para Java 17 -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>

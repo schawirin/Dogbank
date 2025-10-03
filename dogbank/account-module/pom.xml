@@ -4,20 +4,23 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
                              http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
+
   <parent>
     <groupId>com.dogbank</groupId>
     <artifactId>dogbank</artifactId>
     <version>1.0-SNAPSHOT</version>
   </parent>
+
   <artifactId>account-module</artifactId>
   <packaging>jar</packaging>
   <name>account-module</name>
   <version>1.0-SNAPSHOT</version>
+
   <properties>
     <java.version>17</java.version>
   </properties>
+
   <dependencies>
-    <!-- Spring Boot Starter Web: para suporte a controllers REST -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
@@ -28,32 +31,32 @@
         </exclusion>
       </exclusions>
     </dependency>
-    <!-- Spring Boot Starter Data JPA: para mapeamento de entidades -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-data-jpa</artifactId>
     </dependency>
-    <!-- Driver PostgreSQL: para conectar ao banco de dados -->
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
       <scope>runtime</scope>
     </dependency>
-    <!-- Spring Boot Starter Log4j2: para logging -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-log4j2</artifactId>
     </dependency>
-    <!-- Spring Boot Starter Test: para testes -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
+
   <build>
     <plugins>
-      <!-- Plugin do Spring Boot -->
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
@@ -68,7 +71,6 @@
           <mainClass>com.dogbank.account.AccountModuleApplication</mainClass>
         </configuration>
       </plugin>
-      <!-- Maven Compiler Plugin para Java 17 -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
