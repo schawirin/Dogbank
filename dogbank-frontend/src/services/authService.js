@@ -1,30 +1,19 @@
 // src/services/authService.js
 import { authApi, bancoCentralApi } from './api';
 
-const CPF_KEY         = 'cpf';
-const NOME_KEY        = 'nome';
-const CHAVE_PIX_KEY   = 'chavePix';
-const ACCOUNT_ID_KEY  = 'accountId';
+const CPF_KEY = 'cpf';
+const NOME_KEY = 'nome';
+const CHAVE_PIX_KEY = 'chavePix';
+const ACCOUNT_ID_KEY = 'accountId';
 
-/**
- * Serviço de autenticação e sessão
- */
 const authService = {
-  /**
-   * Faz login usando CPF e senha (PIN).
-   * Salva dados no localStorage para uso posterior.
-   *
-   * @param {string} cpf
-   * @param {string} senha
-   * @returns {Promise<{ nome: string, chavePix: string, accountId: number }>}
-   */
   async login(cpf, senha) {
     try {
       console.log('🔐 Tentando login para CPF:', cpf);
       
-      const { data } = await authApi.post('/login', { // ✅ CORRIGIDO: era '/auth/login', agora é só '/login'
+      const { data } = await authApi.post('/login', {
         cpf: cpf.trim(),
-        senha
+        password: senha  // ✅ CORRIGIDO: era "senha", agora é "password"
       });
       
       console.log('✅ Login bem-sucedido, dados recebidos:', data);
@@ -47,56 +36,33 @@ const authService = {
     }
   },
 
-  /**
-   * Sai (logout): remove dados de sessão do localStorage
-   */
   logout() {
-    console.log('🚪 Fazendo logout');
     localStorage.removeItem(CPF_KEY);
     localStorage.removeItem(NOME_KEY);
     localStorage.removeItem(CHAVE_PIX_KEY);
     localStorage.removeItem(ACCOUNT_ID_KEY);
   },
 
-  /**
-   * Retorna o CPF salvo (ou null)
-   */
   getCpf() {
     return localStorage.getItem(CPF_KEY);
   },
 
-  /**
-   * Retorna o nome salvo (ou null)
-   */
   getNome() {
     return localStorage.getItem(NOME_KEY);
   },
 
-  /**
-   * Retorna a chave PIX salva (ou null)
-   */
   getChavePix() {
     return localStorage.getItem(CHAVE_PIX_KEY);
   },
 
-  /**
-   * Retorna o accountId salvo (ou null)
-   */
   getAccountId() {
     const val = localStorage.getItem(ACCOUNT_ID_KEY);
     return val ? Number(val) : null;
   },
 
-  /**
-   * Valida uma chave PIX via Banco Central e busca dados do usuário
-   *
-   * @param {string} chavePix
-   */
   async validatePix(chavePix) {
     try {
-      console.log('🔍 Validando PIX:', chavePix);
-      
-      const { data } = await bancoCentralApi.post('/pix/validate', { // ✅ CORRIGIDO: era '/pix/validate', continua igual
+      const { data } = await bancoCentralApi.post('/pix/validate', {
         pixKey: chavePix,
         amount: 0.01
       });
@@ -107,15 +73,11 @@ const authService = {
 
       try {
         const { data: userData } = await authApi.get(
-          `/pix/${encodeURIComponent(chavePix)}` // ✅ CORRIGIDO: era '/auth/pix/', agora é só '/pix/'
+          `/validate-pix?chavePix=${encodeURIComponent(chavePix)}`
         );
         return {
           valid: true,
-          user: {
-            nome: userData.nome,
-            banco: 'DogBank',
-            cpf: userData.cpf
-          }
+          user: userData.user
         };
       } catch {
         return {
@@ -124,7 +86,6 @@ const authService = {
         };
       }
     } catch (err) {
-      console.error('❌ Erro ao validar PIX:', err.response?.data || err.message);
       return {
         valid: false,
         message: err.response?.data?.error || 'Erro na validação PIX'

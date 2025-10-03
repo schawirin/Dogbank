@@ -25,7 +25,6 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthRequest request) {
-        // normaliza e checa campos obrigatórios manualmente (evita 400 do Bean Validation)
         String cpf = request.getCpf() == null ? null : request.getCpf().trim();
         String pwd = request.getPassword();
 
@@ -50,9 +49,32 @@ public class AuthController {
         resp.setMessage("Login successful");
         resp.setNome(user.getNome());
         resp.setChavePix(user.getChavePix());
-        resp.setAccountId(user.getId()); // placeholder
+        resp.setAccountId(user.getId());
 
         return ResponseEntity.ok(resp);
+    }
+
+    @PostMapping("/validate-password")
+    public ResponseEntity<?> validatePassword(@RequestBody Map<String, String> request) {
+        String cpf = request.get("cpf");
+        String password = request.get("password");
+        
+        if (cpf == null || password == null) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("valid", false, "message", "CPF e senha são obrigatórios"));
+        }
+        
+        Optional<User> userOpt = userRepository.findByCpf(cpf.trim());
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.ok(Map.of("valid", false, "message", "Usuário não encontrado"));
+        }
+        
+        User user = userOpt.get();
+        if (!Objects.equals(password, user.getSenha())) {
+            return ResponseEntity.ok(Map.of("valid", false, "message", "Senha incorreta"));
+        }
+        
+        return ResponseEntity.ok(Map.of("valid", true));
     }
 
     @GetMapping("/validate-pix")
