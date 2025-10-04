@@ -1,4 +1,4 @@
-FROM maven:3.9.7-eclipse-temurin-17 AS builder
+FROM eclipse-temurin:17-jre AS builder
 WORKDIR /app
 
 COPY pom.xml ./pom.xml

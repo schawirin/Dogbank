@@ -1,4 +1,4 @@
-FROM maven:3.9.7-eclipse-temurin-17 AS builder
+FROM eclipse-temurin:17-jre AS builder
 WORKDIR /app
 
 COPY pom.xml ./pom.xml
@@ -13,7 +13,7 @@ COPY auth-module/src ./auth-module/src
 
 RUN mvn -pl auth-module -am clean package -DskipTests
 
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre
 WORKDIR /app
 COPY --from=builder /app/auth-module/target/auth-module-1.0-SNAPSHOT.jar app.jar
 EXPOSE 8088

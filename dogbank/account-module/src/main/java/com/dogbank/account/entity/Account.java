@@ -23,11 +23,14 @@ public class Account {
     @Column(name = "user_name")
     private String userName;
 
-    @Column(name = "banco")  // Adicionando a coluna banco
-    private String banco;    // Adicionando a variável banco
+    @Column(name = "banco")
+    private String banco;
 
     @Column(name = "saldo_investido")
     private BigDecimal saldoInvestido;
+
+    @Column(name = "account_type")  // ADICIONAR
+    private String accountType;     // ADICIONAR
 
     public Account() {}
 
@@ -41,7 +44,7 @@ public class Account {
     public String getBanco() {
         return banco;
     }
-    public void setBanco(String banco) {  // Também adicionando o setter
+    public void setBanco(String banco) {
         this.banco = banco;
     }
 
@@ -78,5 +81,13 @@ public class Account {
     }
     public void setSaldoInvestido(BigDecimal saldoInvestido) {
         this.saldoInvestido = saldoInvestido;
+    }
+
+    // ADICIONAR ESTES MÉTODOS
+    public String getAccountType() {
+        return accountType;
+    }
+    public void setAccountType(String accountType) {
+        this.accountType = accountType;
     }
 }
