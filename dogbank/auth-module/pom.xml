@@ -22,7 +22,7 @@
   </properties>
 
   <dependencies>
-    <!-- Spring Boot Web -->
+    <!-- Spring Boot Webb -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
