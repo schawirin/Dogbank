@@ -19,14 +19,9 @@
 
   <modules>
     <module>account-module</module>
-	<module>auth-module</module>
-	<module>integration-module</module>
-	<module>notification-module</module>
-	<module>transaction-module</module>
-	<module>bancocentral-module</module>
-    <!--
-		
-    -->
+    <module>auth-module</module>
+    <module>transaction-module</module>
+    <module>bancocentral-module</module>
   </modules>
 
   <dependencyManagement>
