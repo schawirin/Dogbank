@@ -1,6 +1,5 @@
 package com.dogbank.account.controller;
 
-import com.dogbank.account.dto.AccountInfoDTO;
 import com.dogbank.account.entity.Account;
 import com.dogbank.account.service.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,101 +8,110 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/accounts")
+@CrossOrigin(origins = "*")
 public class AccountController {
-
+    
     @Autowired
     private AccountService accountService;
-
-    /**
-     * Retorna a conta pelo seu ID, caso exista.
-     * GET /api/accounts/{id}
-     */
-    @GetMapping("/{id}")
-    public ResponseEntity<Account> getAccount(@PathVariable Long id) {
-        // Supõe que getAccountById retorne Optional<Account>
-        Optional<Account> accountOpt = accountService.getAccountById(id);
-        if (accountOpt.isPresent()) {
-            return ResponseEntity.ok(accountOpt.get());
-        } else {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
     
     /**
-     * Cria uma nova conta.
-     * POST /api/accounts
+     * Criar nova conta
      */
     @PostMapping
     public ResponseEntity<Account> createAccount(@RequestBody Account account) {
-        Account created = accountService.createAccount(account);
+        Account created = accountService.save(account);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
-
+    
     /**
-     * Atualiza o saldo da conta.
-     * PUT /api/accounts/{id}/balance?balance=100.00
-     *
-     * Aqui, o service retorna Account ou null.
+     * Listar todas as contas
+     */
+    @GetMapping
+    public ResponseEntity<List<Account>> getAllAccounts() {
+        List<Account> accounts = accountService.findAll();
+        return ResponseEntity.ok(accounts);
+    }
+    
+    /**
+     * Buscar conta por ID
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<Account> getAccountById(@PathVariable Long id) {
+        return accountService.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+    
+    /**
+     * Buscar conta por ID do usuário
+     */
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<Account> getAccountByUserId(@PathVariable Long userId) {
+        return accountService.findByUsuarioId(userId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+    
+    /**
+     * Atualizar saldo da conta
      */
     @PutMapping("/{id}/balance")
-    public ResponseEntity<Account> updateBalance(
-            @PathVariable Long id,
-            @RequestParam BigDecimal balance
-    ) {
-        // Se o service retorna null ao não encontrar a conta:
-        Account updatedAccount = accountService.updateBalance(id, balance);
-
-        if (updatedAccount == null) {
-            // 404 caso não exista conta com esse ID
-            return ResponseEntity.notFound().build();
+    public ResponseEntity<?> updateBalance(
+            @PathVariable Long id, 
+            @RequestBody Map<String, BigDecimal> request) {
+        
+        BigDecimal newBalance = request.get("balance");
+        if (newBalance == null) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Balance is required"));
         }
-        // 200 OK com a conta atualizada
-        return ResponseEntity.ok(updatedAccount);
-    }
-    @GetMapping("/user/{cpf}")
-public ResponseEntity<Account> getAccountByUserCpf(@PathVariable String cpf) {
-    Optional<Account> accountOpt = accountService.getAccountByUserCpf(cpf);
-    if (accountOpt.isPresent()) {
-        return ResponseEntity.ok(accountOpt.get());
-    } else {
+        
+        boolean updated = accountService.updateBalance(id, newBalance);
+        if (updated) {
+            return ResponseEntity.ok()
+                    .body(Map.of("message", "Balance updated successfully"));
+        }
         return ResponseEntity.notFound().build();
     }
-}
+    
     /**
-     * Retorna um DTO com informações detalhadas da conta (saldo, nome, etc.).
-     * GET /api/accounts/{id}/info
+     * Atualizar conta completa
      */
-    @GetMapping("/{id}/info")
-    public ResponseEntity<AccountInfoDTO> getAccountInfo(@PathVariable("id") Long id) {
-        Optional<Account> accountOpt = accountService.getAccountById(id);
+    @PutMapping("/{id}")
+    public ResponseEntity<Account> updateAccount(
+            @PathVariable Long id, 
+            @RequestBody Account accountDetails) {
+        
+        Optional<Account> accountOpt = accountService.findById(id);
         if (accountOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-
+        
         Account account = accountOpt.get();
-
-        // Usa o nome do usuário se existir, caso contrário, define "Usuário Desconhecido"
-        String userName = (account.getUserName() != null && !account.getUserName().isEmpty())
-                ? account.getUserName() : "Usuário Desconhecido";
-
-        // Converte o saldo para Double, usando 0.0 se nulo
-        Double saldo = (account.getBalance() != null) ? account.getBalance().doubleValue() : 0.0;
-        // Converte o saldo investido para Double, usando 0.0 se nulo
-        Double saldoInvestido = (account.getSaldoInvestido() != null)
-                ? account.getSaldoInvestido().doubleValue()
-                : 0.0;
-
-        AccountInfoDTO dto = new AccountInfoDTO(
-                account.getId(),
-                userName,
-                saldo,
-                saldoInvestido
-        );
-        return ResponseEntity.ok(dto);
+        account.setBalance(accountDetails.getBalance());
+        account.setAccountType(accountDetails.getAccountType());
+        // Atualizar outros campos conforme necessário
+        
+        Account updated = accountService.save(account);
+        return ResponseEntity.ok(updated);
+    }
+    
+    /**
+     * Deletar conta
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteAccount(@PathVariable Long id) {
+        if (accountService.findById(id).isPresent()) {
+            accountService.deleteById(id);
+            return ResponseEntity.ok()
+                    .body(Map.of("message", "Account deleted successfully"));
+        }
+        return ResponseEntity.notFound().build();
     }
 }

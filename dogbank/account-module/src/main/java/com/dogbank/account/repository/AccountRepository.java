@@ -12,14 +12,29 @@ import java.util.Optional;
 @Repository
 public interface AccountRepository extends JpaRepository<Account, Long> {
 
+    /**
+     * Buscar conta por número da conta
+     */
     Optional<Account> findByAccountNumber(String accountNumber);
 
+    /**
+     * Buscar conta por nome do usuário
+     */
     Optional<Account> findByUserName(String userName);
 
+    /**
+     * Buscar conta por ID do usuário
+     */
     Optional<Account> findByUsuarioId(Long usuarioId);
 
+    /**
+     * Buscar todas as contas de um usuário
+     */
     List<Account> findAllByUsuarioId(Long usuarioId);
 
+    /**
+     * Buscar conta por CPF do usuário (query customizada com JOIN)
+     */
     @Query(value = "SELECT a.* FROM contas a JOIN usuarios u ON a.usuario_id = u.id WHERE u.cpf = :cpf", nativeQuery = true)
     Optional<Account> findByUserCpf(@Param("cpf") String cpf);
 }
