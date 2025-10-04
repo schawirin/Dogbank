@@ -1,4 +1,4 @@
-package com.dogbank.bancocentral.config;
+package com.dogbank.bancocentral.config; 
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
