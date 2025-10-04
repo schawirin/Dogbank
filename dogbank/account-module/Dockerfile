@@ -1,10 +1,23 @@
-FROM openjdk:17-jdk-slim
+FROM maven:3.9.7-eclipse-temurin-17 AS builder
+WORKDIR /app
 
-# Copia o JAR do serviço para a imagem
-COPY target/account-module-1.0-SNAPSHOT.jar /app.jar
+# Copiar POM pai
+COPY pom.xml ./pom.xml
 
-# Expõe a porta 8089 (conforme definido em application.properties)
+# Copiar POM do account-module
+COPY account-module/pom.xml ./account-module/pom.xml
+
+# Copiar código fonte
+COPY account-module/src ./account-module/src
+
+# Build
+RUN mvn -pl account-module -am clean package -DskipTests
+
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+
+# Copiar APENAS o JAR do account-module
+COPY --from=builder /app/account-module/target/account-module-1.0-SNAPSHOT.jar app.jar
+
 EXPOSE 8089
-
-# Define o entrypoint para executar o JAR
-ENTRYPOINT ["java", "-jar", "/app.jar"]
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-jar", "/app/app.jar"]

@@ -2,12 +2,7 @@ name: docker-publish
 on:
   push:
     branches: [main]
-    tags: ["v*.*.*"]
   workflow_dispatch: {}
-
-env:
-  BACKEND_IMAGE: schawirin/dogbank-backend
-  FRONTEND_IMAGE: schawirin/dogbank-frontend
 
 jobs:
   build-and-push:
@@ -15,10 +10,30 @@ jobs:
     strategy:
       matrix:
         service:
-          - name: backend
+          - name: auth
             context: ./dogbank
-            dockerfile: ./dogbank/Dockerfile
-            image: schawirin/dogbank-backend
+            dockerfile: ./dogbank/auth-module/Dockerfile
+            image: schawirin/dogbank-auth-service
+          - name: account
+            context: ./dogbank
+            dockerfile: ./dogbank/account-module/Dockerfile
+            image: schawirin/dogbank-account-service
+          - name: transactions
+            context: ./dogbank
+            dockerfile: ./dogbank/transaction-module/Dockerfile
+            image: schawirin/dogbank-transaction-service
+          - name: bancocentral
+            context: ./dogbank
+            dockerfile: ./dogbank/bancocentral-module/Dockerfile
+            image: schawirin/dogbank-bancocentral-service
+          - name: integration
+            context: ./dogbank
+            dockerfile: ./dogbank/integration-module/Dockerfile
+            image: schawirin/dogbank-integration-service
+          - name: notifications
+            context: ./dogbank
+            dockerfile: ./dogbank/notification-module/Dockerfile
+            image: schawirin/dogbank-notification-service
           - name: frontend
             context: ./dogbank-frontend
             dockerfile: ./dogbank-frontend/Dockerfile
@@ -26,53 +41,22 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      # (opcional) validar Quality Gate também no push
-      - name: Upload Java coverage (se existir)
-        run: |
-          if [ -f ./dogbank/target/site/jacoco/jacoco.xml ]; then
-            npx -y @datadog/datadog-ci@latest coverage upload --format=jacoco ./dogbank/target/site/jacoco/jacoco.xml
-          fi
-        env:
-          DD_API_KEY: ${{ secrets.DD_API_KEY }}
-          DD_SITE: ${{ secrets.DD_SITE }}
-
-      - name: Upload Frontend coverage (se existir)
-        run: |
-          if [ -f ./dogbank-frontend/coverage/lcov.info ]; then
-            npx -y @datadog/datadog-ci@latest coverage upload --format=lcov ./dogbank-frontend/coverage/lcov.info
-          fi
-        env:
-          DD_API_KEY: ${{ secrets.DD_API_KEY }}
-          DD_SITE: ${{ secrets.DD_SITE }}
-
-      - name: Evaluate Datadog Quality Gates
-        run: npx -y @datadog/datadog-ci@latest gate evaluate --timeout 120 # opcional: --fail-on-empty
-        env:
-          DD_API_KEY: ${{ secrets.DD_API_KEY }}
-          DD_APP_KEY: ${{ secrets.DD_APP_KEY }}
-          DD_SITE: ${{ secrets.DD_SITE }}
-
-      # Docker Hub login + buildx
+      
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
+      
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
+      
       - name: Compute tags
         id: vars
         run: |
           SHA="${GITHUB_SHA::7}"
           echo "sha=${SHA}" >> $GITHUB_OUTPUT
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          else
-            echo "version=" >> $GITHUB_OUTPUT
-          fi
-
+      
       - name: Build & Push ${{ matrix.service.name }}
         uses: docker/build-push-action@v6
         with:
@@ -83,6 +67,5 @@ jobs:
           tags: |
             ${{ matrix.service.image }}:latest
             ${{ matrix.service.image }}:${{ steps.vars.outputs.sha }}
-            ${{ steps.vars.outputs.version && format('{0}:{1}', matrix.service.image, steps.vars.outputs.version) || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
