@@ -1,4 +1,4 @@
-FROM eclipse-temurin:17-jre AS builder
+FROM maven:3.9.7-eclipse-temurin-17 AS builder  ← ESTA linha precisa Maven
 WORKDIR /app
 
 COPY pom.xml ./pom.xml
@@ -10,10 +10,11 @@ COPY integration-module/pom.xml ./integration-module/pom.xml
 COPY notification-module/pom.xml ./notification-module/pom.xml
 
 COPY auth-module/src ./auth-module/src
+COPY account-module/src ./account-module/src
 
 RUN mvn -pl auth-module -am clean package -DskipTests
 
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:17-jre  ← SÓ ESTA linha foi trocada
 WORKDIR /app
 COPY --from=builder /app/auth-module/target/auth-module-1.0-SNAPSHOT.jar app.jar
 EXPOSE 8088
