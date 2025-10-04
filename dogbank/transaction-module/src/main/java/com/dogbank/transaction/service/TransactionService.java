@@ -6,6 +6,7 @@ import com.dogbank.transaction.model.AccountModel;
 import com.dogbank.transaction.model.UserModel;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,9 +27,14 @@ public class TransactionService {
     @Autowired
     private RestTemplate restTemplate;
     
-    private final String bancoCentralUrl = "http://localhost:8085/api/bancocentral/pix/validate";
-    private final String accountServiceUrl = "http://localhost:8089/api/accounts";
-    private final String authServiceUrl = "http://localhost:8088/api/users";
+    @Value("${bancocentral.api.url}")
+    private String bancoCentralUrl;
+    
+    @Value("${account.api.url}")
+    private String accountServiceUrl;
+    
+    @Value("${auth.api.url}")
+    private String authServiceUrl;
     
     /**
      * Executa a transferência via PIX e retorna a entidade Transaction persistida
@@ -78,7 +84,6 @@ public class TransactionService {
         tx.setStartedAt(startedAt);
         tx.setCompletedAt(ZonedDateTime.now());
         tx.setPixKeyDestination(pixKeyDestination);
-        // Ajuste simplificado: usa chave PIX como nome do recebedor e deixa outros campos vazios
         tx.setReceiverName(pixKeyDestination);
         tx.setReceiverBank("");
         tx.setSenderName("");
@@ -89,22 +94,18 @@ public class TransactionService {
         return transactionRepository.save(tx);
     }
     
-    /** Busca transação por ID */
     public Optional<Transaction> findById(Long id) {
         return transactionRepository.findById(id);
     }
     
-    /** Lista transações de origem */
     public List<Transaction> listarTransacoesPorConta(Long accountId) {
         return transactionRepository.findAllByAccountOriginIdOrderByDateDesc(accountId);
     }
     
-    /** Gera código de autenticação */
     public String generateAuthCode(Transaction tx) {
         return UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
     
-    /** Extrai iniciais do nome */
     public String extractInitials(String fullName) {
         if (fullName == null || fullName.isBlank()) return "";
         return Stream.of(fullName.split("\\s+"))
@@ -114,7 +115,6 @@ public class TransactionService {
                      .collect(Collectors.joining());
     }
     
-    /** Mascara CPF/CNPJ ou email */
     public String maskCpf(String pixKey) {
         if (pixKey == null) return "";
         if (pixKey.contains("@")) {
@@ -141,16 +141,12 @@ public class TransactionService {
         } catch (Exception e) {
             Map<String, Object> err = new HashMap<>();
             err.put("status", "FAILED");
-            err.put("error", "Erro na validação externa");
+            err.put("error", "Erro na validação externa: " + e.getMessage());
             return err;
         }
     }
     
-    // Métodos simulados para substituir as chamadas diretas aos repositórios
-    
     private AccountModel getAccountById(Long accountId) {
-        // Em uma implementação real, isso seria uma chamada REST para o account-module
-        // Simulando o retorno para permitir a compilação
         AccountModel account = new AccountModel();
         account.setId(accountId);
         account.setBalance(new BigDecimal("1000.00"));
@@ -158,8 +154,6 @@ public class TransactionService {
     }
     
     private UserModel getUserByPixKey(String pixKey) {
-        // Em uma implementação real, isso seria uma chamada REST para o auth-module
-        // Simulando o retorno para permitir a compilação
         UserModel user = new UserModel();
         user.setId(1L);
         user.setNome("Usuário Simulado");
@@ -168,8 +162,6 @@ public class TransactionService {
     }
     
     private AccountModel getAccountByUserId(Long userId) {
-        // Em uma implementação real, isso seria uma chamada REST para o account-module
-        // Simulando o retorno para permitir a compilação
         AccountModel account = new AccountModel();
         account.setId(2L);
         account.setUsuarioId(userId);
@@ -178,7 +170,6 @@ public class TransactionService {
     }
     
     private void updateAccountBalance(Long accountId, BigDecimal newBalance) {
-        // Em uma implementação real, isso seria uma chamada REST para o account-module
-        // Simulando a atualização para permitir a compilação
+        // Simulação
     }
 }
