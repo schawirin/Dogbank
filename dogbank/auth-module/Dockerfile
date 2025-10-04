@@ -1,4 +1,4 @@
-FROM maven:3.9.7-eclipse-temurin-17 AS builder  ← ESTA linha precisa Maven
+FROM maven:3.9.7-eclipse-temurin-17 AS builder  
 WORKDIR /app
 
 COPY pom.xml ./pom.xml
