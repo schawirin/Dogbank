@@ -1,17 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Configuration status="WARN">
-  <Appenders>
-    <Console name="Console" target="SYSTEM_OUT">
-      <JsonLayout compact="true" eventEol="true" />
-    </Console>
-  </Appenders>
-  <Loggers>
-    <!-- Logger customizado, se desejar -->
-    <Logger name="com.dogbank" level="info" additivity="false">
-      <AppenderRef ref="Console"/>
-    </Logger>
-    <Root level="error">
-      <AppenderRef ref="Console"/>
-    </Root>
-  </Loggers>
+<Configuration status="INFO">
+    <Appenders>
+        <!-- Console Appender com JSON Layout -->
+        <Console name="ConsoleJSON" target="SYSTEM_OUT">
+            <JsonTemplateLayout eventTemplateUri="classpath:EcsLayout.json"/>
+        </Console>
+    </Appenders>
+    
+    <Loggers>
+        <!-- Logger específico para TransactionService -->
+        <Logger name="com.dogbank.transaction.service.TransactionService" level="info" additivity="false">
+            <AppenderRef ref="ConsoleJSON"/>
+        </Logger>
+        
+        <!-- Logger para todo o pacote transaction -->
+        <Logger name="com.dogbank.transaction" level="info" additivity="false">
+            <AppenderRef ref="ConsoleJSON"/>
+        </Logger>
+        
+        <!-- Root Logger -->
+        <Root level="info">
+            <AppenderRef ref="ConsoleJSON"/>
+        </Root>
+    </Loggers>
 </Configuration>
