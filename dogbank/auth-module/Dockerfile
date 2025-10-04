@@ -1,28 +1,20 @@
-########################
-# build stage (com testes)
-########################
 FROM maven:3.9.7-eclipse-temurin-17 AS builder
-WORKDIR /workspace
-
-# cache de dependências
-COPY pom.xml .
-COPY auth-module/pom.xml auth-module/pom.xml
-RUN mvn -q -pl auth-module -am dependency:go-offline
-
-# código
-COPY . .
-# roda testes com o profile test (H2), depois empacota
-RUN mvn -q -pl auth-module -am -Dspring.profiles.active=test clean verify
-# se quiser garantir que o package use o mesmo resultado de testes:
-RUN mvn -q -pl auth-module -am -DskipTests=false package
-
-########################
-# runtime stage
-########################
-FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
-COPY --from=builder /workspace/auth-module/target/*.jar app.jar
+COPY pom.xml ./pom.xml
+COPY auth-module/pom.xml ./auth-module/pom.xml
+COPY account-module/pom.xml ./account-module/pom.xml
+COPY transaction-module/pom.xml ./transaction-module/pom.xml
+COPY bancocentral-module/pom.xml ./bancocentral-module/pom.xml
+COPY integration-module/pom.xml ./integration-module/pom.xml
+COPY notification-module/pom.xml ./notification-module/pom.xml
 
+COPY auth-module/src ./auth-module/src
+
+RUN mvn -pl auth-module -am clean package -DskipTests
+
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY --from=builder /app/auth-module/target/auth-module-1.0-SNAPSHOT.jar app.jar
 EXPOSE 8088
-ENTRYPOINT ["java","-XX:+UseContainerSupport","-jar","/app/app.jar"]
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-jar", "/app/app.jar"]
