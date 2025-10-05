@@ -5,7 +5,7 @@ WORKDIR /build
 COPY pom.xml .
 RUN mvn -N install
 
-# 2. Buildar account-module (dependência do auth)
+# 2. Buildar account-module (dependência do authddd)
 COPY account-module/pom.xml account-module/
 COPY account-module/src account-module/src
 RUN mvn -f account-module/pom.xml clean install -DskipTests
