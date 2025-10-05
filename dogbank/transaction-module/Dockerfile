@@ -5,7 +5,7 @@ WORKDIR /build
 COPY pom.xml .
 RUN mvn -N install
 
-# Buildar dependências (auth e account são necessários para transaction)
+# Buildar dependências
 COPY account-module/pom.xml account-module/
 COPY account-module/src account-module/src
 RUN mvn -f account-module/pom.xml clean install -DskipTests
@@ -23,8 +23,11 @@ COPY transaction-module/pom.xml transaction-module/
 COPY transaction-module/src transaction-module/src
 RUN mvn -f transaction-module/pom.xml clean package -DskipTests
 
+# Debug: ver o que foi gerado
+RUN ls -la /build/transaction-module/target/
+
 FROM eclipse-temurin:17-jre
 WORKDIR /app
-COPY --from=builder /build/transaction-module/target/transaction-module-1.0-SNAPSHOT.jar app.jar
+COPY --from=builder /build/transaction-module/target/*.jar app.jar
 EXPOSE 8084
 ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-jar", "/app/app.jar"]
