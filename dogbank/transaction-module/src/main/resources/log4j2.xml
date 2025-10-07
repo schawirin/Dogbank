@@ -1,26 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Configuration status="INFO">
+<Configuration status="WARN">
     <Appenders>
-        <!-- Console Appender com JSON Layout -->
-        <Console name="ConsoleJSON" target="SYSTEM_OUT">
-            <JsonTemplateLayout eventTemplateUri="classpath:EcsLayout.json"/>
+        <Console name="Console" target="SYSTEM_OUT">
+            <JsonTemplateLayout eventTemplateUri="classpath:LogstashJsonEventLayoutV1.json"/>
         </Console>
     </Appenders>
-    
     <Loggers>
-        <!-- Logger específico para TransactionService -->
-        <Logger name="com.dogbank.transaction.service.TransactionService" level="info" additivity="false">
-            <AppenderRef ref="ConsoleJSON"/>
-        </Logger>
-        
-        <!-- Logger para todo o pacote transaction -->
-        <Logger name="com.dogbank.transaction" level="info" additivity="false">
-            <AppenderRef ref="ConsoleJSON"/>
-        </Logger>
-        
-        <!-- Root Logger -->
         <Root level="info">
-            <AppenderRef ref="ConsoleJSON"/>
+            <AppenderRef ref="Console"/>
         </Root>
+        <Logger name="com.dogbank" level="debug" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
     </Loggers>
 </Configuration>
