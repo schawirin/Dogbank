@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import authService from '../../services/authService'; // Corrigido: importando o default
+import authService from '../../services/authService';
 import Input from '../common/Input';
 import Button from '../common/Button';
 import Alert from '../common/Alert';
@@ -43,17 +43,21 @@ const PasswordForm = () => {
       // Chamar o serviço de autenticação
       const response = await authService.login(cpf, password);
       
-      // Login bem-sucedido
+      console.log('Resposta do login:', response); // Debug
+      
+      // Login bem-sucedido - salvar dados completos incluindo ID
       login({ 
+        id: response.id,
         nome: response.nome, 
         cpf: cpf,
         chavePix: response.chavePix 
       }, "fake-token-for-demo");
       
+      // Salvar userId no localStorage como fallback
+      localStorage.setItem('userId', response.id);
+      
       // Limpar CPF da sessão
       sessionStorage.removeItem('loginCpf');
-      navigate('/dashboard');
-
       
       // Redirecionar para o dashboard
       navigate('/dashboard');

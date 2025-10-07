@@ -30,21 +30,23 @@ const DashboardPage = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // 1) tenta pegar do contexto
-        let chave = user?.cpf;
-        // 2) se não existir, tenta do localStorage
-        if (!chave) {
-          chave = localStorage.getItem('cpf');
+        
+        // Buscar userId - prioridade: contexto > localStorage
+        let userId = user?.id;
+        if (!userId) {
+          userId = localStorage.getItem('userId');
         }
-        if (!chave) {
-          throw new Error('CPF não encontrado no contexto do usuário');
+        if (!userId) {
+          throw new Error('ID do usuário não encontrado');
         }
 
-        // 3) chama o serviço de conta
-        const acct = await accountService.getAccountInfo(chave);
+        console.log('Buscando dados para userId:', userId);
+
+        // Buscar dados da conta usando userId
+        const acct = await accountService.getAccountInfo(userId);
         setAccountData(acct);
 
-        // 4) chama o serviço de histórico (se tiver id)
+        // Buscar histórico de transações
         if (acct?.id) {
           const hx = await pixService.getTransactionHistory(acct.id);
           setTransactions(hx || []);
@@ -57,7 +59,7 @@ const DashboardPage = () => {
       }
     };
 
-    if (user || localStorage.getItem('cpf')) {
+    if (user || localStorage.getItem('userId')) {
       fetchData();
     }
   }, [user]);
