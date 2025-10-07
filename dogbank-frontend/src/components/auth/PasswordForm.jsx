@@ -43,18 +43,18 @@ const PasswordForm = () => {
       // Chamar o serviço de autenticação
       const response = await authService.login(cpf, password);
       
-      console.log('Resposta do login:', response); // Debug
+      console.log('Resposta do login:', response);
       
-      // Login bem-sucedido - salvar dados completos incluindo ID
+      // accountId do backend é o userId que precisamos
       login({ 
-        id: response.id,
+        id: response.accountId,
         nome: response.nome, 
         cpf: cpf,
         chavePix: response.chavePix 
       }, "fake-token-for-demo");
       
-      // Salvar userId no localStorage como fallback
-      localStorage.setItem('userId', response.id);
+      // Salvar como userId (nome usado no DashboardPage)
+      localStorage.setItem('userId', response.accountId);
       
       // Limpar CPF da sessão
       sessionStorage.removeItem('loginCpf');
