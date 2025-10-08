@@ -1,11 +1,16 @@
-FROM maven:3.9.7-eclipse-temurin-17 AS builder
+# ---- build
+FROM maven:3.9.6-eclipse-temurin-17 AS builder
 WORKDIR /build
-COPY auth-module/pom.xml pom.xml
-COPY auth-module/src src
-RUN mvn clean package -DskipTests
+COPY pom.xml .
+COPY src ./src
+RUN mvn -B -DskipTests package
+# (opcional p/ debug)
+# RUN ls -lah target
 
+# ---- runtime
 FROM eclipse-temurin:17-jre
 WORKDIR /app
-COPY --from=builder /build/target/auth-module-1.0-SNAPSHOT.jar app.jar
+ARG JAR_FILE=/build/target/*.jar
+COPY --from=builder ${JAR_FILE} app.jar
 EXPOSE 8088
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENTRYPOINT ["java","-jar","/app/app.jar"]
