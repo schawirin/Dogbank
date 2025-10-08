@@ -1,7 +1,7 @@
 FROM maven:3.9.7-eclipse-temurin-17 AS builder
 WORKDIR /build
-COPY pom.xml .
-COPY src ./src
+COPY bancocentral-module/pom.xml .
+COPY bancocentral-module/src ./src
 RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:17-jre
