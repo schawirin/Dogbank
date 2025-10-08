@@ -9,11 +9,11 @@
         <groupId>com.dogbank</groupId>
         <artifactId>dogbank</artifactId>
         <version>1.0-SNAPSHOT</version>
-    </parent>
+    <relativePath>../pom.xml</relativePath>    </parent>
 
     <artifactId>auth-module</artifactId>
     <version>1.0-SNAPSHOT</version>
-    <name>auth-module</name>
+    <relativePath>../pom.xml</relativePath>    <name>auth-module</name>
     <description>Módulo de autenticação do DogBank</description>
 
     <properties>
@@ -95,31 +95,31 @@
         <groupId>io.opentracing</groupId>
         <artifactId>opentracing-api</artifactId>
         <version>0.33.0</version>
-    </dependency>
+    <relativePath>../pom.xml</relativePath>    </dependency>
     
     <dependency>
         <groupId>io.opentracing</groupId>
         <artifactId>opentracing-util</artifactId>
         <version>0.33.0</version>
-    </dependency>
+    <relativePath>../pom.xml</relativePath>    </dependency>
 
         <!-- JWT -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
             <version>0.11.5</version>
-        </dependency>
+    <relativePath>../pom.xml</relativePath>        </dependency>
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-impl</artifactId>
             <version>0.11.5</version>
-            <scope>runtime</scope>
+    <relativePath>../pom.xml</relativePath>            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-jackson</artifactId>
             <version>0.11.5</version>
-            <scope>runtime</scope>
+    <relativePath>../pom.xml</relativePath>            <scope>runtime</scope>
         </dependency>
 
         <!-- Spring Boot Test -->

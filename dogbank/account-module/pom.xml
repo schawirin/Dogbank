@@ -9,11 +9,11 @@
         <groupId>com.dogbank</groupId>
         <artifactId>dogbank</artifactId>
         <version>1.0-SNAPSHOT</version>
-    </parent>
+    <relativePath>../pom.xml</relativePath>    </parent>
 
     <artifactId>account-module</artifactId>
     <version>1.0-SNAPSHOT</version>
-    <name>account-module</name>
+    <relativePath>../pom.xml</relativePath>    <name>account-module</name>
     <description>Módulo de contas do DogBank</description>
 
     <properties>

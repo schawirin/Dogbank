@@ -9,11 +9,11 @@
         <groupId>com.dogbank</groupId>
         <artifactId>dogbank</artifactId>
         <version>1.0-SNAPSHOT</version>
-    </parent>
+    <relativePath>../pom.xml</relativePath>    </parent>
 
     <artifactId>bancocentral-module</artifactId>
     <version>1.0-SNAPSHOT</version>
-    <name>bancocentral-module</name>
+    <relativePath>../pom.xml</relativePath>    <name>bancocentral-module</name>
     <description>Módulo simulador do Banco Central do DogBank</description>
 
     <properties>

@@ -9,11 +9,11 @@
         <groupId>com.dogbank</groupId>
         <artifactId>dogbank</artifactId>
         <version>1.0-SNAPSHOT</version>
-    </parent>
+    <relativePath>../pom.xml</relativePath>    </parent>
 
     <artifactId>integration-module</artifactId>
     <version>1.0-SNAPSHOT</version>
-    <name>integration-module</name>
+    <relativePath>../pom.xml</relativePath>    <name>integration-module</name>
     <description>Módulo de integração do DogBank</description>
 
     <properties>

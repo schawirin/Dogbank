@@ -9,11 +9,11 @@
         <groupId>com.dogbank</groupId>
         <artifactId>dogbank</artifactId>
         <version>1.0-SNAPSHOT</version>
-    </parent>
+    <relativePath>../pom.xml</relativePath>    </parent>
 
     <artifactId>notification-module</artifactId>
     <version>1.0-SNAPSHOT</version>
-    <name>notification-module</name>
+    <relativePath>../pom.xml</relativePath>    <name>notification-module</name>
     <description>Módulo de notificações do DogBank</description>
 
     <properties>
