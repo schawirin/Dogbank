@@ -5,17 +5,18 @@ const CPF_KEY = 'cpf';
 const NOME_KEY = 'nome';
 const CHAVE_PIX_KEY = 'chavePix';
 const ACCOUNT_ID_KEY = 'accountId';
+const USER_ID_KEY = 'userId'; // ✅ novo: usado pelo DashboardPage
 
 const authService = {
   async login(cpf, senha) {
     try {
       console.log('🔐 Tentando login para CPF:', cpf);
-      
+
       const { data } = await authApi.post('/login', {
         cpf: cpf.trim(),
-        password: senha  // ✅ CORRIGIDO: era "senha", agora é "password"
+        password: senha // já corrigido para "password"
       });
-      
+
       console.log('✅ Login bem-sucedido, dados recebidos:', data);
 
       const { nome, chavePix, accountId } = data;
@@ -23,10 +24,12 @@ const authService = {
         throw new Error('Resposta de login inválida');
       }
 
+      // 💾 Persistência no localStorage
       localStorage.setItem(CPF_KEY, cpf.trim());
       localStorage.setItem(NOME_KEY, nome);
-      localStorage.setItem(CHAVE_PIX_KEY, chavePix);
+      localStorage.setItem(CHAVE_PIX_KEY, chavePix ?? '');
       localStorage.setItem(ACCOUNT_ID_KEY, String(accountId));
+      localStorage.setItem(USER_ID_KEY, String(accountId)); // ✅ adiciona também como "userId"
 
       console.log('💾 Dados salvos no localStorage');
       return { nome, chavePix, accountId };
@@ -41,6 +44,7 @@ const authService = {
     localStorage.removeItem(NOME_KEY);
     localStorage.removeItem(CHAVE_PIX_KEY);
     localStorage.removeItem(ACCOUNT_ID_KEY);
+    localStorage.removeItem(USER_ID_KEY); // ✅ garante limpeza do userId
   },
 
   getCpf() {
@@ -57,6 +61,12 @@ const authService = {
 
   getAccountId() {
     const val = localStorage.getItem(ACCOUNT_ID_KEY);
+    return val ? Number(val) : null;
+  },
+
+  // ✅ opcional útil: se o DashboardPage usa "userId"
+  getUserId() {
+    const val = localStorage.getItem(USER_ID_KEY);
     return val ? Number(val) : null;
   },
 
