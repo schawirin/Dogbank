@@ -430,8 +430,13 @@ spec:
           value: "http://accounts-service:8089"
         - name: AUTH_SERVICE_URL
           value: "http://auth-service:8088"
+<<<<<<< HEAD
         #- name: BANCOCENTRAL_API_URL
         # value: "http://bancocentral-service:8085"
+=======
+       # - name: BANCOCENTRAL_API_URL
+       #   value: "http://bancocentral-service:8085"
+>>>>>>> f6b44b6 (resolve merge conflicts)
         livenessProbe:
           httpGet:
             path: /health
