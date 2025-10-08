@@ -1,7 +1,7 @@
 FROM maven:3.9.7-eclipse-temurin-17 AS builder
 WORKDIR /build
-COPY notification-module/pom.xml .
-COPY notification-module/src ./src
+COPY notification-module/pom.xml pom.xml
+COPY notification-module/src src
 RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:17-jre

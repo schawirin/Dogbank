@@ -1,7 +1,7 @@
 FROM maven:3.9.7-eclipse-temurin-17 AS builder
 WORKDIR /build
-COPY account-module/pom.xml .
-COPY account-module/src ./src
+COPY account-module/pom.xml pom.xml
+COPY account-module/src src
 RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:17-jre

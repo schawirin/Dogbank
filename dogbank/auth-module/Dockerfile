@@ -1,7 +1,7 @@
 FROM maven:3.9.7-eclipse-temurin-17 AS builder
 WORKDIR /build
-COPY auth-module/pom.xml .
-COPY auth-module/src ./src
+COPY auth-module/pom.xml pom.xml
+COPY auth-module/src src
 RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:17-jre
