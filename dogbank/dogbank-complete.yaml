@@ -170,13 +170,13 @@ spec:
               key: POSTGRES_PASSWORD
         livenessProbe:
           httpGet:
-            path: /health
+            path: /actuator/health
             port: 8088
           initialDelaySeconds: 90
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /health
+            path: /actuator/health
             port: 8088
           initialDelaySeconds: 60
           periodSeconds: 5
@@ -256,13 +256,13 @@ spec:
               key: POSTGRES_PASSWORD
         livenessProbe:
           httpGet:
-            path: /health
+            path: /actuator/health
             port: 8089
           initialDelaySeconds: 90
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /health
+            path: /actuator/health
             port: 8089
           initialDelaySeconds: 60
           periodSeconds: 5
@@ -342,13 +342,13 @@ spec:
               key: POSTGRES_PASSWORD
         livenessProbe:
           httpGet:
-            path: /health
+            path: /actuator/health
             port: 8085
           initialDelaySeconds: 90
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /health
+            path: /actuator/health
             port: 8085
           initialDelaySeconds: 60
           periodSeconds: 5
@@ -439,13 +439,13 @@ spec:
 >>>>>>> f6b44b6 (resolve merge conflicts)
         livenessProbe:
           httpGet:
-            path: /health
+            path: /actuator/health
             port: 8084
           initialDelaySeconds: 90
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /health
+            path: /actuator/health
             port: 8084
           initialDelaySeconds: 60
           periodSeconds: 5
@@ -525,13 +525,13 @@ spec:
               key: POSTGRES_PASSWORD
         livenessProbe:
           httpGet:
-            path: /health
+            path: /actuator/health
             port: 8082
           initialDelaySeconds: 90
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /health
+            path: /actuator/health
             port: 8082
           initialDelaySeconds: 60
           periodSeconds: 5
@@ -611,13 +611,13 @@ spec:
               key: POSTGRES_PASSWORD
         livenessProbe:
           httpGet:
-            path: /health
+            path: /actuator/health
             port: 8083
           initialDelaySeconds: 90
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /health
+            path: /actuator/health
             port: 8083
           initialDelaySeconds: 60
           periodSeconds: 5
