@@ -1,9 +1,9 @@
 package com.dogbank.transaction.service;
 
 import com.dogbank.transaction.entity.Transaction;
+import com.dogbank.transaction.repository.TransactionRepository;
 import com.dogbank.transaction.model.AccountModel;
 import com.dogbank.transaction.model.UserModel;
-import com.dogbank.transaction.repository.TransactionRepository;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,11 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.time.ZonedDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class TransactionService {
@@ -48,119 +47,168 @@ public class TransactionService {
     public Transaction transferirPix(Long accountOriginId, String pixKeyDestination, BigDecimal amount) {
         ZonedDateTime startedAt = ZonedDateTime.now();
 
+        // Origem - Simulando chamada REST para account-module
+        AccountModel origin = getAccountById(accountOriginId);
+        if (origin == null) {
+            throw new RuntimeException("Conta de origem não encontrada");
+        }
+
+        // Destino: simulando chamada REST para auth-module e account-module
+        UserModel userDest = getUserByPixKey(pixKeyDestination);
+        if (userDest == null) {
+            throw new RuntimeException("Chave Pix de destino não encontrada");
+        }
+
+        AccountModel dest = getAccountByUserId(userDest.getId());
+        if (dest == null) {
+            throw new RuntimeException("Conta de destino não encontrada");
+        }
+
+        // 🔎 Logs de negócio antes da validação externa
+        log.info("💸 [PIX INICIADO] enviado_por='{}' valor={} recebido_por='{}' banco_destino='{}' cpf_destino='{}' chave='{}'",
+                nvl(origin.getUserName(), "N/A"),
+                amount,
+                nvl(userDest.getNome(), "N/A"),
+                nvl(dest.getBanco(), "DogBank"),
+                nvl(userDest.getCpf(), "N/A"),
+                pixKeyDestination);
+
+        // Validação externa
+        Map<String, Object> validation = validarPixNoBancoCentral(pixKeyDestination, amount);
+        if (!"APPROVED".equals(validation.get("status"))) {
+            throw new RuntimeException("Erro no Banco Central: " + validation.get("error"));
+        }
+
+        // Verifica saldo
+        if (origin.getBalance().compareTo(amount) < 0) {
+            throw new RuntimeException("Saldo insuficiente");
+        }
+
+        // Simulando atualização de saldo via chamadas REST
+        updateAccountBalance(origin.getId(), origin.getBalance().subtract(amount));
+        updateAccountBalance(dest.getId(), dest.getBalance().add(amount));
+
+        // Persiste transação (agora preenchendo os campos solicitados)
+        Transaction tx = new Transaction();
+        tx.setAccountOriginId(accountOriginId);
+        tx.setAccountDestinationId(dest.getId());
+        tx.setAmount(amount);
+        tx.setType("PIX");
+        tx.setStartedAt(startedAt);
+        tx.setCompletedAt(ZonedDateTime.now());
+        tx.setPixKeyDestination(pixKeyDestination);
+
+        // ⚙️ Campos de negócio:
+        tx.setReceiverName(nvl(userDest.getNome(), pixKeyDestination));                     // recebido por
+        tx.setReceiverBank(nvl(dest.getBanco(), "DogBank"));                                // banco de quem recebeu
+        tx.setSenderName(nvl(origin.getUserName(), ""));                                    // enviado por
+        tx.setSenderBankCode(nvl(origin.getBanco(), "DogBank"));                            // banco de quem enviou (seu campo existente)
+        tx.setSenderAgency("");                                                             // opcional
+        tx.setSenderAccountNumber(nvl(origin.getNumeroConta(), ""));                        // opcional
+        tx.setDescription("PIX para " + nvl(userDest.getNome(), pixKeyDestination));
+
+        Transaction saved = transactionRepository.save(tx);
+
+        log.info("✅ [PIX CONCLUÍDO] tx_id={} enviado_por='{}' valor={} recebido_por='{}' banco_destino='{}' chave='{}'",
+                saved.getId(),
+                nvl(origin.getUserName(), "N/A"),
+                amount,
+                nvl(userDest.getNome(), "N/A"),
+                nvl(dest.getBanco(), "DogBank"),
+                pixKeyDestination);
+
+        return saved;
+    }
+
+    public Optional<Transaction> findById(Long id) {
+        return transactionRepository.findById(id);
+    }
+
+    public List<Transaction> listarTransacoesPorConta(Long accountId) {
+        return transactionRepository.findAllByAccountOriginIdOrderByDateDesc(accountId);
+    }
+
+    // Overload para evitar erro quando o Controller passa 'long' primitivo
+    public List<Transaction> listarTransacoesPorConta(long accountId) {
+        return listarTransacoesPorConta(Long.valueOf(accountId));
+    }
+
+    public String generateAuthCode(Transaction tx) {
+        return UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
+    public String extractInitials(String fullName) {
+        if (fullName == null || fullName.isBlank()) return "";
+        return Stream.of(fullName.split("\\s+"))
+                .filter(s -> !s.isBlank())
+                .map(s -> s.substring(0, 1).toUpperCase())
+                .limit(2)
+                .collect(Collectors.joining());
+    }
+
+    public String maskCpf(String pixKey) {
+        if (pixKey == null) return "";
+        if (pixKey.contains("@")) {
+            String[] parts = pixKey.split("@", 2);
+            return parts[0].charAt(0) + "****@" + parts[1];
+        }
+        int len = pixKey.length();
+        if (len <= 4) return pixKey;
+        return "****" + pixKey.substring(len - 4);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> validarPixNoBancoCentral(String pixKey, BigDecimal amount) {
+        Map<String, Object> req = new HashMap<>();
+        req.put("pixKey", pixKey);
+        req.put("amount", amount);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(req, headers);
         try {
-            // Buscar conta origem
-            AccountModel origin = getAccountById(accountOriginId);
-            if (origin == null) {
-                log.error("❌ Conta de origem não encontrada: {}", accountOriginId);
-                throw new RuntimeException("Conta de origem não encontrada");
-            }
-
-            // Buscar usuário e conta destino
-            UserModel userDest = getUserByPixKey(pixKeyDestination);
-            if (userDest == null) {
-                log.error("❌ Chave Pix de destino não encontrada: {}", pixKeyDestination);
-                throw new RuntimeException("Chave Pix de destino não encontrada");
-            }
-
-            AccountModel dest = getAccountByUserId(userDest.getId());
-            if (dest == null) {
-                log.error("❌ Conta de destino não encontrada para usuário: {}", userDest.getId());
-                throw new RuntimeException("Conta de destino não encontrada");
-            }
-
-            final String senderName = nvl(origin.getUserName(), "N/A");
-            final String senderCpf  = maskCpf(nvl(origin.getCpf(), "N/A"));
-            final String senderBank = nvl(origin.getBanco(), "DogBank");
-
-            final String receiverName = nvl(userDest.getNome(), "N/A");
-            final String receiverCpf  = maskCpf(nvl(userDest.getCpf(), "N/A"));
-            final String receiverBank = nvl(dest.getBanco(), "DogBank");
-
-            // LOG INÍCIO (campos de negócio)
-            log.info("💸 [PIX INICIADO] Enviado por: {} (CPF: {}), Banco Origem: {}, Valor: R$ {}, " +
-                            "Recebido por: {} (CPF: {}), Banco Destino: {}, Chave PIX: {}",
-                    senderName, senderCpf, senderBank, amount, receiverName, receiverCpf, receiverBank, pixKeyDestination);
-
-            // Validação no Banco Central
-            log.info("🏦 Validando PIX no Banco Central - Chave: {}, Valor: R$ {}", pixKeyDestination, amount);
-            Map<String, Object> validation = validarPixNoBancoCentral(pixKeyDestination, amount);
-
-            if (validation == null || !"APPROVED".equals(validation.get("status"))) {
-                String error = (String) (validation != null ? validation.get("error") : "unknown");
-                String errorCode = (String) (validation != null ? validation.get("errorCode") : "unknown");
-                log.error("❌ [BANCO CENTRAL REJEITOU] Code: {}, Error: {}, Enviado por: {}, Recebido por: {}, Valor: R$ {}",
-                        errorCode, error, senderName, receiverName, amount);
-                throw new RuntimeException("Erro no Banco Central: " + error);
-            }
-
-            log.info("✅ [BANCO CENTRAL] Validação aprovada");
-
-            // Verifica saldo
-            if (origin.getBalance() == null || amount == null || origin.getBalance().compareTo(amount) < 0) {
-                log.error("❌ Saldo insuficiente - Enviado por: {}, Disponível: R$ {}, Necessário: R$ {}",
-                        senderName, origin.getBalance(), amount);
-                throw new RuntimeException("Saldo insuficiente");
-            }
-
-            // Atualiza saldos
-            updateAccountBalance(origin.getId(), origin.getBalance().subtract(amount));
-            updateAccountBalance(dest.getId(), dest.getBalance().add(amount));
-
-            // Persiste transação
-            Transaction tx = new Transaction();
-            tx.setAccountOriginId(accountOriginId);
-            tx.setAccountDestinationId(dest.getId());
-            tx.setAmount(amount);
-            tx.setType("PIX");
-            tx.setStartedAt(startedAt);
-            tx.setCompletedAt(ZonedDateTime.now());
-            tx.setPixKeyDestination(pixKeyDestination);
-            tx.setReceiverName(receiverName);
-            tx.setReceiverBank(receiverBank);
-            tx.setSenderName(senderName);
-            tx.setSenderBankCode(senderBank);
-            tx.setSenderAgency("");
-            tx.setSenderAccountNumber(nvl(origin.getNumeroConta(), ""));
-            tx.setDescription("PIX para " + receiverName);
-
-            Transaction saved = transactionRepository.save(tx);
-
-            long durationMs = Duration.between(startedAt, ZonedDateTime.now()).toMillis();
-
-            // LOG FINAL (campos de negócio + duração)
-            log.info("✅ [PIX CONCLUÍDO COM SUCESSO] Transaction ID: {}, Duração: {}ms, Enviado por: {} ({}), Valor: R$ {}, " +
-                            "Recebido por: {} ({}), Banco Destino: {}",
-                    saved.getId(), durationMs, senderName, senderBank, amount, receiverName, receiverCpf, receiverBank);
-
-            return saved;
-
-        } catch (RuntimeException e) {
-            log.error("❌ [PIX FALHOU] Conta Origem: {}, Chave Destino: {}, Valor: R$ {}, Erro: {}",
-                    accountOriginId, pixKeyDestination, amount, e.getMessage());
-            throw e;
+            ResponseEntity<Map> resp = restTemplate.exchange(
+                    bancoCentralUrl, HttpMethod.POST, entity, Map.class);
+            return resp.getBody();
+        } catch (Exception e) {
+            Map<String, Object> err = new HashMap<>();
+            err.put("status", "FAILED");
+            err.put("error", "Erro na validação externa: " + e.getMessage());
+            return err;
         }
     }
 
-    // ---------- Helpers ----------
+    private AccountModel getAccountById(Long accountId) {
+        AccountModel account = new AccountModel();
+        account.setId(accountId);
+        account.setBalance(new BigDecimal("1000.00"));
+        // opcional: preencher banco/numeroConta se existir no model
+        return account;
+    }
+
+    private UserModel getUserByPixKey(String pixKey) {
+        UserModel user = new UserModel();
+        user.setId(1L);
+        user.setNome("Usuário Simulado");
+        user.setChavePix(pixKey);
+        // opcional: user.setCpf("12345678901");
+        return user;
+    }
+
+    private AccountModel getAccountByUserId(Long userId) {
+        AccountModel account = new AccountModel();
+        account.setId(2L);
+        account.setUsuarioId(userId);
+        account.setBalance(new BigDecimal("500.00"));
+        // opcional: account.setBanco("ITAÚ");
+        return account;
+    }
+
+    private void updateAccountBalance(Long accountId, BigDecimal newBalance) {
+        // Simulação
+    }
+
+    // util
     private static String nvl(String s, String def) {
-        return (s == null || s.isEmpty()) ? def : s;
-    }
-
-    private static String maskCpf(String cpf) {
-        if (cpf == null || cpf.length() < 11) return cpf;
-        // 123.456.789-01  ->  ***.***.***-01
-        return "***.***.***-" + cpf.substring(cpf.length() - 2);
-    }
-
-    // ---------- Métodos usados (já devem existir no teu projeto).
-    // Se estiverem em outros services/clients, mantenha as chamadas originais. Aqui só deixo a assinatura.
-    private AccountModel getAccountById(Long id) { /* ... */ return null; }
-    private UserModel getUserByPixKey(String pixKey) { /* ... */ return null; }
-    private AccountModel getAccountByUserId(Long userId) { /* ... */ return null; }
-    private void updateAccountBalance(Long accountId, BigDecimal newBalance) { /* ... */ }
-    private Map<String, Object> validarPixNoBancoCentral(String chavePix, BigDecimal valor) {
-        // chamada via restTemplate para o serviço bancocentral; retornar Map com status/error/errorCode
-        return new HashMap<>();
+        return (s == null || s.isBlank()) ? def : s;
     }
 }
