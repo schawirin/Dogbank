@@ -1,94 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Configuration status="WARN" monitorInterval="30">
-    <Properties>
-        <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n</Property>
-        <Property name="APP_NAME">auth-module</Property>
-    </Properties>
-
+<Configuration status="WARN">
     <Appenders>
-        <!-- Console Appender com formato JSON para Datadog -->
-        <Console name="ConsoleJSON" target="SYSTEM_OUT">
-            <JsonLayout compact="true" eventEol="true" stacktraceAsString="true">
-                <KeyValuePair key="service" value="${APP_NAME}"/>
-                <KeyValuePair key="env" value="${env:ENVIRONMENT:-development}"/>
-                <KeyValuePair key="version" value="${env:APP_VERSION:-1.0.0}"/>
+        <Console name="JsonConsole" target="SYSTEM_OUT">
+            <JsonLayout compact="true" eventEol="true" properties="true" stacktraceAsString="true">
+                <KeyValuePair key="service" value="${env:DD_SERVICE:-dogbank}"/>
+                <KeyValuePair key="env" value="${env:DD_ENV:-production}"/>
+                <KeyValuePair key="version" value="${env:DD_VERSION:-v1}"/>
             </JsonLayout>
         </Console>
-
-        <!-- Console Appender com formato legível para desenvolvimento -->
-        <Console name="Console" target="SYSTEM_OUT">
-            <PatternLayout pattern="${LOG_PATTERN}"/>
-        </Console>
-
-        <!-- File Appender com formato JSON -->
-        <RollingFile name="FileJSON" 
-                     fileName="logs/auth-module.json" 
-                     filePattern="logs/auth-module-%d{yyyy-MM-dd}-%i.json.gz">
-            <JsonLayout compact="true" eventEol="true" stacktraceAsString="true">
-                <KeyValuePair key="service" value="${APP_NAME}"/>
-                <KeyValuePair key="env" value="${env:ENVIRONMENT:-development}"/>
-                <KeyValuePair key="version" value="${env:APP_VERSION:-1.0.0}"/>
-            </JsonLayout>
-            <Policies>
-                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
-                <SizeBasedTriggeringPolicy size="100 MB"/>
-            </Policies>
-            <DefaultRolloverStrategy max="30"/>
-        </RollingFile>
-
-        <!-- File Appender com formato legível -->
-        <RollingFile name="File" 
-                     fileName="logs/auth-module.log" 
-                     filePattern="logs/auth-module-%d{yyyy-MM-dd}-%i.log.gz">
-            <PatternLayout pattern="${LOG_PATTERN}"/>
-            <Policies>
-                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
-                <SizeBasedTriggeringPolicy size="100 MB"/>
-            </Policies>
-            <DefaultRolloverStrategy max="30"/>
-        </RollingFile>
-
-        <!-- Async Appender para melhor performance -->
-        <Async name="AsyncConsoleJSON">
-            <AppenderRef ref="ConsoleJSON"/>
-        </Async>
-
-        <Async name="AsyncFileJSON">
-            <AppenderRef ref="FileJSON"/>
-        </Async>
     </Appenders>
 
     <Loggers>
-        <!-- Logger específico para o pacote com.dogbank -->
-        <Logger name="com.dogbank" level="info" additivity="false">
-            <AppenderRef ref="AsyncConsoleJSON"/>
-            <AppenderRef ref="AsyncFileJSON"/>
-        </Logger>
-
-        <!-- Logger para SQL (útil para debug) -->
-        <Logger name="org.hibernate.SQL" level="debug" additivity="false">
-            <AppenderRef ref="AsyncFileJSON"/>
-        </Logger>
-
-        <!-- Logger para parâmetros SQL -->
-        <Logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="trace" additivity="false">
-            <AppenderRef ref="AsyncFileJSON"/>
-        </Logger>
-
-        <!-- Logger para Spring Framework -->
-        <Logger name="org.springframework" level="warn" additivity="false">
-            <AppenderRef ref="AsyncConsoleJSON"/>
-        </Logger>
-
-        <!-- Logger para Datadog -->
-        <Logger name="com.datadoghq" level="info" additivity="false">
-            <AppenderRef ref="AsyncConsoleJSON"/>
-        </Logger>
-
-        <!-- Root Logger -->
         <Root level="info">
-            <AppenderRef ref="AsyncConsoleJSON"/>
-            <AppenderRef ref="AsyncFileJSON"/>
+            <AppenderRef ref="JsonConsole"/>
         </Root>
+        
+        <Logger name="com.dogbank" level="debug" additivity="false">
+            <AppenderRef ref="JsonConsole"/>
+        </Logger>
+        
+        <Logger name="org.springframework" level="warn"/>
+        <Logger name="org.hibernate" level="warn"/>
+        <Logger name="org.apache.catalina" level="warn"/>
     </Loggers>
 </Configuration>
