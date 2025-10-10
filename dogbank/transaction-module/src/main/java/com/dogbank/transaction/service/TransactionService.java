@@ -5,11 +5,17 @@ import com.dogbank.transaction.repository.TransactionRepository;
 import com.dogbank.transaction.model.AccountModel;
 import com.dogbank.transaction.model.UserModel;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
@@ -20,6 +26,8 @@ import java.util.stream.Stream;
 
 @Service
 public class TransactionService {
+    
+    private static final Logger log = LoggerFactory.getLogger(TransactionService.class);
     
     @Autowired
     private TransactionRepository transactionRepository;
@@ -36,64 +44,122 @@ public class TransactionService {
     @Value("${auth.api.url}")
     private String authServiceUrl;
     
-    /**
-     * Executa a transferência via PIX e retorna a entidade Transaction persistida
-     */
     @Transactional
     public Transaction transferirPix(Long accountOriginId, String pixKeyDestination, BigDecimal amount) {
         ZonedDateTime startedAt = ZonedDateTime.now();
         
-        // Origem - Simulando chamada REST para account-module
-        AccountModel origin = getAccountById(accountOriginId);
-        if (origin == null) {
-            throw new RuntimeException("Conta de origem não encontrada");
+        // Adiciona contexto ao MDC para logs estruturados
+        MDC.put("chave_pix", pixKeyDestination);
+        MDC.put("valor", amount.toString());
+        MDC.put("conta_origem_id", accountOriginId.toString());
+        
+        try {
+            // Origem
+            AccountModel origin = getAccountById(accountOriginId);
+            if (origin == null) {
+                MDC.put("status_transacao", "ERRO_CONTA_ORIGEM_NAO_ENCONTRADA");
+                log.error("Conta de origem não encontrada");
+                throw new RuntimeException("Conta de origem não encontrada");
+            }
+            
+            MDC.put("remetente_nome", origin.getUserName() != null ? origin.getUserName() : "N/A");
+            MDC.put("remetente_banco", origin.getBanco() != null ? origin.getBanco() : "DogBank");
+            
+            // Destino
+            UserModel userDest = getUserByPixKey(pixKeyDestination);
+            if (userDest == null) {
+                MDC.put("status_transacao", "ERRO_CHAVE_PIX_NAO_ENCONTRADA");
+                log.error("Chave Pix de destino não encontrada");
+                throw new RuntimeException("Chave Pix de destino não encontrada");
+            }
+            
+            MDC.put("destinatario_nome", userDest.getNome());
+            MDC.put("destinatario_cpf", userDest.getCpf() != null ? maskCpf(userDest.getCpf()) : "N/A");
+            
+            AccountModel dest = getAccountByUserId(userDest.getId());
+            if (dest == null) {
+                MDC.put("status_transacao", "ERRO_CONTA_DESTINO_NAO_ENCONTRADA");
+                log.error("Conta de destino não encontrada");
+                throw new RuntimeException("Conta de destino não encontrada");
+            }
+            
+            MDC.put("destinatario_banco", dest.getBanco() != null ? dest.getBanco() : "DogBank");
+            MDC.put("status_transacao", "VALIDANDO_BANCO_CENTRAL");
+            
+            log.info("PIX iniciado");
+            
+            // Validação Banco Central
+            Map<String, Object> validation = validarPixNoBancoCentral(pixKeyDestination, amount);
+            
+            if (!"APPROVED".equals(validation.get("status"))) {
+                String error = (String) validation.get("error");
+                String errorCode = (String) validation.get("errorCode");
+                MDC.put("status_transacao", "REJEITADO_BANCO_CENTRAL");
+                MDC.put("erro_codigo", errorCode != null ? errorCode : "DESCONHECIDO");
+                MDC.put("erro_mensagem", error != null ? error : "Erro desconhecido");
+                log.error("Banco Central rejeitou a transação");
+                throw new RuntimeException("Erro no Banco Central: " + error);
+            }
+            
+            MDC.put("status_transacao", "BANCO_CENTRAL_APROVADO");
+            log.info("Validação do Banco Central aprovada");
+            
+            // Verifica saldo
+            if (origin.getBalance().compareTo(amount) < 0) {
+                MDC.put("status_transacao", "ERRO_SALDO_INSUFICIENTE");
+                MDC.put("saldo_disponivel", origin.getBalance().toString());
+                log.error("Saldo insuficiente");
+                throw new RuntimeException("Saldo insuficiente");
+            }
+            
+            // Atualiza saldos
+            updateAccountBalance(origin.getId(), origin.getBalance().subtract(amount));
+            updateAccountBalance(dest.getId(), dest.getBalance().add(amount));
+            
+            // Persiste transação
+            Transaction tx = new Transaction();
+            tx.setAccountOriginId(accountOriginId);
+            tx.setAccountDestinationId(dest.getId());
+            tx.setAmount(amount);
+            tx.setType("PIX");
+            tx.setStartedAt(startedAt);
+            tx.setCompletedAt(ZonedDateTime.now());
+            tx.setPixKeyDestination(pixKeyDestination);
+            tx.setReceiverName(userDest.getNome());
+            tx.setReceiverBank(dest.getBanco() != null ? dest.getBanco() : "DogBank");
+            tx.setSenderName(origin.getUserName() != null ? origin.getUserName() : "");
+            tx.setSenderBankCode(origin.getBanco() != null ? origin.getBanco() : "DogBank");
+            tx.setSenderAgency("");
+            tx.setSenderAccountNumber("");
+            tx.setDescription("PIX para " + userDest.getNome());
+            
+            Transaction saved = transactionRepository.save(tx);
+            
+            long durationMs = ZonedDateTime.now().toInstant().toEpochMilli() - 
+                             startedAt.toInstant().toEpochMilli();
+            
+            MDC.put("status_transacao", "CONCLUIDO");
+            MDC.put("transaction_id", saved.getId().toString());
+            MDC.put("duracao_ms", String.valueOf(durationMs));
+            
+            log.info("PIX concluído com sucesso");
+            
+            return saved;
+            
+        } catch (RuntimeException e) {
+            if (!MDC.getCopyOfContextMap().containsKey("status_transacao")) {
+                MDC.put("status_transacao", "ERRO_GENERICO");
+            }
+            MDC.put("erro_mensagem", e.getMessage());
+            log.error("Falha na transferência PIX", e);
+            throw e;
+        } finally {
+            // Limpa MDC
+            MDC.clear();
         }
-        
-        // Destino: simulando chamada REST para auth-module e account-module
-        UserModel userDest = getUserByPixKey(pixKeyDestination);
-        if (userDest == null) {
-            throw new RuntimeException("Chave Pix de destino não encontrada");
-        }
-        
-        AccountModel dest = getAccountByUserId(userDest.getId());
-        if (dest == null) {
-            throw new RuntimeException("Conta de destino não encontrada");
-        }
-        
-        // Validação externa
-        Map<String, Object> validation = validarPixNoBancoCentral(pixKeyDestination, amount);
-        if (!"APPROVED".equals(validation.get("status"))) {
-            throw new RuntimeException("Erro no Banco Central: " + validation.get("error"));
-        }
-        
-        // Verifica saldo
-        if (origin.getBalance().compareTo(amount) < 0) {
-            throw new RuntimeException("Saldo insuficiente");
-        }
-        
-        // Simulando atualização de saldo via chamadas REST
-        updateAccountBalance(origin.getId(), origin.getBalance().subtract(amount));
-        updateAccountBalance(dest.getId(), dest.getBalance().add(amount));
-        
-        // Persiste transação
-        Transaction tx = new Transaction();
-        tx.setAccountOriginId(accountOriginId);
-        tx.setAccountDestinationId(dest.getId());
-        tx.setAmount(amount);
-        tx.setType("PIX");
-        tx.setStartedAt(startedAt);
-        tx.setCompletedAt(ZonedDateTime.now());
-        tx.setPixKeyDestination(pixKeyDestination);
-        tx.setReceiverName(pixKeyDestination);
-        tx.setReceiverBank("");
-        tx.setSenderName("");
-        tx.setSenderBankCode("");
-        tx.setSenderAgency("");
-        tx.setSenderAccountNumber("");
-        tx.setDescription("PIX para chave " + pixKeyDestination);
-        return transactionRepository.save(tx);
     }
     
+    // Restante dos métodos iguais...
     public Optional<Transaction> findById(Long id) {
         return transactionRepository.findById(id);
     }
@@ -131,17 +197,40 @@ public class TransactionService {
         Map<String, Object> req = new HashMap<>();
         req.put("pixKey", pixKey);
         req.put("amount", amount);
+        
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(req, headers);
+        
         try {
             ResponseEntity<Map> resp = restTemplate.exchange(
-                bancoCentralUrl, HttpMethod.POST, entity, Map.class);
+                bancoCentralUrl, 
+                HttpMethod.POST, 
+                entity, 
+                Map.class
+            );
+            
             return resp.getBody();
+            
+        } catch (HttpClientErrorException | HttpServerErrorException e) {
+            Map<String, Object> err = new HashMap<>();
+            err.put("status", "FAILED");
+            err.put("error", "Erro HTTP: " + e.getStatusCode());
+            err.put("errorCode", "HTTP-" + e.getStatusCode().value());
+            return err;
+            
+        } catch (ResourceAccessException e) {
+            Map<String, Object> err = new HashMap<>();
+            err.put("status", "FAILED");
+            err.put("error", "Timeout ao conectar com Banco Central");
+            err.put("errorCode", "PIX-TIMEOUT");
+            return err;
+            
         } catch (Exception e) {
             Map<String, Object> err = new HashMap<>();
             err.put("status", "FAILED");
             err.put("error", "Erro na validação externa: " + e.getMessage());
+            err.put("errorCode", "PIX-ERRO-GENERICO");
             return err;
         }
     }
@@ -149,15 +238,19 @@ public class TransactionService {
     private AccountModel getAccountById(Long accountId) {
         AccountModel account = new AccountModel();
         account.setId(accountId);
-        account.setBalance(new BigDecimal("1000.00"));
+        account.setBalance(new BigDecimal("10000.00"));
+        account.setUserName("Usuário Origem");
+        account.setBanco("DogBank");
+        account.setNumeroConta("DB00000001");
         return account;
     }
     
     private UserModel getUserByPixKey(String pixKey) {
         UserModel user = new UserModel();
         user.setId(1L);
-        user.setNome("Usuário Simulado");
+        user.setNome("Usuário Destino");
         user.setChavePix(pixKey);
+        user.setCpf("12345678900");
         return user;
     }
     
@@ -166,6 +259,8 @@ public class TransactionService {
         account.setId(2L);
         account.setUsuarioId(userId);
         account.setBalance(new BigDecimal("500.00"));
+        account.setBanco("Santander");
+        account.setNumeroConta("DB00000002");
         return account;
     }
     
