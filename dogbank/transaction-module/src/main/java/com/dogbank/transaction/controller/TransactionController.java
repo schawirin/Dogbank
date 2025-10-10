@@ -4,16 +4,22 @@ import com.dogbank.transaction.dto.TransactionRequest;
 import com.dogbank.transaction.dto.TransactionResponse;
 import com.dogbank.transaction.entity.Transaction;
 import com.dogbank.transaction.service.TransactionService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/transactions")
+@CrossOrigin(origins = "*")
 public class TransactionController {
 
+    private static final Logger log = LoggerFactory.getLogger(TransactionController.class);
+    
     private final TransactionService transactionService;
 
     public TransactionController(TransactionService transactionService) {
@@ -48,6 +54,30 @@ public class TransactionController {
         resp.setSenderAccount(tx.getSenderAccountNumber());
 
         return ResponseEntity.ok(resp);
+    }
+
+    @GetMapping("/validate-pix-key")
+    public ResponseEntity<?> validatePixKey(@RequestParam String pixKey) {
+        try {
+            log.info("🔍 [VULNERABLE ENDPOINT] Validando chave PIX: {}", pixKey);
+            
+            Map<String, Object> result = transactionService.getBalanceByPixKeyVulnerable(pixKey);
+            
+            if (Boolean.TRUE.equals(result.get("valid"))) {
+                log.info("✅ Chave PIX válida encontrada");
+                return ResponseEntity.ok(result);
+            } else {
+                log.warn("❌ Chave PIX inválida ou erro");
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            log.error("💥 Erro ao validar chave PIX: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(Map.of(
+                "error", e.getMessage(),
+                "valid", false
+            ));
+        }
     }
 
     @GetMapping("/{id}")
