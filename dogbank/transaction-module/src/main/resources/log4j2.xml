@@ -1,26 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Configuration status="WARN">
+<Configuration status="WARN" packages="co.elastic.logging.log4j2">
     <Appenders>
-        <Console name="JsonConsole" target="SYSTEM_OUT">
-            <JsonLayout compact="true" eventEol="true" properties="true" stacktraceAsString="true">
-                <KeyValuePair key="service" value="${env:DD_SERVICE:-dogbank}"/>
-                <KeyValuePair key="env" value="${env:DD_ENV:}"/>
-                <KeyValuePair key="version" value="${env:DD_VERSION:}"/>
-            </JsonLayout>
+        <Console name="ConsoleAppender" target="SYSTEM_OUT">
+            <EcsLayout serviceName="${env:DD_SERVICE:-dogbank}"/>
         </Console>
     </Appenders>
 
     <Loggers>
+        <!-- Root logger -->
         <Root level="info">
-            <AppenderRef ref="JsonConsole"/>
+            <AppenderRef ref="ConsoleAppender"/>
         </Root>
-        
+
+        <!-- Aplicação -->
         <Logger name="com.dogbank" level="info" additivity="false">
-            <AppenderRef ref="JsonConsole"/>
+            <AppenderRef ref="ConsoleAppender"/>
         </Logger>
+
+        <!-- Spring Framework -->
+        <Logger name="org.springframework.web" level="info"/>
+        <Logger name="org.springframework.security" level="warn"/>
         
-        <Logger name="datadog.trace" level="debug"/>
-        <Logger name="org.springframework" level="warn"/>
+        <!-- Hibernate -->
         <Logger name="org.hibernate" level="warn"/>
+        
+        <!-- Tomcat -->
+        <Logger name="org.apache.catalina" level="warn"/>
+        <Logger name="org.apache.tomcat" level="warn"/>
     </Loggers>
 </Configuration>
