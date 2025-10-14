@@ -1,0 +1,651 @@
+{
+    "title": "🐕 DogBank PIX - Dashboard Completo",
+    "description": "Observabilidade de transações PIX com ASM",
+    "widgets": [
+      {
+        "id": 4750886682807887,
+        "definition": {
+          "title": "✅ PIX Com Sucesso",
+          "title_size": "16",
+          "title_align": "left",
+          "time": {},
+          "type": "query_value",
+          "requests": [
+            {
+              "formulas": [
+                {
+                  "formula": "query1"
+                }
+              ],
+              "queries": [
+                {
+                  "name": "query1",
+                  "data_source": "logs",
+                  "search": {
+                    "query": "env:production service:transactions @status_transacao:CONCLUIDO"
+                  },
+                  "indexes": ["*"],
+                  "group_by": [],
+                  "compute": {
+                    "aggregation": "count"
+                  },
+                  "storage": "hot"
+                }
+              ],
+              "response_format": "scalar",
+              "conditional_formats": [
+                {
+                  "comparator": ">",
+                  "palette": "white_on_green",
+                  "value": 0
+                }
+              ]
+            }
+          ],
+          "autoscale": true,
+          "precision": 0
+        }
+      },
+      {
+        "id": 4750886682807888,
+        "definition": {
+          "title": "❌ PIX Com Falha",
+          "title_size": "16",
+          "title_align": "left",
+          "time": {},
+          "type": "query_value",
+          "requests": [
+            {
+              "formulas": [
+                {
+                  "formula": "query1"
+                }
+              ],
+              "queries": [
+                {
+                  "name": "query1",
+                  "data_source": "logs",
+                  "search": {
+                    "query": "env:production service:transactions @status_transacao:ERRO*"
+                  },
+                  "indexes": ["*"],
+                  "group_by": [],
+                  "compute": {
+                    "aggregation": "count"
+                  },
+                  "storage": "hot"
+                }
+              ],
+              "response_format": "scalar",
+              "conditional_formats": [
+                {
+                  "comparator": ">",
+                  "palette": "white_on_red",
+                  "value": 0
+                }
+              ]
+            }
+          ],
+          "autoscale": true,
+          "precision": 0
+        }
+      },
+      {
+        "id": 4750886682807889,
+        "definition": {
+          "title": "💰 Valor Total Transferido (R$)",
+          "title_size": "16",
+          "title_align": "left",
+          "time": {},
+          "type": "query_value",
+          "requests": [
+            {
+              "formulas": [
+                {
+                  "formula": "query1"
+                }
+              ],
+              "queries": [
+                {
+                  "name": "query1",
+                  "data_source": "logs",
+                  "search": {
+                    "query": "env:production service:transactions @status_transacao:CONCLUIDO @valor:*"
+                  },
+                  "indexes": ["*"],
+                  "group_by": [],
+                  "compute": {
+                    "aggregation": "sum",
+                    "metric": "@valor"
+                  },
+                  "storage": "hot"
+                }
+              ],
+              "response_format": "scalar"
+            }
+          ],
+          "autoscale": true,
+          "precision": 2
+        }
+      },
+      {
+        "id": 4750886682807890,
+        "definition": {
+          "title": "💸 Valor Perdido em Falhas (R$)",
+          "title_size": "16",
+          "title_align": "left",
+          "time": {},
+          "type": "query_value",
+          "requests": [
+            {
+              "formulas": [
+                {
+                  "formula": "query1"
+                }
+              ],
+              "queries": [
+                {
+                  "name": "query1",
+                  "data_source": "logs",
+                  "search": {
+                    "query": "env:production service:transactions @status_transacao:ERRO* @valor:*"
+                  },
+                  "indexes": ["*"],
+                  "group_by": [],
+                  "compute": {
+                    "aggregation": "sum",
+                    "metric": "@valor"
+                  },
+                  "storage": "hot"
+                }
+              ],
+              "response_format": "scalar",
+              "conditional_formats": [
+                {
+                  "comparator": ">",
+                  "palette": "white_on_red",
+                  "value": 0
+                }
+              ]
+            }
+          ],
+          "autoscale": true,
+          "precision": 2
+        }
+      },
+      {
+        "id": 4750886682807891,
+        "definition": {
+          "title": "Transações PIX - Sucesso vs Falha",
+          "title_size": "16",
+          "title_align": "left",
+          "time": {},
+          "show_legend": true,
+          "legend_layout": "auto",
+          "legend_columns": ["avg", "min", "max", "value", "sum"],
+          "type": "timeseries",
+          "requests": [
+            {
+              "formulas": [
+                {
+                  "formula": "query1",
+                  "alias": "✅ Sucesso"
+                },
+                {
+                  "formula": "query2",
+                  "alias": "❌ Falha"
+                }
+              ],
+              "queries": [
+                {
+                  "name": "query1",
+                  "data_source": "logs",
+                  "search": {
+                    "query": "env:production service:transactions @status_transacao:CONCLUIDO"
+                  },
+                  "indexes": ["*"],
+                  "group_by": [],
+                  "compute": {
+                    "aggregation": "count"
+                  },
+                  "storage": "hot"
+                },
+                {
+                  "name": "query2",
+                  "data_source": "logs",
+                  "search": {
+                    "query": "env:production service:transactions @status_transacao:ERRO*"
+                  },
+                  "indexes": ["*"],
+                  "group_by": [],
+                  "compute": {
+                    "aggregation": "count"
+                  },
+                  "storage": "hot"
+                }
+              ],
+              "response_format": "timeseries",
+              "style": {
+                "palette": "dog_classic",
+                "line_type": "solid",
+                "line_width": "normal"
+              },
+              "display_type": "bars"
+            }
+          ],
+          "yaxis": {
+            "include_zero": true,
+            "scale": "linear"
+          }
+        }
+      },
+      {
+        "id": 4750886682807892,
+        "definition": {
+          "title": "Valor Monetário - Sucesso vs Perdas (R$)",
+          "title_size": "16",
+          "title_align": "left",
+          "time": {},
+          "show_legend": true,
+          "type": "timeseries",
+          "requests": [
+            {
+              "formulas": [
+                {
+                  "formula": "query1",
+                  "alias": "💰 Transferido"
+                },
+                {
+                  "formula": "query2",
+                  "alias": "💸 Perdido"
+                }
+              ],
+              "queries": [
+                {
+                  "name": "query1",
+                  "data_source": "logs",
+                  "search": {
+                    "query": "env:production service:transactions @status_transacao:CONCLUIDO @valor:*"
+                  },
+                  "indexes": ["*"],
+                  "group_by": [],
+                  "compute": {
+                    "aggregation": "sum",
+                    "metric": "@valor"
+                  },
+                  "storage": "hot"
+                },
+                {
+                  "name": "query2",
+                  "data_source": "logs",
+                  "search": {
+                    "query": "env:production service:transactions @status_transacao:ERRO* @valor:*"
+                  },
+                  "indexes": ["*"],
+                  "group_by": [],
+                  "compute": {
+                    "aggregation": "sum",
+                    "metric": "@valor"
+                  },
+                  "storage": "hot"
+                }
+              ],
+              "response_format": "timeseries",
+              "display_type": "area"
+            }
+          ]
+        }
+      },
+      {
+        "id": 4750886682807893,
+        "definition": {
+          "title": "⏱️ Tempo Médio de Transação (ms)",
+          "title_size": "16",
+          "title_align": "left",
+          "time": {},
+          "type": "query_value",
+          "requests": [
+            {
+              "formulas": [
+                {
+                  "formula": "query1"
+                }
+              ],
+              "queries": [
+                {
+                  "name": "query1",
+                  "data_source": "logs",
+                  "search": {
+                    "query": "env:production service:transactions @duracao_ms:*"
+                  },
+                  "indexes": ["*"],
+                  "group_by": [],
+                  "compute": {
+                    "aggregation": "avg",
+                    "metric": "@duracao_ms"
+                  },
+                  "storage": "hot"
+                }
+              ],
+              "response_format": "scalar",
+              "conditional_formats": [
+                {
+                  "comparator": "<",
+                  "palette": "white_on_green",
+                  "value": 1000
+                },
+                {
+                  "comparator": ">=",
+                  "palette": "white_on_yellow",
+                  "value": 1000
+                },
+                {
+                  "comparator": ">=",
+                  "palette": "white_on_red",
+                  "value": 3000
+                }
+              ]
+            }
+          ],
+          "autoscale": true,
+          "precision": 0
+        }
+      },
+      {
+        "id": 4750886682807894,
+        "definition": {
+          "title": "Latência - P50, P95, P99 (ms)",
+          "title_size": "16",
+          "title_align": "left",
+          "time": {},
+          "show_legend": true,
+          "type": "timeseries",
+          "requests": [
+            {
+              "formulas": [
+                {
+                  "formula": "query1",
+                  "alias": "P50"
+                },
+                {
+                  "formula": "query2",
+                  "alias": "P95"
+                },
+                {
+                  "formula": "query3",
+                  "alias": "P99"
+                }
+              ],
+              "queries": [
+                {
+                  "name": "query1",
+                  "data_source": "logs",
+                  "search": {
+                    "query": "env:production service:transactions @duracao_ms:*"
+                  },
+                  "indexes": ["*"],
+                  "group_by": [],
+                  "compute": {
+                    "aggregation": "pc50",
+                    "metric": "@duracao_ms"
+                  },
+                  "storage": "hot"
+                },
+                {
+                  "name": "query2",
+                  "data_source": "logs",
+                  "search": {
+                    "query": "env:production service:transactions @duracao_ms:*"
+                  },
+                  "indexes": ["*"],
+                  "group_by": [],
+                  "compute": {
+                    "aggregation": "pc95",
+                    "metric": "@duracao_ms"
+                  },
+                  "storage": "hot"
+                },
+                {
+                  "name": "query3",
+                  "data_source": "logs",
+                  "search": {
+                    "query": "env:production service:transactions @duracao_ms:*"
+                  },
+                  "indexes": ["*"],
+                  "group_by": [],
+                  "compute": {
+                    "aggregation": "pc99",
+                    "metric": "@duracao_ms"
+                  },
+                  "storage": "hot"
+                }
+              ],
+              "response_format": "timeseries",
+              "display_type": "line"
+            }
+          ]
+        }
+      },
+      {
+        "id": 4750886682807895,
+        "definition": {
+          "title": "🚨 Ataques SQL Injection Detectados",
+          "title_size": "16",
+          "title_align": "left",
+          "time": {},
+          "type": "query_value",
+          "requests": [
+            {
+              "formulas": [
+                {
+                  "formula": "query1"
+                }
+              ],
+              "queries": [
+                {
+                  "name": "query1",
+                  "data_source": "logs",
+                  "search": {
+                    "query": "env:production service:transactions @security_event:sql_injection_vulnerable_endpoint"
+                  },
+                  "indexes": ["*"],
+                  "group_by": [],
+                  "compute": {
+                    "aggregation": "count"
+                  },
+                  "storage": "hot"
+                }
+              ],
+              "response_format": "scalar",
+              "conditional_formats": [
+                {
+                  "comparator": ">",
+                  "palette": "white_on_red",
+                  "value": 0
+                },
+                {
+                  "comparator": "<=",
+                  "palette": "white_on_green",
+                  "value": 0
+                }
+              ]
+            }
+          ],
+          "autoscale": true,
+          "precision": 0
+        }
+      },
+      {
+        "id": 4750886682807896,
+        "definition": {
+          "title": "Ataques de Segurança - Timeline",
+          "title_size": "16",
+          "title_align": "left",
+          "time": {},
+          "show_legend": true,
+          "type": "timeseries",
+          "requests": [
+            {
+              "formulas": [
+                {
+                  "formula": "query1"
+                }
+              ],
+              "queries": [
+                {
+                  "name": "query1",
+                  "data_source": "logs",
+                  "search": {
+                    "query": "env:production service:transactions @security_event:*"
+                  },
+                  "indexes": ["*"],
+                  "group_by": [
+                    {
+                      "facet": "@security_event",
+                      "limit": 10,
+                      "sort": {
+                        "aggregation": "count",
+                        "order": "desc"
+                      }
+                    }
+                  ],
+                  "compute": {
+                    "aggregation": "count"
+                  },
+                  "storage": "hot"
+                }
+              ],
+              "response_format": "timeseries",
+              "style": {
+                "palette": "warm"
+              },
+              "display_type": "bars"
+            }
+          ]
+        }
+      },
+      {
+        "id": 4750886682807897,
+        "definition": {
+          "title": "Top Motivos de Falha",
+          "title_size": "16",
+          "title_align": "left",
+          "time": {},
+          "type": "toplist",
+          "requests": [
+            {
+              "formulas": [
+                {
+                  "formula": "query1",
+                  "limit": {
+                    "count": 10,
+                    "order": "desc"
+                  }
+                }
+              ],
+              "queries": [
+                {
+                  "name": "query1",
+                  "data_source": "logs",
+                  "search": {
+                    "query": "env:production service:transactions @status_transacao:ERRO*"
+                  },
+                  "indexes": ["*"],
+                  "group_by": [
+                    {
+                      "facet": "@status_transacao",
+                      "limit": 10,
+                      "sort": {
+                        "aggregation": "count",
+                        "order": "desc"
+                      }
+                    }
+                  ],
+                  "compute": {
+                    "aggregation": "count"
+                  },
+                  "storage": "hot"
+                }
+              ],
+              "response_format": "scalar"
+            }
+          ]
+        }
+      },
+      {
+        "id": 4750886682807898,
+        "definition": {
+          "title": "Taxa de Erro (%)",
+          "title_size": "16",
+          "title_align": "left",
+          "time": {},
+          "show_legend": false,
+          "type": "timeseries",
+          "requests": [
+            {
+              "formulas": [
+                {
+                  "formula": "(query2 / query1) * 100"
+                }
+              ],
+              "queries": [
+                {
+                  "name": "query1",
+                  "data_source": "logs",
+                  "search": {
+                    "query": "env:production service:transactions @status_transacao:*"
+                  },
+                  "indexes": ["*"],
+                  "group_by": [],
+                  "compute": {
+                    "aggregation": "count"
+                  },
+                  "storage": "hot"
+                },
+                {
+                  "name": "query2",
+                  "data_source": "logs",
+                  "search": {
+                    "query": "env:production service:transactions @status_transacao:ERRO*"
+                  },
+                  "indexes": ["*"],
+                  "group_by": [],
+                  "compute": {
+                    "aggregation": "count"
+                  },
+                  "storage": "hot"
+                }
+              ],
+              "response_format": "timeseries",
+              "style": {
+                "palette": "warm",
+                "line_type": "solid",
+                "line_width": "normal"
+              },
+              "display_type": "line"
+            }
+          ],
+          "yaxis": {
+            "min": "0",
+            "max": "100"
+          },
+          "markers": [
+            {
+              "value": "y = 5",
+              "display_type": "warning dashed",
+              "label": " ⚠️ Warning "
+            },
+            {
+              "value": "y = 10",
+              "display_type": "error dashed",
+              "label": " 🚨 Critical "
+            }
+          ]
+        }
+      }
+    ],
+    "template_variables": [],
+    "layout_type": "ordered",
+    "notify_list": [],
+    "reflow_type": "auto"
+  }
