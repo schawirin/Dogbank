@@ -210,7 +210,7 @@ public class UserService {
             
             Optional<User> userOpt = userRepository.findById(userId);
             
-            if (!userOpt.isPresent()) {
+            if (userOpt.isEmpty()) {
                 logData.put("status", "user_not_found");
                 logger.warn("Usuário não encontrado para validação de senha: {}", logData);
                 return false;
@@ -307,7 +307,7 @@ public class UserService {
 
             Optional<User> userOpt = userRepository.findById(userId);
             
-            if (!userOpt.isPresent()) {
+            if (userOpt.isEmpty()) {
                 logData.put("status", "user_not_found");
                 logger.warn("Usuário não encontrado: {}", logData);
                 throw new IllegalArgumentException("Usuário não encontrado");
