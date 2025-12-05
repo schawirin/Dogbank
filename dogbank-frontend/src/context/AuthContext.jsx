@@ -14,7 +14,8 @@ export const AuthProvider = ({ children }) => {
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
 
-    if (token && userData) {
+    // Apenas restaura se AMBOS existem E o token NÃO é "fake-token" (de teste)
+    if (token && userData && token !== 'fake-token') {
       try {
         const parsed = JSON.parse(userData);
         setUser(parsed);
@@ -24,6 +25,10 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('user');
         localStorage.removeItem('token');
       }
+    } else if (token === 'fake-token') {
+      // Se for fake-token, limpa tudo (era de teste)
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
     }
 
     setLoading(false);
