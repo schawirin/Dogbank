@@ -21,8 +21,8 @@ public class CorsConfig {
         // Origins permitidas - domínio HTTPS
         configuration.setAllowedOrigins(Arrays.asList(
             "http://localhost:3000",
-            "https://lab-dogbank.54.81.253.85.sslip.io",
-            "http://lab-dogbank.54.81.253.85.sslip.io"
+            "https://lab.dogbank.dog",
+            "http://lab.dogbank.dog"
         ));
         configuration.setAllowCredentials(false);
 
