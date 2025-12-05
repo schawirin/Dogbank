@@ -65,7 +65,7 @@ const PasswordPage = () => {
       };
       login(userObj, 'fake-token');
 
-      navigate('/dashboard', { replace: true });
+      navigate('/app/dashboard', { replace: true });
 
     } catch (err) {
       console.error('Erro no login:', err);
