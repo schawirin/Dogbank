@@ -9,8 +9,8 @@ spec:
   headers:
     accessControlAllowOriginList:
       - "http://localhost:3000"
-      - "https://lab-dogbank.54.81.253.85.sslip.io"
-      - "http://lab-dogbank.54.81.253.85.sslip.io"
+      - "https://lab.dogbank.dog"
+      - "http://lab.dogbank.dog"
     accessControlAllowMethods:
       - "GET"
       - "POST"
@@ -37,7 +37,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`lab-dogbank.54.81.253.85.sslip.io`) && PathPrefix(`/api/auth`)
+    - match: Host(`lab.dogbank.dog`) && PathPrefix(`/api/auth`)
       kind: Rule
       services:
         - name: auth-service
@@ -46,7 +46,7 @@ spec:
         - name: cors-headers
       priority: 100
 
-    - match: Host(`lab-dogbank.54.81.253.85.sslip.io`) && PathPrefix(`/api/accounts`)
+    - match: Host(`lab.dogbank.dog`) && PathPrefix(`/api/accounts`)
       kind: Rule
       services:
         - name: account-service
@@ -55,7 +55,7 @@ spec:
         - name: cors-headers
       priority: 100
 
-    - match: Host(`lab-dogbank.54.81.253.85.sslip.io`) && PathPrefix(`/api/transactions`)
+    - match: Host(`lab.dogbank.dog`) && PathPrefix(`/api/transactions`)
       kind: Rule
       services:
         - name: transaction-service
@@ -64,7 +64,7 @@ spec:
         - name: cors-headers
       priority: 100
 
-    - match: Host(`lab-dogbank.54.81.253.85.sslip.io`) && PathPrefix(`/api/bancocentral`)
+    - match: Host(`lab.dogbank.dog`) && PathPrefix(`/api/bancocentral`)
       kind: Rule
       services:
         - name: bancocentral-service
@@ -73,7 +73,7 @@ spec:
         - name: cors-headers
       priority: 100
 
-    - match: Host(`lab-dogbank.54.81.253.85.sslip.io`) && PathPrefix(`/api/integration`)
+    - match: Host(`lab.dogbank.dog`) && PathPrefix(`/api/integration`)
       kind: Rule
       services:
         - name: integration-service
@@ -82,7 +82,7 @@ spec:
         - name: cors-headers
       priority: 100
 
-    - match: Host(`lab-dogbank.54.81.253.85.sslip.io`) && PathPrefix(`/api/notifications`)
+    - match: Host(`lab.dogbank.dog`) && PathPrefix(`/api/notifications`)
       kind: Rule
       services:
         - name: notifications-service
@@ -94,7 +94,7 @@ spec:
   tls:
     certResolver: letsencrypt
     domains:
-      - main: lab-dogbank.54.81.253.85.sslip.io
+      - main: lab.dogbank.dog
 
 ---
 # IngressRoute: Frontend HTTPS
@@ -107,7 +107,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`lab-dogbank.54.81.253.85.sslip.io`) && PathPrefix(`/`)
+    - match: Host(`lab.dogbank.dog`) && PathPrefix(`/`)
       kind: Rule
       services:
         - name: dogbank-frontend-service
@@ -117,7 +117,7 @@ spec:
   tls:
     certResolver: letsencrypt
     domains:
-      - main: lab-dogbank.54.81.253.85.sslip.io
+      - main: lab.dogbank.dog
 ---
 # IngressRoute: HTTP (sem redirect para HTTPS)
 apiVersion: traefik.io/v1alpha1
