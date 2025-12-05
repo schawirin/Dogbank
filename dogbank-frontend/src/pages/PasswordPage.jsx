@@ -52,15 +52,19 @@ const PasswordPage = () => {
     setLoading(true);
     setError('');
     try {
-      // 2) Desestrutura a resposta da API: { token, user }
-      const resp = await authService.login(cpf, pin);
-      const token = resp.token ?? resp.accessToken;       // ajuste se for outro campo
-      const userObj = resp.user   ?? resp.usuario    ?? resp; // resp.user ou resp.usuario, ou resp inteiro
+      // Chama o authService que já salva os dados no localStorage
+      const { nome, chavePix, accountId } = await authService.login(cpf, pin);
 
-      // 3) Passa ambos para o seu contexto: login(user, token)
-      login(userObj, token);
+      // Atualiza o contexto com os dados do usuário
+      // Como não temos token real, usamos um token fake para manter compatibilidade
+      const userObj = {
+        cpf,
+        nome,
+        chavePix,
+        id: accountId
+      };
+      login(userObj, 'fake-token');
 
-      // 4) Vai pro dashboard
       navigate('/dashboard', { replace: true });
 
     } catch (err) {

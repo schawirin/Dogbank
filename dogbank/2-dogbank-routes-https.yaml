@@ -46,7 +46,7 @@ spec:
         - name: cors-headers
       priority: 100
 
-    - match: Host(`lab.jjs123.com`) && PathPrefix(`/api/accounts`)
+    - match: Host(`lab.dogbank.com`) && PathPrefix(`/api/accounts`)
       kind: Rule
       services:
         - name: account-service
@@ -55,7 +55,7 @@ spec:
         - name: cors-headers
       priority: 100
 
-    - match: Host(`lab.jjs123.com`) && PathPrefix(`/api/transactions`)
+    - match: Host(`lab.dogbank.com`) && PathPrefix(`/api/transactions`)
       kind: Rule
       services:
         - name: transaction-service
@@ -64,7 +64,7 @@ spec:
         - name: cors-headers
       priority: 100
 
-    - match: Host(`lab.jjs123.com`) && PathPrefix(`/api/bancocentral`)
+    - match: Host(`lab.dogbank.com`) && PathPrefix(`/api/bancocentral`)
       kind: Rule
       services:
         - name: bancocentral-service
@@ -73,7 +73,7 @@ spec:
         - name: cors-headers
       priority: 100
 
-    - match: Host(`lab.jjs123.com`) && PathPrefix(`/api/integration`)
+    - match: Host(`lab.dogbank.com`) && PathPrefix(`/api/integration`)
       kind: Rule
       services:
         - name: integration-service
@@ -82,7 +82,7 @@ spec:
         - name: cors-headers
       priority: 100
 
-    - match: Host(`lab.jjs123.com`) && PathPrefix(`/api/notifications`)
+    - match: Host(`lab.dogbank.com`) && PathPrefix(`/api/notifications`)
       kind: Rule
       services:
         - name: notifications-service
@@ -107,7 +107,7 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`lab.jjs123.com`) && PathPrefix(`/`)
+    - match: Host(`lab.dogbank.com`) && PathPrefix(`/`)
       kind: Rule
       services:
         - name: dogbank-frontend-service
