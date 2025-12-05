@@ -6,6 +6,8 @@ import { AuthProvider } from './context/AuthContext';
 import MainLayout from './components/layout/MainLayout';
 
 // Páginas
+import WelcomePage from './pages/WelcomePage';
+import RegisterPage from './pages/RegisterPage';
 import LoginPage from './pages/LoginPage';
 import PasswordPage from './pages/PasswordPage';
 import DashboardPage from './pages/DashboardPage';
@@ -40,13 +42,17 @@ datadogRum.init({
 const App = () => (
   <AuthProvider>
     <Routes>
+      {/* Página inicial */}
+      <Route path="/" element={<WelcomePage />} />
+
       {/* Rotas públicas */}
+      <Route path="/register" element={<RegisterPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/password" element={<PasswordPage />} />
 
       {/* Rotas protegidas */}
-      <Route path="/" element={<MainLayout />}>
-        <Route index element={<Navigate to="/dashboard" replace />} />
+      <Route path="/app" element={<MainLayout />}>
+        <Route index element={<Navigate to="/app/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="extrato" element={<ExtractPage />} />
         <Route path="cartoes" element={<CardsPage />} />     {/* NOVA ROTA */}
