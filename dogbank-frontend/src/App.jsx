@@ -10,11 +10,15 @@ import LoginPage from './pages/LoginPage';
 import PasswordPage from './pages/PasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import ExtractPage from './pages/ExtractPage';
-import CardsPage from './pages/CardsPage';               // NOVA PÁGINA
+import CardsPage from './pages/CardsPage';
 import PixTransferPage from './pages/PixTransferPage';
 import PixConfirmPage from './pages/PixConfirmPage';
 import PixReceiptPage from './pages/PixReceiptPage';
 import NotFoundPage from './pages/NotFoundPage';
+
+// Modern Styles
+import './styles/animations.css';
+import './styles/modern-effects.css';
 
 import { datadogRum } from '@datadog/browser-rum';
 

@@ -1,0 +1,323 @@
+/* ================================
+   DOGBANK - MODERN VISUAL EFFECTS
+   ================================ */
+
+/* Glassmorphism */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glass-dark {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-purple {
+  background: rgba(119, 74, 244, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(119, 74, 244, 0.2);
+}
+
+/* Gradient Backgrounds */
+.gradient-purple {
+  background: linear-gradient(135deg, #774af4 0%, #6931e6 100%);
+}
+
+.gradient-purple-blue {
+  background: linear-gradient(135deg, #774af4 0%, #0ea5e9 100%);
+}
+
+.gradient-purple-pink {
+  background: linear-gradient(135deg, #774af4 0%, #ec4899 100%);
+}
+
+.gradient-animated {
+  background: linear-gradient(
+    -45deg,
+    #774af4,
+    #6931e6,
+    #0ea5e9,
+    #38bdf8
+  );
+  background-size: 400% 400%;
+  animation: gradientShift 15s ease infinite;
+}
+
+/* Hover Effects */
+.hover-lift {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(119, 74, 244, 0.15);
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 20px rgba(119, 74, 244, 0.4),
+              0 0 40px rgba(119, 74, 244, 0.2);
+}
+
+.hover-scale {
+  transition: transform 0.3s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+/* Card Styles */
+.card-modern {
+  background: white;
+  border-radius: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02),
+              0 10px 15px rgba(0, 0, 0, 0.03);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-modern:hover {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08),
+              0 20px 40px rgba(119, 74, 244, 0.05);
+  transform: translateY(-2px);
+}
+
+.card-gradient {
+  background: linear-gradient(135deg,
+    rgba(119, 74, 244, 0.05) 0%,
+    rgba(14, 165, 233, 0.05) 100%);
+  border: 1px solid rgba(119, 74, 244, 0.1);
+}
+
+/* Text Effects */
+.text-gradient {
+  background: linear-gradient(135deg, #774af4 0%, #0ea5e9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-shimmer {
+  background: linear-gradient(
+    90deg,
+    #774af4 0%,
+    #9776ff 50%,
+    #774af4 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 3s linear infinite;
+}
+
+/* Button Effects */
+.btn-modern {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.btn-modern::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
+.btn-modern:hover::before {
+  left: 100%;
+}
+
+.btn-glow {
+  box-shadow: 0 4px 15px rgba(119, 74, 244, 0.3);
+  transition: all 0.3s ease;
+}
+
+.btn-glow:hover {
+  box-shadow: 0 6px 25px rgba(119, 74, 244, 0.5);
+  transform: translateY(-2px);
+}
+
+/* Neumorphism */
+.neumorphic {
+  background: #f8f9fd;
+  box-shadow: 8px 8px 16px rgba(209, 213, 219, 0.4),
+              -8px -8px 16px rgba(255, 255, 255, 0.8);
+}
+
+.neumorphic-inset {
+  background: #f8f9fd;
+  box-shadow: inset 8px 8px 16px rgba(209, 213, 219, 0.3),
+              inset -8px -8px 16px rgba(255, 255, 255, 0.7);
+}
+
+/* Borders */
+.border-gradient {
+  position: relative;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.border-gradient::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(135deg, #774af4, #0ea5e9);
+  border-radius: inherit;
+  z-index: -1;
+}
+
+/* Pulse Animation */
+.pulse-ring {
+  position: relative;
+}
+
+.pulse-ring::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #774af4, #0ea5e9);
+  opacity: 0;
+  animation: pulseRing 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulseRing {
+  0% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+}
+
+/* Loading Skeleton */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 25%,
+    #e0e0e0 50%,
+    #f0f0f0 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 0.5rem;
+}
+
+/* Scroll Effects */
+.scroll-smooth {
+  scroll-behavior: smooth;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Focus Effects */
+.focus-ring-purple:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(119, 74, 244, 0.3);
+}
+
+/* Transition Utilities */
+.transition-smooth {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.transition-spring {
+  transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* Overlay Effects */
+.overlay-gradient {
+  position: relative;
+}
+
+.overlay-gradient::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.4) 100%
+  );
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Backdrop Blur */
+.backdrop-blur-sm {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.backdrop-blur-md {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.backdrop-blur-lg {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Interactive Elements */
+.interactive {
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.2s ease;
+}
+
+.interactive:active {
+  transform: scale(0.98);
+}
+
+/* Success/Error States */
+.success-glow {
+  box-shadow: 0 0 20px rgba(0, 180, 42, 0.3);
+}
+
+.error-glow {
+  box-shadow: 0 0 20px rgba(255, 0, 34, 0.3);
+}
+
+/* Badge Effects */
+.badge-pulse {
+  position: relative;
+}
+
+.badge-pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: inherit;
+  animation: pulse 2s ease-in-out infinite;
+}
