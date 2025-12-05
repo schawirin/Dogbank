@@ -16,8 +16,8 @@ public class CorsConfig {
                 registry.addMapping("/**")
                         .allowedOrigins(
                                 "http://localhost:3000",
-                                "https://lab.dogbank.com",
-                                "http://lab.dogbank.com"
+                                "https://lab-dogbank.54.81.253.85.sslip.io",
+                                "http://lab-dogbank.54.81.253.85.sslip.io"
                         )
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH")
                         .allowedHeaders("*")
