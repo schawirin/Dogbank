@@ -1,0 +1,156 @@
+---
+# Middleware to strip /api/{service} prefix
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-api-prefix
+  namespace: traefik
+spec:
+  stripPrefixRegex:
+    regex:
+      - "^/api/[^/]+"
+
+---
+# IngressRoute for Frontend - namespace traefik
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: dogbank-frontend
+  namespace: traefik
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/`)
+      kind: Rule
+      priority: 1
+      services:
+        - name: dogbank-frontend-service
+          namespace: production
+          port: 80
+
+---
+# IngressRoute for Auth API
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: dogbank-auth
+  namespace: traefik
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/api/auth`)
+      kind: Rule
+      priority: 10
+      middlewares:
+        - name: strip-api-prefix
+      services:
+        - name: auth-service
+          namespace: production
+          port: 8088
+
+---
+# IngressRoute for Accounts API
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: dogbank-accounts
+  namespace: traefik
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/api/accounts`)
+      kind: Rule
+      priority: 10
+      middlewares:
+        - name: strip-api-prefix
+      services:
+        - name: accounts-service
+          namespace: production
+          port: 8089
+
+---
+# IngressRoute for Transactions API
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: dogbank-transactions
+  namespace: traefik
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/api/transactions`)
+      kind: Rule
+      priority: 10
+      middlewares:
+        - name: strip-api-prefix
+      services:
+        - name: transactions-service
+          namespace: production
+          port: 8084
+
+---
+# IngressRoute for Integration API
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: dogbank-integration
+  namespace: traefik
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/api/integration`)
+      kind: Rule
+      priority: 10
+      middlewares:
+        - name: strip-api-prefix
+      services:
+        - name: integration-service
+          namespace: production
+          port: 8082
+
+---
+# IngressRoute for BancoCentral API
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: dogbank-bancocentral
+  namespace: traefik
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/api/bancocentral`)
+      kind: Rule
+      priority: 10
+      middlewares:
+        - name: strip-api-prefix
+      services:
+        - name: bancocentral-service
+          namespace: production
+          port: 8085
+
+---
+# IngressRoute for Notifications API
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: dogbank-notifications
+  namespace: traefik
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/api/notifications`)
+      kind: Rule
+      priority: 10
+      middlewares:
+        - name: strip-api-prefix
+      services:
+        - name: notifications-service
+          namespace: production
+          port: 8083

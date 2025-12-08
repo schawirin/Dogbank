@@ -28,6 +28,12 @@ data:
       root /usr/share/nginx/html;
       index index.html index.htm;
 
+      # Redirect root to /password using the original Host header
+      location = / {
+        return 302 $scheme://$http_host/password;
+      }
+
+      # SPA fallback for all other routes
       location / {
         try_files $uri $uri/ /index.html;
       }
