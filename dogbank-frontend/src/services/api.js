@@ -56,16 +56,18 @@ api.interceptors.response.use(
 );
 
 // Instâncias específicas para cada módulo
+// WORKAROUND: Traefik está removendo o prefixo /api/auth, então duplicamos
 export const authApi = axios.create({
-  baseURL: '/api/auth',
+  baseURL: '/api/auth/api/auth',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   }
 });
 
+// WORKAROUND: Traefik está removendo os prefixos, então duplicamos
 export const accountApi = axios.create({
-  baseURL: '/api/accounts',
+  baseURL: '/api/accounts/api/accounts',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -73,7 +75,7 @@ export const accountApi = axios.create({
 });
 
 export const transactionApi = axios.create({
-  baseURL: '/api/transactions',
+  baseURL: '/api/transactions/api/transactions',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -81,7 +83,7 @@ export const transactionApi = axios.create({
 });
 
 export const integrationApi = axios.create({
-  baseURL: '/api/integration',
+  baseURL: '/api/integration/api/integration',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -89,7 +91,7 @@ export const integrationApi = axios.create({
 });
 
 export const notificationApi = axios.create({
-  baseURL: '/api/notifications',
+  baseURL: '/api/notifications/api/notifications',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -97,7 +99,7 @@ export const notificationApi = axios.create({
 });
 
 export const bancoCentralApi = axios.create({
-  baseURL: '/api/bancocentral',
+  baseURL: '/api/bancocentral/api/bancocentral',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
