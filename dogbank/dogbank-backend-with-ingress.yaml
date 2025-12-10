@@ -1,0 +1,625 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dogbank-postgres-secret
+  namespace: default
+type: Opaque
+data:
+  POSTGRES_USER: ZG9nYmFuaw==
+  POSTGRES_PASSWORD: ZG9nMTIzNA==
+  POSTGRES_DB: ZG9nYmFuaw==
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-script
+  namespace: default
+data:
+  01-init.sql: |
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id SERIAL PRIMARY KEY,
+        cpf VARCHAR(14) UNIQUE NOT NULL,
+        senha VARCHAR(255) NOT NULL,
+        nome VARCHAR(100) NOT NULL,
+        email VARCHAR(100) UNIQUE NOT NULL,
+        chave_pix VARCHAR(100),
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS contas (
+        id SERIAL PRIMARY KEY,
+        usuario_id INTEGER REFERENCES usuarios(id),
+        numero_conta VARCHAR(20) UNIQUE NOT NULL,
+        saldo DECIMAL(10,2) DEFAULT 0.00,
+        banco VARCHAR(50) DEFAULT 'DogBank',
+        user_name VARCHAR(100),
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS transacoes_pix (
+        id SERIAL PRIMARY KEY,
+        conta_origem INTEGER REFERENCES contas(id),
+        conta_destino INTEGER REFERENCES contas(id),
+        valor_transacionado DECIMAL(10,2) NOT NULL,
+        chave_pix_destino VARCHAR(100),
+        data_transacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(20) DEFAULT 'CONCLUIDA'
+    );
+    INSERT INTO usuarios (cpf, senha, nome, email, chave_pix) VALUES
+    ('12345678915','123456','yuki itadori','yuki.itadori@email.com','yuki.pix@email.com'),
+    ('98765432101','123456','Pedro Silva','pedro.silva@email.com','pedro.pix@email.com'),
+    ('45678912302','123456','João Santos','joao.santos@email.com','joao.pix@email.com'),
+    ('78912345603','123456','Emiliano Costa','emiliano.costa@email.com','emiliano.pix@email.com'),
+    ('32165498704','123456','Eliane Oliveira','eliane.oliveira@email.com','eliane.pix@email.com'),
+    ('65498732105','123456','Patrícia Souza','patricia.souza@email.com','patricia.pix@email.com'),
+    ('15975385206','123456','Renato Almeida','renato.almeida@email.com','renato.pix@email.com'),
+    ('66666666666','123456','Usuário Teste','teste@email.com','teste.pix@email.com')
+    ON CONFLICT (cpf) DO NOTHING;
+
+    INSERT INTO contas (usuario_id, numero_conta, saldo, user_name, banco)
+    SELECT
+      u.id,
+      'DB' || LPAD(u.id::TEXT, 8, '0'),
+      10000.00,
+      u.nome,
+      CASE (random() * 4)::int
+        WHEN 0 THEN 'ITAÚ'
+        WHEN 1 THEN 'SANTANDER'
+        WHEN 2 THEN 'BANCO PAN'
+        WHEN 3 THEN 'DOGBANK'
+        ELSE 'BANK OF AMERICA'
+      END
+    FROM usuarios u
+    WHERE NOT EXISTS (SELECT 1 FROM contas c WHERE c.usuario_id = u.id);
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        ports:
+        - containerPort: 5432
+        envFrom:
+        - secretRef:
+            name: dogbank-postgres-secret
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        - name: init-script
+          mountPath: /docker-entrypoint-initdb.d
+      volumes:
+      - name: postgres-storage
+        emptyDir: {}
+      - name: init-script
+        configMap:
+          name: postgres-init-script
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: default
+spec:
+  selector:
+    app: postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+
+---
+# AUTH - porta 8088
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth
+  template:
+    metadata:
+      labels:
+        app: auth
+    spec:
+      containers:
+      - name: auth
+        image: schawirin/dogbank-auth-service:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8088
+        env:
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres:5432/dogbank"
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_USER
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_PASSWORD
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8088
+          initialDelaySeconds: 90
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8088
+          initialDelaySeconds: 60
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: default
+spec:
+  selector:
+    app: auth
+  ports:
+  - name: http
+    port: 8088
+    targetPort: 8088
+
+---
+# ACCOUNTS - porta 8089
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: accounts
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: accounts
+  template:
+    metadata:
+      labels:
+        app: accounts
+    spec:
+      containers:
+      - name: accounts
+        image: schawirin/dogbank-account-service:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8089
+        env:
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres:5432/dogbank"
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_USER
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_PASSWORD
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8089
+          initialDelaySeconds: 90
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8089
+          initialDelaySeconds: 60
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: accounts-service
+  namespace: default
+spec:
+  selector:
+    app: accounts
+  ports:
+  - name: http
+    port: 8089
+    targetPort: 8089
+
+---
+# BANCOCENTRAL - porta 8085
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bancocentral
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bancocentral
+  template:
+    metadata:
+      labels:
+        app: bancocentral
+    spec:
+      containers:
+      - name: bancocentral
+        image: schawirin/dogbank-bancocentral-service:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8085
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8085
+          initialDelaySeconds: 90
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8085
+          initialDelaySeconds: 60
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bancocentral-service
+  namespace: default
+spec:
+  selector:
+    app: bancocentral
+  ports:
+  - name: http
+    port: 8085
+    targetPort: 8085
+
+---
+# TRANSACTIONS - porta 8084
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transactions
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: transactions
+  template:
+    metadata:
+      labels:
+        app: transactions
+    spec:
+      containers:
+      - name: transactions
+        image: schawirin/dogbank-transaction-service:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8084
+        env:
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres:5432/dogbank"
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_USER
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_PASSWORD
+        - name: ACCOUNT_SERVICE_URL
+          value: "http://accounts-service:8089"
+        - name: AUTH_SERVICE_URL
+          value: "http://auth-service:8088"
+        - name: BANCOCENTRAL_API_URL
+          value: "http://bancocentral-service:8085/api/bancocentral/pix/validate"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8084
+          initialDelaySeconds: 90
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8084
+          initialDelaySeconds: 60
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: transactions-service
+  namespace: default
+spec:
+  selector:
+    app: transactions
+  ports:
+  - name: http
+    port: 8084
+    targetPort: 8084
+
+---
+# INTEGRATION - porta 8082
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: integration
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: integration
+  template:
+    metadata:
+      labels:
+        app: integration
+    spec:
+      containers:
+      - name: integration
+        image: schawirin/dogbank-integration-service:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8082
+        env:
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres:5432/dogbank"
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_USER
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_PASSWORD
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8082
+          initialDelaySeconds: 90
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8082
+          initialDelaySeconds: 60
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: integration-service
+  namespace: default
+spec:
+  selector:
+    app: integration
+  ports:
+  - name: http
+    port: 8082
+    targetPort: 8082
+
+---
+# NOTIFICATIONS - porta 8083
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notifications
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notifications
+  template:
+    metadata:
+      labels:
+        app: notifications
+    spec:
+      containers:
+      - name: notifications
+        image: schawirin/dogbank-notification-service:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8083
+        env:
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres:5432/dogbank"
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_USER
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dogbank-postgres-secret
+              key: POSTGRES_PASSWORD
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8083
+          initialDelaySeconds: 90
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8083
+          initialDelaySeconds: 60
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notifications-service
+  namespace: default
+spec:
+  selector:
+    app: notifications
+  ports:
+  - name: http
+    port: 8083
+    targetPort: 8083
+
+---
+# IngressRoute for Frontend (root path) - apontando para traefik namespace
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: frontend-ingress
+  namespace: default
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/`)
+      kind: Rule
+      priority: 1
+      services:
+        - name: dogbank-frontend-service
+          port: 80
+
+---
+# IngressRoute for Auth API
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: auth-ingress
+  namespace: default
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/api/auth`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: auth-service
+          port: 8088
+
+---
+# IngressRoute for Accounts API
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: accounts-ingress
+  namespace: default
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/api/accounts`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: accounts-service
+          port: 8089
+
+---
+# IngressRoute for Transactions API
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: transactions-ingress
+  namespace: default
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/api/transactions`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: transactions-service
+          port: 8084
+
+---
+# IngressRoute for Integration API
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: integration-ingress
+  namespace: default
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/api/integration`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: integration-service
+          port: 8082
+
+---
+# IngressRoute for BancoCentral API
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: bancocentral-ingress
+  namespace: default
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/api/bancocentral`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: bancocentral-service
+          port: 8085
+
+---
+# IngressRoute for Notifications API
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: notifications-ingress
+  namespace: default
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/api/notifications`)
+      kind: Rule
+      priority: 10
+      services:
+        - name: notifications-service
+          port: 8083
