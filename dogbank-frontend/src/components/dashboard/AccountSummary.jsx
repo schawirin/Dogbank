@@ -31,11 +31,11 @@ const AccountSummary = ({ accountData }) => {
   };
   
   const handlePixClick = () => {
-    navigate('/pix');
+    navigate('/app/pix');
   };
-  
+
   const handleExtractClick = () => {
-    navigate('/extract');
+    navigate('/app/extrato');
   };
   
   return (

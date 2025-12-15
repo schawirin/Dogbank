@@ -114,7 +114,7 @@ const DashboardPage = () => {
               <div className="text-5xl mb-3">💳</div>
               <p className="mb-3">Você ainda não possui cartões.</p>
               <button
-                onClick={() => navigate('/cartoes')}
+                onClick={() => navigate('/app/cartoes')}
                 className="text-primary-500 text-sm font-semibold hover:text-primary-600 transition-smooth px-4 py-2 rounded-lg hover:bg-primary-50"
               >
                 Solicitar cartão →

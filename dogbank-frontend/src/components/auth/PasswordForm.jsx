@@ -60,7 +60,7 @@ const PasswordForm = () => {
       sessionStorage.removeItem('loginCpf');
       
       // Redirecionar para o dashboard
-      navigate('/dashboard');
+      navigate('/app/dashboard');
     } catch (err) {
       console.error('Erro de login:', err);
       setError('Senha incorreta. Tente novamente.');

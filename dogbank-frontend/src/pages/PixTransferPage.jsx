@@ -113,7 +113,7 @@ const PixTransferPage = () => {
 
     const numericAmount = parseFloat(amount.replace(/\./g, '').replace(',', '.'));
 
-    navigate('/pix/confirm', {
+    navigate('/app/pix/confirm', {
       state: {
         pixKey,
         amount: numericAmount.toFixed(2),
@@ -145,8 +145,8 @@ const PixTransferPage = () => {
     <div className="py-6">
       {/* Header moderno */}
       <div className="mb-8">
-        <button 
-          onClick={() => navigate('/dashboard')}
+        <button
+          onClick={() => navigate('/app/dashboard')}
           className="flex items-center text-primary-600 hover:text-primary-700 mb-4 transition-colors"
         >
           <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
