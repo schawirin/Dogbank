@@ -91,7 +91,7 @@ jobs:
 
       - name: Configure kubectl for EKS
         run: |
-          aws eks update-kubeconfig --name dogbank-cluster --region us-east-1
+          aws eks update-kubeconfig --name eks-sandbox-datadog --region us-east-1
 
       - name: Rollout restart deployments
         run: |
