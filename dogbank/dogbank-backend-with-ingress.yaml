@@ -337,9 +337,9 @@ spec:
             secretKeyRef:
               name: dogbank-postgres-secret
               key: POSTGRES_PASSWORD
-        - name: ACCOUNT_SERVICE_URL
+        - name: ACCOUNT_API_URL
           value: "http://accounts-service:8089"
-        - name: AUTH_SERVICE_URL
+        - name: AUTH_API_URL
           value: "http://auth-service:8088"
         - name: BANCOCENTRAL_API_URL
           value: "http://bancocentral-service:8085/api/bancocentral/pix/validate"
