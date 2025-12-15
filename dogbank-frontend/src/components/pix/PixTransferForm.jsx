@@ -133,7 +133,7 @@ const PixTransferForm = ({ onConfirm }) => {
           description: description.trim(),
           accountOriginId: accountData.id
         })
-        navigate('/dashboard', {
+        navigate('/app/dashboard', {
           state: { transferSuccess: true, message: 'Transferência realizada com sucesso!' }
         })
       }

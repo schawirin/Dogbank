@@ -10,22 +10,22 @@ const QuickActions = () => {
   return (
     <Card title="Ações rápidas">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Button 
-          onClick={() => navigate('/pix')} 
+        <Button
+          onClick={() => navigate('/app/pix')}
           className="flex-1"
         >
           Fazer PIX
         </Button>
-        <Button 
+        <Button
           variant="secondary"
-          onClick={() => navigate('/extrato')}
+          onClick={() => navigate('/app/extrato')}
           className="flex-1"
         >
           Extrato
         </Button>
-        <Button 
+        <Button
           variant="secondary"
-          onClick={() => navigate('/cartoes')}
+          onClick={() => navigate('/app/cartoes')}
           className="flex-1"
         >
           Cartões
