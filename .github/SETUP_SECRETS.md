@@ -60,8 +60,8 @@ metadata:
   namespace: kube-system
 data:
   mapUsers: |
-    - userarn: arn:aws:iam::ACCOUNT_ID:user/github-actions
-      username: github-actions
+    - userarn: arn:aws:iam::061039767542:user/github-actions-dogbank
+      username: github-actions-dogbank
       groups:
         - system:masters
 ```
