@@ -60,8 +60,8 @@ const pixService = {
 
   async getTransactionHistory(accountId) {
     try {
-      // URL correta: /api/transactions?accountId=X
-      const { data } = await transactionApi.get(`?accountId=${accountId}`);
+      // URL correta: /api/transactions/account/{accountId}
+      const { data } = await transactionApi.get(`/account/${accountId}`);
       return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('Erro ao buscar histórico:', error);
