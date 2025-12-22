@@ -11,7 +11,7 @@ apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: cors-headers
-  namespace: production
+  namespace: default
 spec:
   headers:
     accessControlAllowOriginList:
@@ -31,12 +31,24 @@ spec:
     accessControlMaxAge: 100
 
 ---
+# Middleware: Strip-Prefix for Auth
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: auth-stripprefix
+  namespace: default
+spec:
+  stripPrefix:
+    prefixes:
+      - /api/auth
+
+---
 # IngressRoute: Backend APIs
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: backend-apis
-  namespace: production
+  namespace: default
 spec:
   entryPoints:
   - web
@@ -47,9 +59,10 @@ spec:
     - name: auth-service
       port: 8088
     middlewares:
+    - name: auth-stripprefix
     - name: cors-headers
     priority: 100
-  
+
   - match: PathPrefix(`/api/accounts`)
     kind: Rule
     services:
@@ -58,7 +71,7 @@ spec:
     middlewares:
     - name: cors-headers
     priority: 100
-  
+
   - match: PathPrefix(`/api/transactions`)
     kind: Rule
     services:
@@ -67,7 +80,7 @@ spec:
     middlewares:
     - name: cors-headers
     priority: 100
-  
+
   - match: PathPrefix(`/api/bancocentral`)
     kind: Rule
     services:
@@ -76,7 +89,7 @@ spec:
     middlewares:
     - name: cors-headers
     priority: 100
-  
+
   - match: PathPrefix(`/api/integration`)
     kind: Rule
     services:
@@ -85,7 +98,7 @@ spec:
     middlewares:
     - name: cors-headers
     priority: 100
-  
+
   - match: PathPrefix(`/api/notifications`)
     kind: Rule
     services:
@@ -101,7 +114,7 @@ apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: frontend
-  namespace: production
+  namespace: default
 spec:
   entryPoints:
   - web
