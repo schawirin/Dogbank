@@ -56,16 +56,16 @@ api.interceptors.response.use(
 );
 
 // Instâncias específicas para cada módulo
-// Auth API: usa /api/auth duplicado porque o middleware auth-stripprefix remove o primeiro /api/auth
+// CORRIGIDO: Removido path duplicado - Nginx já faz o roteamento correto
 export const authApi = axios.create({
-  baseURL: '/api/auth/api/auth',
+  baseURL: '/api/auth',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   }
 });
 
-// Demais APIs: usam path simples pois Traefik NÃO remove prefixos
+// Account API
 export const accountApi = axios.create({
   baseURL: '/api/accounts',
   timeout: 10000,
@@ -74,6 +74,7 @@ export const accountApi = axios.create({
   }
 });
 
+// Transaction API
 export const transactionApi = axios.create({
   baseURL: '/api/transactions',
   timeout: 10000,
@@ -82,6 +83,7 @@ export const transactionApi = axios.create({
   }
 });
 
+// Integration API
 export const integrationApi = axios.create({
   baseURL: '/api/integration',
   timeout: 10000,
@@ -90,6 +92,7 @@ export const integrationApi = axios.create({
   }
 });
 
+// Notification API
 export const notificationApi = axios.create({
   baseURL: '/api/notifications',
   timeout: 10000,
@@ -98,6 +101,7 @@ export const notificationApi = axios.create({
   }
 });
 
+// Banco Central API
 export const bancoCentralApi = axios.create({
   baseURL: '/api/bancocentral',
   timeout: 10000,
