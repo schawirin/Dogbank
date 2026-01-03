@@ -1,5 +1,5 @@
 # Multi-stage build para bancocentral-module
-FROM maven:3.9.7-eclipse-temurin-17 AS builder
+FROM maven:3.9.7-eclipse-temurin-21 AS builder
 WORKDIR /app
 # Copia todo o projeto
 COPY . .
@@ -8,7 +8,7 @@ RUN mvn -f pom.xml clean install -DskipTests -N
 # Build do bancocentral-module
 RUN mvn -f bancocentral-module/pom.xml clean package -DskipTests
 # Runtime stage
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 # Instala wget para health checks
 RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
