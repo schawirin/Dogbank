@@ -18,28 +18,28 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Origins permitidas - domínio HTTPS
-        configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:3000",
-            "https://lab.dogbank.dog",
-            "http://lab.dogbank.dog"
-        ));
-        configuration.setAllowCredentials(false);
+        // DESENVOLVIMENTO: Permitir todas as origens usando patterns
+        // Para produção, substituir por origens específicas
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+        
+        // Permitir credentials (cookies, authorization headers)
+        configuration.setAllowCredentials(true);
 
         // Métodos permitidos
         configuration.setAllowedMethods(Arrays.asList(
             "GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"
         ));
 
-        // Headers permitidos
-        configuration.setAllowedHeaders(List.of("*"));
+        // Headers permitidos - todos
+        configuration.setAllowedHeaders(Arrays.asList("*"));
 
         // Headers expostos
         configuration.setExposedHeaders(Arrays.asList(
-            "Authorization", "Cache-Control", "Content-Type"
+            "Authorization", "Cache-Control", "Content-Type", 
+            "X-Requested-With", "Accept", "Origin"
         ));
 
-        // Tempo de cache para preflight
+        // Tempo de cache para preflight (1 hora)
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
