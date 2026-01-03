@@ -408,6 +408,31 @@ services:
           memory: 512M
 
   # ===========================================================================
+  # 🌐 FRONTEND (React)
+  # ===========================================================================
+  
+  frontend:
+    build:
+      context: ../dogbank-frontend
+      dockerfile: Dockerfile
+    container_name: dogbank-frontend
+    environment:
+      REACT_APP_API_URL: ${REACT_APP_API_URL:-}
+      NODE_ENV: production
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # ===========================================================================
   # 🔒 NGINX API GATEWAY (HTTPS)
   # ===========================================================================
   
@@ -422,6 +447,7 @@ services:
       - ./nginx/ssl:/etc/nginx/ssl:ro
       - ./nginx/logs:/var/log/nginx
     depends_on:
+      - frontend
       - auth-service
       - account-service
       - transaction-service
