@@ -1,5 +1,5 @@
 // src/services/pixService.js
-import { transactionApi, bancoCentralApi } from './api';
+import { transactionApi, bancoCentralApi, authApi } from './api';
 import authService from './authService';
 
 /**
@@ -17,13 +17,50 @@ const pixService = {
       console.log('🔍 Validando chave PIX:', { pixKey, amount });
       console.log('🔍 bancoCentralApi baseURL:', bancoCentralApi.defaults.baseURL);
       
-      const { data } = await bancoCentralApi.post(
-        '/pix/validate',
-        { pixKey, amount }
-      );
-      
-      console.log('✅ Chave PIX validada:', data);
-      return data;
+      // 1) Primeiro verifica se a chave existe no auth-service (banco de dados local)
+      console.log('🔍 Verificando se chave PIX existe no sistema...');
+      try {
+        const authResponse = await authApi.get(`/validate-pix?chavePix=${encodeURIComponent(pixKey)}`);
+        console.log('🔍 Resposta do auth-service:', authResponse.data);
+        
+        if (!authResponse.data.valid) {
+          console.warn('⚠️ Chave PIX não encontrada no sistema');
+          return {
+            status: 'REJECTED',
+            error: 'Chave PIX não encontrada no sistema. Verifique se a chave está correta.',
+            valid: false
+          };
+        }
+        
+        // Guarda os dados do usuário para retornar depois
+        const userData = authResponse.data.user;
+        console.log('✅ Usuário encontrado:', userData);
+        
+        // 2) Depois valida no Banco Central
+        const { data } = await bancoCentralApi.post(
+          '/pix/validate',
+          { pixKey, amount }
+        );
+        
+        console.log('✅ Chave PIX validada no Banco Central:', data);
+        
+        // Retorna com os dados do usuário
+        return {
+          ...data,
+          valid: data.status === 'APPROVED',
+          user: userData
+        };
+      } catch (authError) {
+        // Se o auth-service retornar 404, a chave não existe
+        if (authError.response?.status === 404) {
+          return {
+            status: 'REJECTED',
+            error: 'Chave PIX não encontrada. Verifique se a chave está correta.',
+            valid: false
+          };
+        }
+        throw authError;
+      }
     } catch (error) {
       console.error('❌ Erro ao validar chave PIX:', error.response?.data || error.message || error);
       throw error;
@@ -110,7 +147,34 @@ const pixService = {
       const { data } = await transactionApi.get(`/account/${accountId}`);
       
       console.log('✅ Histórico de transações obtido:', data);
-      return data;
+      
+      // Transforma os dados para o formato esperado pelo frontend
+      const transformedData = data.map(tx => {
+        // Determina se é enviado ou recebido baseado no accountOriginId
+        const isEnviado = tx.accountOriginId === accountId;
+        
+        return {
+          id: tx.id,
+          tipo: isEnviado ? 'enviado' : 'recebido',
+          valor: tx.amount,
+          amount: tx.amount,
+          data: tx.completedAt || tx.startedAt || tx.date,
+          createdAt: tx.startedAt,
+          completedAt: tx.completedAt,
+          destinatario: tx.receiverName,
+          receiverName: tx.receiverName,
+          origem: tx.senderName,
+          senderName: tx.senderName,
+          descricao: tx.description,
+          description: tx.description,
+          pixKey: tx.pixKeyDestination,
+          receiverBank: tx.receiverBank,
+          senderBank: tx.senderBankCode
+        };
+      });
+      
+      console.log('✅ Transações transformadas:', transformedData);
+      return transformedData;
     } catch (error) {
       console.error('❌ Erro detalhado ao buscar histórico:', {
         message: error.message,
