@@ -114,7 +114,7 @@ export const notificationApi = axios.create({
 
 export const bancoCentralApi = axios.create({
   baseURL: '/api/bancocentral',
-  timeout: 10000,
+  timeout: 15000, // Increased to handle Banco Central delays (timeout simulation uses 5s delay)
   headers: {
     'Content-Type': 'application/json',
   }

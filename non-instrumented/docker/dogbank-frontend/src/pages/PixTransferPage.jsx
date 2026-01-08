@@ -70,12 +70,9 @@ const PixTransferPage = () => {
     }
     try {
       setValidatingKey(true);
-      const result = await pixService.validatePixKey(
-        pixKey.trim(),
-        parseFloat(amount.replace(/\./g, '').replace(',', '.')) || 0,
-      );
+      const result = await pixService.validatePixKey(pixKey.trim());
 
-      if (result.status === 'APPROVED' || result.valid) {
+      if (result.valid) {
         setRecipientInfo(result.user ?? { nome: 'Destinatário', banco: '' });
         setPixKeyError('');
         return true;
