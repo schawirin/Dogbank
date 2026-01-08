@@ -29,11 +29,21 @@ datadogRum.init({
     service: 'dogbank',
     env: 'dogbank',
     // Specify a version number to identify the deployed version of your application in Datadog
-    // version: '1.0.0',
+    version: '1.0.0',
     sessionSampleRate: 100,
     sessionReplaySampleRate: 100,
     defaultPrivacyLevel: 'allow',
+    // Forward console logs to Datadog
+    forwardConsoleLogs: ['log', 'info', 'warn', 'error'],
+    forwardErrorsToLogs: true,
+    // Track user interactions
+    trackUserInteractions: true,
+    trackResources: true,
+    trackLongTasks: true,
 });
+
+// Start session replay recording
+datadogRum.startSessionReplayRecording();
 
 const App = () => (
   <AuthProvider>
