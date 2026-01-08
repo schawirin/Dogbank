@@ -87,7 +87,7 @@ TRUNCATE TABLE usuarios CASCADE;
 -- INSERIR USUÁRIOS DE TESTE
 -- =============================================================================
 INSERT INTO usuarios (cpf, senha, nome, email, chave_pix) VALUES
-('12345678915', '123456', 'Julia Medina', 'julia.medina@dogbank.com', 'julia.medina@dogbank.com'),
+('12345678915', '123456', 'Vitoria Itadori', 'vitoria.itadori@dogbank.com', 'vitoria.itadori@dogbank.com'),
 ('98765432101', '123456', 'Pedro Silva', 'pedro.silva@dogbank.com', 'pedro.silva@dogbank.com'),
 ('45678912302', '123456', 'João Santos', 'joao.santos@dogbank.com', 'joao.santos@dogbank.com'),
 ('78912345603', '123456', 'Emiliano Costa', 'emiliano.costa@dogbank.com', 'emiliano.costa@dogbank.com'),
@@ -100,7 +100,7 @@ INSERT INTO usuarios (cpf, senha, nome, email, chave_pix) VALUES
 -- CRIAR CONTAS COM SALDO INICIAL
 -- =============================================================================
 INSERT INTO contas (usuario_id, numero_conta, saldo, banco, user_name) VALUES
-((SELECT id FROM usuarios WHERE cpf='12345678915'), '0001-9', 10000.00, 'DOG BANK', 'Julia Medina'),
+((SELECT id FROM usuarios WHERE cpf='12345678915'), '0001-9', 10000.00, 'DOG BANK', 'Vitoria Itadori'),
 ((SELECT id FROM usuarios WHERE cpf='98765432101'), '0002-1', 15000.00, 'Banco do Brasil', 'Pedro Silva'),
 ((SELECT id FROM usuarios WHERE cpf='45678912302'), '0003-2', 8500.00, 'Itaú', 'João Santos'),
 ((SELECT id FROM usuarios WHERE cpf='78912345603'), '0004-3', 12000.00, 'Santander', 'Emiliano Costa'),
@@ -112,7 +112,7 @@ INSERT INTO contas (usuario_id, numero_conta, saldo, banco, user_name) VALUES
 -- =============================================================================
 -- VERIFICAR E ATUALIZAR SALDOS (garantia extra)
 -- =============================================================================
-UPDATE contas SET saldo = 10000.00, banco = 'DOG BANK', user_name = 'Julia Medina' WHERE numero_conta = '0001-9';
+UPDATE contas SET saldo = 10000.00, banco = 'DOG BANK', user_name = 'Vitoria Itadori' WHERE numero_conta = '0001-9';
 UPDATE contas SET saldo = 15000.00, banco = 'Banco do Brasil', user_name = 'Pedro Silva' WHERE numero_conta = '0002-1';
 UPDATE contas SET saldo = 8500.00, banco = 'Itaú', user_name = 'João Santos' WHERE numero_conta = '0003-2';
 UPDATE contas SET saldo = 12000.00, banco = 'Santander', user_name = 'Emiliano Costa' WHERE numero_conta = '0004-3';
@@ -126,7 +126,7 @@ UPDATE contas SET saldo = 50000.00, banco = 'DOG BANK', user_name = 'Usuário Te
 -- =============================================================================
 INSERT INTO transacoes_pix (conta_origem, conta_destino, valor_transacionado, chave_pix_destino, status) VALUES
 ((SELECT id FROM contas WHERE numero_conta='0001-9'), (SELECT id FROM contas WHERE numero_conta='0002-1'), 100.00, 'pedro.silva@dogbank.com', 'CONCLUIDA'),
-((SELECT id FROM contas WHERE numero_conta='0008-7'), (SELECT id FROM contas WHERE numero_conta='0001-9'), 500.00, 'julia.medina@dogbank.com', 'CONCLUIDA'),
+((SELECT id FROM contas WHERE numero_conta='0008-7'), (SELECT id FROM contas WHERE numero_conta='0001-9'), 500.00, 'vitoria.itadori@dogbank.com', 'CONCLUIDA'),
 ((SELECT id FROM contas WHERE numero_conta='0002-1'), (SELECT id FROM contas WHERE numero_conta='0003-2'), 250.00, 'joao.santos@dogbank.com', 'CONCLUIDA'),
 ((SELECT id FROM contas WHERE numero_conta='0006-5'), (SELECT id FROM contas WHERE numero_conta='0008-7'), 1000.00, 'teste@dogbank.com', 'CONCLUIDA'),
 ((SELECT id FROM contas WHERE numero_conta='0004-3'), (SELECT id FROM contas WHERE numero_conta='0005-4'), 350.00, 'eliane.oliveira@dogbank.com', 'CONCLUIDA');
