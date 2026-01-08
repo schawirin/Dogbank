@@ -137,18 +137,50 @@ const DashboardPage = () => {
                 <h3 className="text-lg font-semibold text-slate-900">Meus cartões</h3>
               </div>
               
-              <div className="py-6 text-center">
-                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <CreditCard className="w-8 h-8 text-slate-400" />
-                </div>
-                <p className="text-slate-500 mb-4">Você ainda não possui cartões.</p>
-                <button
+              {/* Mini Card Preview */}
+              <div className="mb-4">
+                <div 
+                  className="relative h-36 rounded-xl p-4 text-white shadow-lg cursor-pointer hover:scale-[1.02] transition-transform"
+                  style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
                   onClick={() => navigate('/dashboard/cartoes')}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-medium text-sm hover:from-violet-500 hover:to-purple-500 transition-all shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40"
                 >
-                  Solicitar cartão
-                </button>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="text-xs font-bold opacity-90">DogBank</div>
+                    <div className="text-xs opacity-70">Mastercard</div>
+                  </div>
+                  <div className="w-8 h-5 bg-yellow-300 rounded opacity-80 mb-3"></div>
+                  <div className="text-sm font-mono tracking-wider mb-2">**** **** **** 1234</div>
+                  <div className="flex justify-between items-end text-xs">
+                    <div>
+                      <div className="opacity-60">PORTADOR</div>
+                      <div className="font-medium">{(user?.nome || 'CLIENTE DOGBANK').toUpperCase()}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="opacity-60">VÁLIDO</div>
+                      <div className="font-medium">12/28</div>
+                    </div>
+                  </div>
+                </div>
               </div>
+
+              {/* Card Info Summary */}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="bg-slate-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-slate-500">Limite disponível</p>
+                  <p className="text-sm font-bold text-green-600">R$ 3.250,00</p>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-slate-500">Fatura atual</p>
+                  <p className="text-sm font-bold text-red-600">R$ 1.750,00</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => navigate('/dashboard/cartoes')}
+                className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-medium text-sm hover:from-violet-500 hover:to-purple-500 transition-all shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40"
+              >
+                Consultar cartões
+              </button>
             </div>
           </Card>
 
