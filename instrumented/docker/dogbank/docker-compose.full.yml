@@ -52,6 +52,16 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db:/docker-entrypoint-initdb.d:ro
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "pg_stat_statements.max=10000"
+      - "-c"
+      - "pg_stat_statements.track=all"
+      - "-c"
+      - "track_activity_query_size=4096"
     networks:
       - dogbank-network
     healthcheck:
@@ -62,9 +72,6 @@ services:
       start_period: 30s
     restart: unless-stopped
     labels:
-      com.datadoghq.ad.check_names: '["postgres"]'
-      com.datadoghq.ad.init_configs: '[{}]'
-      com.datadoghq.ad.instances: '[{"host":"%%host%%", "port":"5432", "username":"dogbank", "password":"dog1234", "dbname":"dogbank"}]'
       com.datadoghq.ad.logs: '[{"source": "postgresql", "service": "dogbank-postgres"}]'
 
   # ===========================================================================
@@ -121,16 +128,22 @@ services:
       DD_TAGS: "env:dogbank project:dogbank"
       # Dogstatsd
       DD_DOGSTATSD_NON_LOCAL_TRAFFIC: "true"
+      # Database Monitoring (DBM)
+      DD_DBM_ENABLED: "true"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /proc/:/host/proc/:ro
       - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./datadog/conf.d/postgres.d/conf.yaml:/etc/datadog-agent/conf.d/postgres.d/conf.yaml:ro
     ports:
       - "8126:8126"  # APM traces
       - "8125:8125/udp"  # DogStatsD
     networks:
       - dogbank-network
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   # ===========================================================================
