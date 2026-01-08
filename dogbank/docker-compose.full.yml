@@ -118,7 +118,7 @@ services:
       # Container monitoring
       DD_CONTAINER_EXCLUDE: "name:datadog-agent"
       # Tags
-      DD_TAGS: "env:development project:dogbank"
+      DD_TAGS: "env:dogbank project:dogbank"
       # Dogstatsd
       DD_DOGSTATSD_NON_LOCAL_TRAFFIC: "true"
     volumes:
@@ -151,7 +151,7 @@ services:
       # Datadog
       DD_AGENT_HOST: datadog-agent
       DD_SERVICE: bancocentral-service
-      DD_ENV: development
+      DD_ENV: dogbank
       DD_VERSION: "1.0.0"
     depends_on:
       postgres:
@@ -192,7 +192,7 @@ services:
       # Datadog
       DD_AGENT_HOST: datadog-agent
       DD_SERVICE: auth-service
-      DD_ENV: development
+      DD_ENV: dogbank
       DD_VERSION: "1.0.0"
     depends_on:
       postgres:
@@ -231,7 +231,7 @@ services:
       # Datadog
       DD_AGENT_HOST: datadog-agent
       DD_SERVICE: account-service
-      DD_ENV: development
+      DD_ENV: dogbank
       DD_VERSION: "1.0.0"
     depends_on:
       postgres:
@@ -272,7 +272,7 @@ services:
       # Datadog
       DD_AGENT_HOST: datadog-agent
       DD_SERVICE: transaction-service
-      DD_ENV: development
+      DD_ENV: dogbank
       DD_VERSION: "1.0.0"
     depends_on:
       postgres:
