@@ -37,6 +37,11 @@ const LoginForm = () => {
 
   return (
     <div className="w-full max-w-md mx-auto">
+      <div className="text-center mb-8">
+        <h1 className="text-2xl font-bold text-neutral-800">Bem-vindo ao DogBank</h1>
+        <p className="text-neutral-500 mt-2">Digite seu CPF para continuar</p>
+      </div>
+
       {error && (
         <Alert
           type="error"
@@ -64,13 +69,12 @@ const LoginForm = () => {
       </form>
 
       <div className="mt-6 text-center">
-        <button
-          type="button"
-          onClick={() => navigate('/')}
-          className="text-sm text-neutral-500 hover:text-neutral-700"
-        >
-          ← Voltar
-        </button>
+        <p className="text-sm text-neutral-500">
+          Ainda não é cliente?{' '}
+          <a href="#" className="text-primary-500 hover:text-primary-600">
+            Abra sua conta
+          </a>
+        </p>
       </div>
     </div>
   );

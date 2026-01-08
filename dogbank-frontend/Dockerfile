@@ -1,19 +1,31 @@
-# Stage 1: build
+# Multi-stage Dockerfile para o frontend do DogBank (produção)
+
+# Stage 1: Build da aplicação React
 FROM node:18-alpine AS builder
+
 WORKDIR /app
 
-# só o package*.json para aproveitar cache
+# Copiar package.json e package-lock.json
 COPY package*.json ./
-RUN npm ci
 
-# agora copia o restante do código
+# Copiar todo o código fonte do projeto para o diretório de trabalho
 COPY . .
-# gera build de produção (usa devDependencies no build)
-RUN npm run build
 
-# Stage 2: runtime
+# Instalar dependências e construir a aplicação
+# Usando npx para garantir que react-scripts seja executado corretamente
+RUN npm ci --omit=dev && npx react-scripts build
+
+# Stage 2: Servir a aplicação com Nginx
 FROM nginx:stable-alpine
-# copia o build estático para o Nginx
+
+# Copiar os arquivos de build do stage anterior para o diretório de serviço do Nginx
 COPY --from=builder /app/build /usr/share/nginx/html
+
+# Copiar configuração customizada do nginx
+COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Expor a porta 80 (porta padrão do Nginx)
 EXPOSE 80
+
+# Comando para iniciar o Nginx
 CMD ["nginx", "-g", "daemon off;"]

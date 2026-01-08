@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import authService from '../../services/authService';
+import authService from '../../services/authService'; // Corrigido: importando o default
 import Input from '../common/Input';
 import Button from '../common/Button';
 import Alert from '../common/Alert';
@@ -43,24 +43,20 @@ const PasswordForm = () => {
       // Chamar o serviço de autenticação
       const response = await authService.login(cpf, password);
       
-      console.log('Resposta do login:', response);
-      
-      // accountId do backend é o userId que precisamos
+      // Login bem-sucedido
       login({ 
-        id: response.accountId,
         nome: response.nome, 
         cpf: cpf,
         chavePix: response.chavePix 
       }, "fake-token-for-demo");
       
-      // Salvar como userId (nome usado no DashboardPage)
-      localStorage.setItem('userId', response.accountId);
-      
       // Limpar CPF da sessão
       sessionStorage.removeItem('loginCpf');
+      navigate('/dashboard');
+
       
       // Redirecionar para o dashboard
-      navigate('/app/dashboard');
+      navigate('/dashboard');
     } catch (err) {
       console.error('Erro de login:', err);
       setError('Senha incorreta. Tente novamente.');

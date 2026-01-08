@@ -54,7 +54,7 @@ const PixConfirmPage = () => {
       });
 
       // Redireciona para recibo
-      navigate('/app/pix/receipt', { state: receipt });
+      navigate('/pix/receipt', { state: receipt });
     } catch (err) {
       console.error('Erro na confirmação PIX:', err);
       const msg = err.response?.data?.error || err.message || 'Falha na confirmação.';
@@ -75,8 +75,8 @@ const PixConfirmPage = () => {
     <div className="py-6">
       {/* Header moderno */}
       <div className="mb-8">
-        <button
-          onClick={() => navigate('/app/pix')}
+        <button 
+          onClick={() => navigate('/pix')}
           className="flex items-center text-primary-600 hover:text-primary-700 mb-4 transition-colors"
           disabled={loading}
         >

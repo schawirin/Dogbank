@@ -38,52 +38,24 @@ const PixTransferForm = ({ onConfirm }) => {
     fetchAccountData()
   }, [user])
 
-  // ⚠️ CHAMA O ENDPOINT VULNERÁVEL A SQL INJECTION
   const validatePixKey = async () => {
     if (!pixKey.trim()) {
       setPixKeyError('Digite uma chave PIX válida')
       return false
     }
-    
     try {
       setValidatingKey(true)
-      
-      // 🔥 ENDPOINT VULNERÁVEL - PERMITE SQL INJECTION
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8084'
-      const response = await fetch(
-        `${API_BASE_URL}/api/transactions/validate-pix-key?pixKey=${encodeURIComponent(pixKey)}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
-      )
-      
-      const data = await response.json()
-      
-      console.log('🔍 Validação PIX Response:', data)
-      
-      if (data.valid) {
-        // Dados do destinatário retornados pelo backend
-        setRecipientInfo({
-          nome: data.nome || 'N/A',
-          banco: data.banco || 'DogBank',
-          cpf: data.cpf || 'N/A',
-          email: data.email || 'N/A'
-        })
+      const resp = await authService.validatePix(pixKey)
+      if (resp.valid) {
+        setRecipientInfo(resp.user)
         setPixKeyError('')
         return true
       } else {
-        setPixKeyError(data.message || data.error || 'Chave PIX inválida')
-        setRecipientInfo(null)
+        setPixKeyError(resp.message || 'Chave PIX inválida')
         return false
       }
-      
-    } catch (error) {
-      console.error('❌ Erro ao validar PIX:', error)
+    } catch {
       setPixKeyError('Erro ao validar a chave PIX.')
-      setRecipientInfo(null)
       return false
     } finally {
       setValidatingKey(false)
@@ -133,7 +105,7 @@ const PixTransferForm = ({ onConfirm }) => {
           description: description.trim(),
           accountOriginId: accountData.id
         })
-        navigate('/app/dashboard', {
+        navigate('/dashboard', {
           state: { transferSuccess: true, message: 'Transferência realizada com sucesso!' }
         })
       }
@@ -151,13 +123,6 @@ const PixTransferForm = ({ onConfirm }) => {
     setAmount(v)
   }
 
-  // Validar ao sair do campo (onBlur)
-  const handlePixKeyBlur = () => {
-    if (pixKey.trim()) {
-      validatePixKey()
-    }
-  }
-
   return (
     <Card>
       <h2 className="text-xl font-semibold mb-6">Transferência PIX</h2>
@@ -172,29 +137,19 @@ const PixTransferForm = ({ onConfirm }) => {
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
           label="Chave PIX"
-          placeholder="CPF, e-mail, telefone ou chave aleatória"
           value={pixKey}
           onChange={e => setPixKey(e.target.value)}
-          onBlur={handlePixKeyBlur}
           error={pixKeyError}
           disabled={loading || validatingKey}
         />
-        {validatingKey && (
-          <div className="text-sm text-gray-500">
-            🔍 Validando chave PIX...
-          </div>
-        )}
         {recipientInfo && (
-          <div className="p-4 bg-green-50 border border-green-200 rounded">
-            <p className="font-semibold text-green-800">✅ Destinatário encontrado:</p>
-            <p className="text-sm mt-2"><strong>Nome:</strong> {recipientInfo.nome}</p>
-            <p className="text-sm"><strong>Banco:</strong> {recipientInfo.banco}</p>
-            <p className="text-sm"><strong>CPF:</strong> {recipientInfo.cpf}</p>
+          <div className="p-2 bg-primary-50 rounded">
+            <p>Destinatário: {recipientInfo.nome}</p>
+            <p>Banco: {recipientInfo.banco}</p>
           </div>
         )}
         <Input
           label="Valor"
-          placeholder="0,00"
           value={amount}
           onChange={handleAmountChange}
           error={amountError}
@@ -202,13 +157,12 @@ const PixTransferForm = ({ onConfirm }) => {
         />
         <Input
           label="Descrição (opcional)"
-          placeholder="Ex: Pagamento do aluguel"
           value={description}
           onChange={e => setDescription(e.target.value)}
           disabled={loading}
         />
 
-        <Button type="submit" fullWidth disabled={loading || validatingKey || !recipientInfo}>
+        <Button type="submit" fullWidth disabled={loading || validatingKey}>
           {loading ? 'Processando...' : 'Continuar'}
         </Button>
       </form>

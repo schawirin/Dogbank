@@ -314,7 +314,7 @@ const CardsPage = () => {
       <div className="mt-6">
         <Button 
           variant="secondary" 
-          onClick={() => navigate('/app/dashboard')}
+          onClick={() => navigate('/dashboard')}
         >
           ← Voltar ao Dashboard
         </Button>

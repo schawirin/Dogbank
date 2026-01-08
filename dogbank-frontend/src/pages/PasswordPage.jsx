@@ -1,16 +1,17 @@
-// src/pages/PasswordPage.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { ArrowLeft, Shield, Delete } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import authService from '../services/authService';
-import Card from '../components/common/Card';
-import Button from '../components/common/Button';
-import Alert from '../components/common/Alert';
-import { ArrowLeftOnRectangleIcon } from '@heroicons/react/24/outline';
 
 const PIN_LENGTH = 6;
-const KEYPAD = ['1','2','3','4','5','6','7','8','9','0'];
+const KEYPAD = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
 
+/**
+ * Página de senha/PIN - Redesenhada com split layout
+ * - Left side: Visual branding com roxo Datadog
+ * - Right side: Teclado numérico para PIN
+ */
 const PasswordPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -21,14 +22,17 @@ const PasswordPage = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // 1) Pega o CPF que veio de LoginPage via state
+  // Pega o CPF que veio de LoginPage via state
   useEffect(() => {
     const fromState = location.state?.cpf;
-    if (!fromState) {
+    const fromSession = sessionStorage.getItem('loginCpf');
+    const finalCpf = fromState || fromSession;
+
+    if (!finalCpf) {
       navigate('/login', { replace: true });
       return;
     }
-    setCpf(fromState);
+    setCpf(finalCpf);
   }, [location.state, navigate]);
 
   const addDigit = (d) => {
@@ -37,9 +41,18 @@ const PasswordPage = () => {
       setError('');
     }
   };
+
   const removeDigit = () => {
     setPin(p => p.slice(0, -1));
     setError('');
+  };
+
+  const handleKeypadClick = (key) => {
+    if (key === 'del') {
+      removeDigit();
+    } else if (key !== '') {
+      addDigit(key);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -52,20 +65,18 @@ const PasswordPage = () => {
     setLoading(true);
     setError('');
     try {
-      // Chama o authService que já salva os dados no localStorage
-      const { nome, chavePix, accountId } = await authService.login(cpf, pin);
+      // Chama a API de login
+      const resp = await authService.login(cpf, pin);
+      const token = resp.token ?? resp.accessToken;
+      const userObj = resp.user ?? resp.usuario ?? resp;
 
-      // Atualiza o contexto com os dados do usuário
-      // Como não temos token real, usamos um token fake para manter compatibilidade
-      const userObj = {
-        cpf,
-        nome,
-        chavePix,
-        id: accountId
-      };
-      login(userObj, 'fake-token');
+      // Passa para o contexto de autenticação
+      login(userObj, token);
 
-      navigate('/app/dashboard', { replace: true });
+      // ✅ Aguarda React processar estado antes de navegar
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 0);
 
     } catch (err) {
       console.error('Erro no login:', err);
@@ -81,70 +92,142 @@ const PasswordPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4">
-      <Card className="w-full max-w-sm sm:max-w-md lg:max-w-lg py-10 text-center">
-        <h1 className="text-xl sm:text-2xl font-semibold mb-2">
-          Digite sua senha de acesso
-        </h1>
-        <p className="text-sm text-neutral-500 mb-4">
-          CPF: <span className="font-medium">{cpf}</span>
-        </p>
-
-        <div className="flex justify-center gap-4 mb-6">
-          {Array.from({ length: PIN_LENGTH }).map((_, i) => (
-            <span
-              key={i}
-              className={`h-3 w-3 sm:h-4 sm:w-4 rounded-full transition-colors ${
-                i < pin.length ? 'bg-primary-500' : 'border border-neutral-400'
-              }`}
-            />
-          ))}
+    <div className="min-h-screen flex">
+      {/* LEFT SIDE - Visual/Branding */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary-900 via-primary-700 to-primary-500 p-12 items-center justify-center relative overflow-hidden">
+        {/* Background pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-white rounded-full blur-3xl"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-white rounded-full blur-3xl"></div>
         </div>
 
-        {error && (
-          <Alert
-            type="error"
-            message={error}
-            onClose={() => setError('')}
-            className="mb-6"
-          />
-        )}
+        {/* Content */}
+        <div className="relative z-10 text-white max-w-lg">
+          <div className="w-24 h-24 bg-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center mb-8">
+            <span className="text-5xl font-bold">D</span>
+          </div>
+          <h1 className="text-5xl font-bold mb-4">Acesso Seguro</h1>
+          <p className="text-xl text-white/90">
+            Digite sua senha de 6 dígitos para acessar sua conta com total segurança.
+          </p>
 
-        <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-3 gap-3 mb-8 max-w-xs mx-auto">
-            {KEYPAD.map(d => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => addDigit(d)}
-                className="py-3 sm:py-4 rounded-lg border border-neutral-300 hover:bg-primary-50 active:bg-primary-100 transition text-lg font-medium"
-              >
-                {d}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={removeDigit}
-              className="py-3 sm:py-4 rounded-lg border border-neutral-300 hover:bg-neutral-100 active:bg-neutral-200 flex items-center justify-center"
-            >
-              <ArrowLeftOnRectangleIcon className="h-5 w-5 sm:h-6 sm:w-6" />
-            </button>
+          <div className="mt-12 space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                <Shield size={24} />
+              </div>
+              <div>
+                <h3 className="font-semibold">Criptografia Avançada</h3>
+                <p className="text-sm text-white/80">Seus dados protegidos com tecnologia de ponta</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT SIDE - Password Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
+        <div className="w-full max-w-md">
+          {/* Back button */}
+          <Link
+            to="/login"
+            className="inline-flex items-center gap-2 text-foreground/60 hover:text-foreground mb-8 transition-colors"
+          >
+            <ArrowLeft size={20} />
+            Voltar
+          </Link>
+
+          {/* Logo mobile */}
+          <div className="lg:hidden flex justify-center mb-8">
+            <div className="w-16 h-16 bg-primary-500 rounded-2xl flex items-center justify-center">
+              <span className="text-2xl font-bold text-white">D</span>
+            </div>
           </div>
 
-          <Button
-            type="submit"
-            disabled={pin.length !== PIN_LENGTH || loading}
-            fullWidth
-            size="lg"
-          >
-            {loading ? 'Validando…' : 'Entrar'}
-          </Button>
-        </form>
+          {/* Heading */}
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold mb-2">Digite sua senha</h2>
+            <p className="text-foreground/60">CPF: {cpf}</p>
+          </div>
 
-        <p className="mt-6 text-sm text-neutral-500">
-          Esqueceu a senha? Abra o app para redefinir.
-        </p>
-      </Card>
+          {/* PIN Dots */}
+          <div className="flex justify-center gap-3 mb-8">
+            {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+              <span
+                key={i}
+                className={`h-4 w-4 rounded-full transition-all ${
+                  i < pin.length
+                    ? 'bg-primary-500 scale-110'
+                    : 'border-2 border-border'
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* Error Alert */}
+          {error && (
+            <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-center">
+              {error}
+            </div>
+          )}
+
+          {/* Keypad */}
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-3 gap-3 mb-8 max-w-xs mx-auto">
+              {KEYPAD.map((key, idx) => {
+                if (key === '') {
+                  return <div key={idx} />;
+                }
+                if (key === 'del') {
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleKeypadClick('del')}
+                      className="py-4 rounded-xl border border-border hover:bg-accent active:bg-accent/80 transition flex items-center justify-center"
+                    >
+                      <Delete size={24} className="text-foreground/60" />
+                    </button>
+                  );
+                }
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleKeypadClick(key)}
+                    className="py-4 rounded-xl border border-border hover:bg-primary-500/10 hover:border-primary-500 active:bg-primary-500/20 transition text-lg font-semibold"
+                  >
+                    {key}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="submit"
+              disabled={pin.length !== PIN_LENGTH || loading}
+              className="w-full bg-primary-500 text-white py-4 rounded-xl font-semibold text-lg hover:bg-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 hover:scale-[1.02]"
+            >
+              {loading ? 'Validando...' : 'Entrar'}
+            </button>
+          </form>
+
+          {/* Footer */}
+          <div className="mt-8 text-center">
+            <p className="text-foreground/60 text-sm">
+              Esqueceu a senha?{' '}
+              <button className="text-primary-500 font-semibold hover:text-primary-600">
+                Recuperar acesso
+              </button>
+            </p>
+          </div>
+
+          {/* Disclaimer */}
+          <div className="mt-12 text-center text-xs text-foreground/40">
+            <p>Este é um projeto de demonstração. Não é um banco real.</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
