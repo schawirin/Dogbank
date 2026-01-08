@@ -397,7 +397,7 @@ public class TransactionService {
     @SuppressWarnings("unchecked")
     private Map<String, Object> validarPixNoBancoCentral(String pixKey, BigDecimal amount) {
         try {
-            String url = bancoCentralUrl + "/api/pix/validate";
+            String url = bancoCentralUrl + "/pix/validate";
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             
