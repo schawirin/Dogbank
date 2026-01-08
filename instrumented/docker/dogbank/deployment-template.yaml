@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-module
+  namespace: production
+  labels:
+    app: auth-module
+    # Tag Datadog: define o ambiente (env) em que o serviço roda (ex: production, staging, dev)
+    tags.datadoghq.com/env: production
+    # Tag Datadog: nome lógico do serviço (aparece no APM, Logs e Métricas)
+    tags.datadoghq.com/service: auth-module
+    # Tag Datadog: versão da aplicação, usada para versionamento em métricas e traces
+    tags.datadoghq.com/version: v1
+    # Tag Datadog customizada: identifica a equipe responsável pelo serviço (usada em Cloud Cost e filtros)
+    tags.datadoghq.com/team: plataforma
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-module
+  template:
+    metadata:
+      labels:
+        app: auth-module
+        # Repete no Pod: ambiente em que o serviço roda
+        tags.datadoghq.com/env: production
+        # Repete no Pod: nome lógico do serviço
+        tags.datadoghq.com/service: auth-module
+        # Repete no Pod: versão da aplicação
+        tags.datadoghq.com/version: v1
+        # Repete no Pod: tag customizada de time (para chargeback/showback no Cloud Cost)
+        tags.datadoghq.com/team: plataforma
+        # Annotation Datadog: habilita auto-instrumentação APM via Admission Controller
+        admission.datadoghq.com/enabled: "true"
+      annotations:
+        # Annotation Datadog: instrui o Agent a coletar logs deste container
+        # - "source: java" → classifica a origem como aplicação Java
+        # - "service: auth-module" → vincula os logs ao mesmo serviço configurado no APM
+        ad.datadoghq.com/auth-module.logs: '[{"source":"java","service":"auth-module"}]'
+    spec:
+      containers:
+        - name: auth-module
+          image: schawirin/dogbank-auth-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            # Variável Datadog: injeta IDs de trace nos logs (correlação automática entre Logs ↔ APM)
+            - name: DD_LOGS_INJECTION
+              value: "true"
+            - name: DD_IAST_ENABLED
+              value: "true"
+
+            # Configuração da aplicação (não relacionada ao Datadog)
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres:5432/dogbank"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-postgres-secret
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-postgres-secret
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "300m"

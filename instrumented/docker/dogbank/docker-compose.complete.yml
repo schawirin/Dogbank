@@ -1,0 +1,491 @@
+# =============================================================================
+# Docker Compose Completo - DogBank
+# =============================================================================
+# Inclui todos os microserviços:
+# - Auth, Account, Transaction, Banco Central, Integration, Notification
+# - Autorizador (NOVO) - Autorização e detecção de fraude
+# - Ledger (NOVO) - Partidas dobradas e auditoria
+# - Nginx com HTTPS
+# - PostgreSQL e Redis
+# =============================================================================
+# 
+# USO:
+#   docker-compose -f docker-compose.complete.yml up -d
+#
+# PRIMEIRO USO (gerar certificados SSL):
+#   cd nginx/ssl && ./generate-certs.sh
+#   docker-compose -f docker-compose.complete.yml up -d
+#
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # 💾 DATA LAYER
+  # ===========================================================================
+  
+  postgres:
+    image: postgres:15-alpine
+    container_name: dogbank-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dogbank}
+      POSTGRES_USER: ${POSTGRES_USER:-dogbank}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dog1234}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "127.0.0.1:5432:5432"  # Apenas localhost pode acessar
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d:ro
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dogbank} -d ${POSTGRES_DB:-dogbank}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  redis:
+    image: redis:7-alpine
+    container_name: dogbank-redis
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    ports:
+      - "127.0.0.1:6379:6379"  # Apenas localhost pode acessar
+    volumes:
+      - redis_data:/data
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  # ===========================================================================
+  # 🏛️ BANCO CENTRAL SERVICE
+  # ===========================================================================
+  
+  bancocentral-service:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.bancocentral
+    container_name: bancocentral-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dogbank}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-dogbank}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-dog1234}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 10
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 5
+      SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT: 30000
+      SERVER_PORT: 8085
+      # Datadog APM (opcional)
+      DD_SERVICE: bancocentral-service
+      DD_ENV: ${DD_ENV:-dogbank}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8085/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ===========================================================================
+  # 🔑 AUTH SERVICE
+  # ===========================================================================
+  
+  auth-service:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.auth
+    container_name: auth-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dogbank}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-dogbank}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-dog1234}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 10
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 5
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SERVER_PORT: 8088
+      # JWT Configuration
+      JWT_SECRET: ${JWT_SECRET:-dogbank-secret-key-change-in-production}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      # Datadog APM
+      DD_SERVICE: auth-service
+      DD_ENV: ${DD_ENV:-dogbank}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8088/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ===========================================================================
+  # 💳 ACCOUNT SERVICE
+  # ===========================================================================
+  
+  account-service:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.account
+    container_name: account-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dogbank}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-dogbank}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-dog1234}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 10
+      SERVER_PORT: 8089
+      # Datadog APM
+      DD_SERVICE: account-service
+      DD_ENV: ${DD_ENV:-dogbank}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8089/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ===========================================================================
+  # ✅ AUTORIZADOR SERVICE (NOVO)
+  # ===========================================================================
+  
+  autorizador-service:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.autorizador
+    container_name: autorizador-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dogbank}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-dogbank}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-dog1234}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 10
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SERVER_PORT: 8090
+      # Service URLs
+      ACCOUNT_SERVICE_URL: http://account-service:8089
+      # Limites de transação
+      TRANSACTION_LIMIT_DAILY: ${TRANSACTION_LIMIT_DAILY:-50000}
+      TRANSACTION_LIMIT_SINGLE: ${TRANSACTION_LIMIT_SINGLE:-10000}
+      # Datadog APM
+      DD_SERVICE: autorizador-service
+      DD_ENV: ${DD_ENV:-dogbank}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      account-service:
+        condition: service_healthy
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ===========================================================================
+  # 📒 LEDGER SERVICE (NOVO)
+  # ===========================================================================
+  
+  ledger-service:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.ledger
+    container_name: ledger-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dogbank}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-dogbank}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-dog1234}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 10
+      SERVER_PORT: 8091
+      # Service URLs
+      ACCOUNT_SERVICE_URL: http://account-service:8089
+      # Datadog APM
+      DD_SERVICE: ledger-service
+      DD_ENV: ${DD_ENV:-dogbank}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      account-service:
+        condition: service_healthy
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8091/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ===========================================================================
+  # 💸 TRANSACTION SERVICE
+  # ===========================================================================
+  
+  transaction-service:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.transaction
+    container_name: transaction-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dogbank}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-dogbank}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-dog1234}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 10
+      SERVER_PORT: 8084
+      # Service URLs
+      BANCOCENTRAL_API_URL: http://bancocentral-service:8085/api/bancocentral/pix/validate
+      ACCOUNT_SERVICE_URL: http://account-service:8089
+      AUTORIZADOR_SERVICE_URL: http://autorizador-service:8090
+      LEDGER_SERVICE_URL: http://ledger-service:8091
+      NOTIFICATION_SERVICE_URL: http://notification-service:8083
+      # Datadog APM
+      DD_SERVICE: transaction-service
+      DD_ENV: ${DD_ENV:-dogbank}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      bancocentral-service:
+        condition: service_healthy
+      account-service:
+        condition: service_healthy
+      autorizador-service:
+        condition: service_healthy
+      ledger-service:
+        condition: service_healthy
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8084/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ===========================================================================
+  # 🔗 INTEGRATION SERVICE
+  # ===========================================================================
+  
+  integration-service:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.integration
+    container_name: integration-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dogbank}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-dogbank}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-dog1234}
+      SERVER_PORT: 8082
+      # Datadog Configuration
+      DD_API_KEY: ${DD_API_KEY:-}
+      DD_SITE: ${DD_SITE:-datadoghq.com}
+      DD_SERVICE: integration-service
+      DD_ENV: ${DD_ENV:-dogbank}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ===========================================================================
+  # 📢 NOTIFICATION SERVICE
+  # ===========================================================================
+  
+  notification-service:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.notification
+    container_name: notification-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dogbank}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-dogbank}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-dog1234}
+      SERVER_PORT: 8083
+      # Email Configuration (opcional)
+      SPRING_MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      SPRING_MAIL_PORT: ${MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      # Datadog APM
+      DD_SERVICE: notification-service
+      DD_ENV: ${DD_ENV:-dogbank}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ===========================================================================
+  # 🌐 FRONTEND (React)
+  # ===========================================================================
+  
+  frontend:
+    build:
+      context: ../dogbank-frontend
+      dockerfile: Dockerfile
+    container_name: dogbank-frontend
+    environment:
+      REACT_APP_API_URL: ${REACT_APP_API_URL:-}
+      NODE_ENV: production
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # ===========================================================================
+  # 🔒 NGINX API GATEWAY (HTTPS)
+  # ===========================================================================
+  
+  nginx:
+    image: nginx:alpine
+    container_name: dogbank-gateway
+    ports:
+      - "80:80"      # HTTP (redireciona para HTTPS)
+      - "443:443"    # HTTPS
+    volumes:
+      - ./nginx/nginx-complete.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - frontend
+      - auth-service
+      - account-service
+      - transaction-service
+      - autorizador-service
+      - ledger-service
+      - bancocentral-service
+      - integration-service
+      - notification-service
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+
+networks:
+  dogbank-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

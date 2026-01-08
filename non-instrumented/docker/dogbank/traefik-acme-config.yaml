@@ -1,0 +1,58 @@
+---
+# ConfigMap com arquivo traefik.yaml para Let's Encrypt
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traefik-config-acme
+  namespace: traefik
+data:
+  traefik.yaml: |
+    global:
+      checkNewVersion: false
+      sendAnonymousUsage: false
+
+    entryPoints:
+      web:
+        address: ":8000"
+        http:
+          redirections:
+            entryPoint:
+              to: websecure
+              scheme: https
+      websecure:
+        address: ":8443"
+
+    api:
+      insecure: true
+      dashboard: true
+
+    providers:
+      kubernetesCRD:
+        ingressClass: traefik
+        allowCrossNamespace: true
+        allowEmptyServices: true
+      kubernetesIngress:
+        ingressClass: traefik
+        allowEmptyServices: true
+
+    # Let's Encrypt Configuration
+    certificatesResolvers:
+      letsencrypt:
+        acme:
+          email: admin@dogbank.local
+          storage: /acme/acme.json
+          httpChallenge:
+            entryPoint: web
+          # Para produção, descomente a linha abaixo e comente a staging
+          # caServer: https://acme-v02.api.letsencrypt.org/directory
+          # Para testes, use staging (sem rate limit):
+          caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+
+    ping: {}
+    metrics:
+      prometheus:
+        addEntryPointsLabels: true
+        addServicesLabels: true
+        entryPoint: metrics
+    log:
+      level: INFO

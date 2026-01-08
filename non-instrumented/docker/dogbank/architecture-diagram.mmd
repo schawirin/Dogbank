@@ -1,0 +1,139 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1a1a2e', 'primaryTextColor': '#fff', 'primaryBorderColor': '#00d9ff', 'lineColor': '#00d9ff', 'secondaryColor': '#16213e', 'tertiaryColor': '#0f3460', 'background': '#0a0a0a', 'mainBkg': '#1a1a2e', 'nodeBorder': '#00d9ff', 'clusterBkg': '#16213e', 'clusterBorder': '#00d9ff', 'titleColor': '#00d9ff', 'edgeLabelBackground': '#1a1a2e'}}}%%
+
+flowchart TB
+    subgraph CLIENTS["🌐 CLIENTS"]
+        direction LR
+        WEB["🖥️ Web App<br/>(React)"]
+        MOBILE["📱 Mobile App"]
+        API_CLIENT["🔌 API Client"]
+    end
+
+    subgraph GATEWAY["🔒 API GATEWAY (Nginx)"]
+        direction TB
+        HTTP["HTTP :80<br/>↓ Redirect"]
+        HTTPS["HTTPS :443<br/>TLS 1.2/1.3 | HTTP/2"]
+        
+        subgraph SECURITY["🛡️ Security Layer"]
+            RATE["⏱️ Rate Limiting<br/>Login: 5/min<br/>Transactions: 30/min"]
+            HEADERS["📋 Security Headers<br/>HSTS | CSP | X-Frame"]
+            CORS["🔗 CORS<br/>Origin Validation"]
+        end
+        
+        SSL["🔐 SSL/TLS<br/>Certificates"]
+    end
+
+    subgraph MICROSERVICES["⚙️ MICROSERVICES"]
+        direction TB
+        
+        subgraph AUTH_GROUP["🔑 Authentication"]
+            AUTH["Auth Service<br/>:8088<br/>━━━━━━━━━━<br/>• Login/Logout<br/>• User Management<br/>• Password Validation"]
+        end
+        
+        subgraph CORE_BANKING["💰 Core Banking"]
+            ACCOUNT["Account Service<br/>:8089<br/>━━━━━━━━━━<br/>• Account CRUD<br/>• Balance Management<br/>• User Accounts"]
+            
+            TRANSACTION["Transaction Service<br/>:8084<br/>━━━━━━━━━━<br/>• PIX Transfers<br/>• Transaction History<br/>• ⚠️ SQL Injection Demo"]
+        end
+        
+        subgraph NEW_MODULES["🆕 New Modules"]
+            AUTORIZADOR["Autorizador Service<br/>:8090<br/>━━━━━━━━━━<br/>• Transaction Authorization<br/>• Fraud Detection<br/>• Limit Validation"]
+            
+            LEDGER["Ledger Service<br/>:8091<br/>━━━━━━━━━━<br/>• Double-Entry Bookkeeping<br/>• Account Balances<br/>• Audit Trail"]
+        end
+        
+        subgraph EXTERNAL_INT["🌍 External Integration"]
+            BANCOCENTRAL["Banco Central Service<br/>:8085<br/>━━━━━━━━━━<br/>• PIX Validation<br/>• Central Bank API<br/>• Compliance"]
+            
+            INTEGRATION["Integration Service<br/>:8082<br/>━━━━━━━━━━<br/>• Datadog Metrics<br/>• External APIs<br/>• Monitoring"]
+        end
+        
+        subgraph SUPPORT["📢 Support Services"]
+            NOTIFICATION["Notification Service<br/>:8083<br/>━━━━━━━━━━<br/>• Email/SMS<br/>• Push Notifications<br/>• Alerts"]
+        end
+    end
+
+    subgraph DATA["💾 DATA LAYER"]
+        direction LR
+        POSTGRES[("🐘 PostgreSQL<br/>:5432<br/>━━━━━━━━━━<br/>• usuarios<br/>• contas<br/>• transacoes_pix<br/>• ledger_entries")]
+        
+        REDIS[("⚡ Redis<br/>:6379<br/>━━━━━━━━━━<br/>• Session Cache<br/>• Rate Limit State<br/>• Temp Data")]
+    end
+
+    subgraph OBSERVABILITY["📊 OBSERVABILITY"]
+        direction LR
+        DATADOG["🐕 Datadog<br/>━━━━━━━━━━<br/>• APM<br/>• Logs<br/>• Metrics<br/>• ASM"]
+        
+        LOGS["📝 Nginx Logs<br/>━━━━━━━━━━<br/>• Access Logs<br/>• Error Logs"]
+    end
+
+    %% Client Connections
+    WEB -->|"HTTPS"| HTTPS
+    MOBILE -->|"HTTPS"| HTTPS
+    API_CLIENT -->|"HTTPS"| HTTPS
+    
+    %% HTTP Redirect
+    HTTP -.->|"301 Redirect"| HTTPS
+    
+    %% Gateway to Security
+    HTTPS --> SECURITY
+    HTTPS --> SSL
+    
+    %% Gateway to Services
+    SECURITY -->|"/api/auth/*"| AUTH
+    SECURITY -->|"/api/accounts/*"| ACCOUNT
+    SECURITY -->|"/api/transactions/*"| TRANSACTION
+    SECURITY -->|"/api/autorizador/*"| AUTORIZADOR
+    SECURITY -->|"/api/ledger/*"| LEDGER
+    SECURITY -->|"/api/bancocentral/*"| BANCOCENTRAL
+    SECURITY -->|"/api/integration/*"| INTEGRATION
+    SECURITY -->|"/api/notifications/*"| NOTIFICATION
+
+    %% Service Dependencies
+    AUTH -->|"User Data"| POSTGRES
+    ACCOUNT -->|"Account Data"| POSTGRES
+    TRANSACTION -->|"Transaction Data"| POSTGRES
+    AUTORIZADOR -->|"Authorization Rules"| POSTGRES
+    LEDGER -->|"Ledger Entries"| POSTGRES
+    BANCOCENTRAL -->|"PIX Data"| POSTGRES
+    NOTIFICATION -->|"Notification Log"| POSTGRES
+    
+    %% Inter-service Communication
+    TRANSACTION -->|"Validate PIX"| BANCOCENTRAL
+    TRANSACTION -->|"Authorize"| AUTORIZADOR
+    TRANSACTION -->|"Record Entry"| LEDGER
+    TRANSACTION -->|"Update Balance"| ACCOUNT
+    TRANSACTION -->|"Send Alert"| NOTIFICATION
+    
+    AUTORIZADOR -->|"Check Limits"| ACCOUNT
+    AUTORIZADOR -->|"Fraud Check"| INTEGRATION
+    
+    LEDGER -->|"Balance Update"| ACCOUNT
+    
+    %% Cache connections
+    AUTH -.->|"Session"| REDIS
+    AUTORIZADOR -.->|"Rate State"| REDIS
+    
+    %% Observability
+    AUTH -.->|"Metrics"| DATADOG
+    TRANSACTION -.->|"Metrics"| DATADOG
+    AUTORIZADOR -.->|"Metrics"| DATADOG
+    LEDGER -.->|"Metrics"| DATADOG
+    INTEGRATION -->|"Send Metrics"| DATADOG
+    HTTPS -.->|"Access Logs"| LOGS
+
+    %% Styling
+    classDef clientStyle fill:#2d3436,stroke:#00d9ff,stroke-width:2px,color:#fff
+    classDef gatewayStyle fill:#0984e3,stroke:#00d9ff,stroke-width:2px,color:#fff
+    classDef serviceStyle fill:#6c5ce7,stroke:#00d9ff,stroke-width:2px,color:#fff
+    classDef newServiceStyle fill:#00b894,stroke:#00d9ff,stroke-width:3px,color:#fff
+    classDef dataStyle fill:#d63031,stroke:#00d9ff,stroke-width:2px,color:#fff
+    classDef obsStyle fill:#fdcb6e,stroke:#00d9ff,stroke-width:2px,color:#000
+    classDef securityStyle fill:#e17055,stroke:#00d9ff,stroke-width:2px,color:#fff
+
+    class WEB,MOBILE,API_CLIENT clientStyle
+    class HTTP,HTTPS,SSL gatewayStyle
+    class RATE,HEADERS,CORS securityStyle
+    class AUTH,ACCOUNT,TRANSACTION,BANCOCENTRAL,INTEGRATION,NOTIFICATION serviceStyle
+    class AUTORIZADOR,LEDGER newServiceStyle
+    class POSTGRES,REDIS dataStyle
+    class DATADOG,LOGS obsStyle

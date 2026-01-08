@@ -1,0 +1,650 @@
+Abaixo está um **README.md** atualizado, refletindo as últimas mudanças que você fez no **auth-module** (uso do CPF como login, sem coluna `login` no banco, porta 8088, senha em texto puro para testes, etc.) e também incluindo o seu novo script `run-all.sh` com a liberação da porta 8088.
+
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)                            
+export PATH=$JAVA_HOME/bin:$PATH
+
+
+# se ainda não tiver rodando
+docker run --name dogbank \
+  -e POSTGRES_USER=dogbank \
+  -e POSTGRES_PASSWORD=dog1234 \
+  -e POSTGRES_DB=banco_db \
+  -v ~/docker/pgdata:/var/lib/postgresql/data \
+  -p 5432:5432 \
+  -d postgres:14
+
+---
+
+```markdown
+# DogBank
+
+O **DogBank** é um projeto modular que simula um sistema bancário moderno, inspirado na identidade visual do C6 Bank, mas com uma paleta de cores roxa (inspirada na Datadog). O projeto é dividido em módulos, facilitando a manutenção e futura migração para uma arquitetura de microserviços.
+
+## Índice
+
+- [Estrutura do Projeto](#estrutura-do-projeto)
+- [Módulos do Back-End](#módulos-do-back-end)
+  - [auth-module](#auth-module)
+  - [account-module](#account-module)
+  - [transaction-module](#transaction-module)
+  - [integration-module](#integration-module)
+  - [notification-module](#notification-module)
+- [Configuração do Banco de Dados](#configuração-do-banco-de-dados)
+- [Possíveis Conflitos de Portas](#possíveis-conflitos-de-portas)
+- [Front-End](#front-end)
+- [Como Testar](#como-testar)
+- [Rodando Todos os Módulos Localmente](#rodando-todos-os-módulos-localmente)
+
+---
+
+## Estrutura do Projeto
+
+```
+dogbank/
+├── pom.xml                # POM raiz do projeto multi-módulo
+├── auth-module/           # Módulo de autenticação
+├── account-module/        # Módulo de gerenciamento de contas
+├── transaction-module/    # Módulo de transações (simulação de transferências PIX)
+├── integration-module/    # Módulo de integração com serviços externos (simulação do sistema PIX)
+└── notification-module/   # Módulo de notificações (alertas, e-mails, SMS)
+```
+
+O front-end do projeto está implementado separadamente em React:
+
+```
+dogbank-frontend/
+├── public/
+├── src/
+│   ├── components/
+│   │   ├── Header.js
+│   │   ├── Footer.js
+│   │   └── ... (outros componentes)
+│   ├── pages/
+│   │   ├── LoginScreen.js
+│   │   └── PasswordScreen.js
+│   ├── App.js
+│   ├── theme.js                 # Tema personalizado (paleta roxa)
+│   └── index.js
+├── package.json
+└── README.md
+```
+
+---
+
+## Módulos do Back-End
+
+### auth-module
+
+**Função:**  
+Gerencia a autenticação dos usuários. O login agora é feito via **CPF** (sem pontos ou traços) + uma **senha em texto puro** (`"123456"`) apenas para fins de teste/demonstração (sem uso de criptografia).
+
+**Principais Arquivos:**
+- **`auth-module/pom.xml`**: Define dependências (Spring Boot Starter Web, Spring Data JPA, PostgreSQL Driver, Log4j2) e configurações gerais.
+- **`src/main/java/com/dogbank/auth/AuthModuleApplication.java`**: Classe principal para iniciar o módulo de autenticação.
+- **`src/main/java/com/dogbank/auth/config/SecurityConfig.java`**: Configuração do Spring Security, liberando `/api/auth/login`.
+- **`src/main/java/com/dogbank/auth/config/CorsConfig.java`**: Configuração de CORS para permitir requisições do front-end.
+- **`src/main/java/com/dogbank/auth/controller/AuthController.java`**: Endpoint REST para login e teste de Chave PIX.
+- **`src/main/java/com/dogbank/auth/dto/AuthRequest.java`**: DTO que recebe `cpf` e `password` (no lugar de `username`).
+- **`src/main/java/com/dogbank/auth/entity/User.java`**: Entidade JPA mapeada para a tabela `usuarios` (sem a coluna `login`).
+- **`src/main/java/com/dogbank/auth/repository/UserRepository.java`**: Métodos para buscar o usuário por `cpf` ou `chave_pix`.
+
+**Porta Padrão:**  
+- O `auth-module` está configurado para iniciar na porta **8088** (veja `src/main/resources/application.properties`).
+
+### account-module
+
+**Função:**  
+Gerencia as contas bancárias, permitindo criação, consulta e atualização de saldo. Cada conta é associada a um usuário cujo login corresponde ao CPF.
+
+**Principais Arquivos:**
+- **`account-module/pom.xml`**: Dependências (Spring Boot Starter Web, Data JPA, PostgreSQL, Log4j2).
+- **`src/main/java/com/dogbank/account/entity/Account.java`**: Entidade JPA representando uma conta.
+- **`src/main/java/com/dogbank/account/repository/AccountRepository.java`**: Interface de repositório para operações CRUD.
+- **`src/main/java/com/dogbank/account/service/AccountService.java`**: Lógica de negócio.
+- **`src/main/java/com/dogbank/account/controller/AccountController.java`**: Endpoints REST para operações com contas.
+- **`src/main/java/com/dogbank/account/config/CorsConfig.java`**: Configuração de CORS.
+
+### transaction-module
+
+**Função:**  
+Simula transações financeiras, como transferências PIX, persistindo dados de transação (contas de origem/destino, valor, horário).
+
+**Principais Arquivos:**
+- **`transaction-module/pom.xml`**: Dependências (Spring Boot Starter Web, Data JPA, PostgreSQL, Log4j2).
+- **`src/main/java/com/dogbank/transaction/TransactionModuleApplication.java`**: Classe principal.
+- **`src/main/java/com/dogbank/transaction/entity/Transaction.java`**: Entidade JPA de transação.
+- **`src/main/java/com/dogbank/transaction/repository/TransactionRepository.java`**: Repositório para transações.
+- **`src/main/java/com/dogbank/transaction/dto/TransactionRequest.java`** / **TransactionResponse.java**: DTOs de entrada/saída.
+- **`src/main/java/com/dogbank/transaction/service/TransactionService.java`**: Lógica de negócio.
+- **`src/main/java/com/dogbank/transaction/controller/TransactionController.java`**: Endpoints REST.
+- **`src/main/java/com/dogbank/transaction/config/CorsConfig.java`**: Configuração de CORS.
+
+### integration-module
+
+**Função:**  
+Simula a comunicação com sistemas externos, como o sistema PIX do Banco Central.
+
+**Principais Arquivos:**
+- **`integration-module/pom.xml`**: Dependências (Spring Boot Starter Web, Log4j2).
+- **`src/main/java/com/dogbank/integration/IntegrationModuleApplication.java`**: Classe principal.
+- **`src/main/java/com/dogbank/integration/service/ExternalIntegrationService.java`**: Lógica de integração externa (simulada).
+- **`src/main/java/com/dogbank/integration/controller/IntegrationController.java`**: Endpoint REST para testar a integração.
+- **`src/main/java/com/dogbank/integration/config/CorsConfig.java`**: Configuração de CORS.
+
+### notification-module
+
+**Função:**  
+Gerencia notificações (alertas, e-mails, SMS), simulando envios e registrando logs.
+
+**Principais Arquivos:**
+- **`notification-module/pom.xml`**: Dependências (Spring Boot Starter Web, Log4j2).
+- **`src/main/java/com/dogbank/notification/NotificationModuleApplication.java`**: Classe principal.
+- **`src/main/java/com/dogbank/notification/service/NotificationService.java`**: Serviço que simula envios de notificação.
+- **`src/main/java/com/dogbank/notification/controller/NotificationController.java`**: Endpoints REST para disparar notificações.
+- **`src/main/java/com/dogbank/notification/config/CorsConfig.java`**: Configuração de CORS.
+
+---
+
+## Configuração do Banco de Dados
+
+### Setup do PostgreSQL com Docker
+
+Crie um diretório para armazenar os dados do PostgreSQL:
+
+```bash
+mkdir -p ~/docker/pgdata
+```
+
+Depois, execute o container:
+
+```bash
+docker run --name dogbank \
+  -e POSTGRES_USER=dogbank \
+  -e POSTGRES_PASSWORD=dog1234 \
+  -e POSTGRES_DB=banco_db \
+  -v ~/docker/pgdata:/var/lib/postgresql/data \
+  -p 5432:5432 \
+  -d postgres:14
+```
+
+Isso iniciará o PostgreSQL com:
+- **Usuário:** `dogbank`
+- **Senha:** `dog1234`
+- **Banco:** `banco_db`
+
+Verifique no DBeaver ou psql se está tudo OK, conectando em `localhost:5432/banco_db`, usuário `dogbank`, senha `dog1234`.
+
+CREATE TABLE usuarios (
+    id SERIAL PRIMARY KEY,
+    cpf VARCHAR(11) NOT NULL UNIQUE,
+    senha VARCHAR(100) NOT NULL,
+    nome VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE,
+    chave_pix VARCHAR(100) UNIQUE,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE contas (
+    id SERIAL PRIMARY KEY,
+    usuario_id INT NOT NULL,
+    numero_conta VARCHAR(20) NOT NULL,
+    saldo NUMERIC(12,2) DEFAULT 0,
+    banco VARCHAR(50) NOT NULL DEFAULT 'DOG BANK',
+
+    CONSTRAINT fk_usuario
+        FOREIGN KEY (usuario_id)
+        REFERENCES usuarios (id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+);
+
+
+CREATE TABLE transacoes_pix (
+    id SERIAL PRIMARY KEY,
+    conta_origem INT NOT NULL,
+    conta_destino INT NOT NULL,
+    valor_transacionado NUMERIC(12,2) NOT NULL,
+    chave_pix_destino VARCHAR(100),
+    data_transacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_conta_origem
+        FOREIGN KEY (conta_origem)
+        REFERENCES contas (id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_conta_destino
+        FOREIGN KEY (conta_destino)
+        REFERENCES contas (id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
+
+
+
+INSERT INTO usuarios (cpf, senha, nome, email, chave_pix)
+VALUES (
+  '12345678915',
+  '123456',        -- texto puro apenas para teste
+  'yuki itadori',
+  'yuki.itadori@gmail.com',
+  'yuki.itadori@gmail.com'
+);
+
+INSERT INTO contas (usuario_id, numero_conta, saldo)
+VALUES (1, '0001-9', 10000.00);
+
+SELECT c.id AS account_id,
+       c.numero_conta,
+       c.saldo,
+       u.id AS usuario_id,
+       u.nome,
+       u.cpf
+FROM contas c
+JOIN usuarios u ON c.usuario_id = u.id
+WHERE u.cpf = '12345678915';
+
+
+
+SELECT * FROM contas;
+
+
+
+UPDATE contas
+SET user_name = 'yuki itadori'
+WHERE id = 1;
+
+
+
+INSERT INTO contas (usuario_id, numero_conta, saldo, user_name)
+VALUES (1, '0001-9', 10000.00, 'yuki itadori');
+
+
+
+
+
+
+-- 1) Insere usuários na tabela "usuarios"
+INSERT INTO usuarios (cpf, senha, nome, email, chave_pix)
+VALUES
+  ('11111111111', '123456', 'Pedro', 'pedro@example.com', 'pedro@example.com'),
+  ('22222222222', '123456', 'João', 'joao@example.com', 'joao@example.com'),
+  ('33333333333', '123456', 'Emiliano', 'emiliano@example.com', 'emiliano@example.com'),
+  ('44444444444', '123456', 'Eliane', 'eliane@example.com', 'eliane@example.com'),
+  ('55555555555', '123456', 'Patrícia', 'patricia@example.com', 'patricia@example.com');
+
+-- 2) Cria as contas para esses usuários, cada uma com saldo de 10k e um banco diferente
+--    Usamos subselect para pegar o "id" do usuário a partir do CPF.
+
+INSERT INTO contas (usuario_id, numero_conta, saldo, banco, user_name)
+VALUES 
+  (
+    (SELECT id FROM usuarios WHERE cpf='11111111111'), 
+    '0002-1', 
+    10000.00, 
+    'Banco do Brasil', 
+    'Pedro'
+  ),
+  (
+    (SELECT id FROM usuarios WHERE cpf='22222222222'), 
+    '0003-2', 
+    10000.00, 
+    'Itaú', 
+    'João'
+  ),
+  (
+    (SELECT id FROM usuarios WHERE cpf='33333333333'), 
+    '0004-3', 
+    10000.00, 
+    'Santander', 
+    'Emiliano'
+  ),
+  (
+    (SELECT id FROM usuarios WHERE cpf='44444444444'), 
+    '0005-4', 
+    10000.00, 
+    'Bradesco', 
+    'Eliane'
+  ),
+  (
+    (SELECT id FROM usuarios WHERE cpf='55555555555'), 
+    '0006-5', 
+    10000.00, 
+    'Nubank', 
+    'Patrícia'
+  );
+
+-- 3) Se quiser incluir mais um no "Dogbank":
+INSERT INTO usuarios (cpf, senha, nome, email, chave_pix)
+VALUES (
+  '66666666666', 
+  '123456', 
+  'Renato', 
+  'renato@example.com', 
+  'renato@example.com'
+);
+
+INSERT INTO contas (usuario_id, numero_conta, saldo, banco, user_name)
+VALUES (
+  (SELECT id FROM usuarios WHERE cpf='66666666666'),
+  '0007-6',
+  10000.00,
+  'Dogbank',
+  'Renato'
+);
+
+
+
+
+SELECT c.id AS conta_id,
+       c.numero_conta,
+       c.saldo,
+       c.banco,
+       c.user_name,
+       u.nome AS nome_usuario,
+       u.cpf
+FROM contas c
+JOIN usuarios u ON c.usuario_id = u.id
+ORDER BY c.id;
+
+
+---
+
+## Possíveis Conflitos de Portas
+
+Cada módulo deve ter sua própria porta. Por exemplo:
+
+- **auth-module**: `server.port=8088`
+- **account-module**: `server.port=8082`
+- **transaction-module**: `server.port=8083`
+- **integration-module**: `server.port=8084`
+- **notification-module**: `server.port=8085`
+
+Se houver conflito (outra aplicação usando a mesma porta), dê um `kill` no processo. O script `run-all.sh` abaixo já cuida disso para as portas listadas.
+
+---
+
+## Front-End
+
+O front-end do DogBank (React) usa Material UI com tema em tons de roxo.  
+- **Tela de Login:** Dividida em duas etapas (entrada de CPF e entrada de senha).
+- **Chamadas ao Back-End:** Feitas via Axios ou fetch para as rotas `http://localhost:<porta>/api/...`.
+
+Estrutura simplificada:
+
+```
+dogbank-frontend/
+├── public/
+├── src/
+│   ├── components/
+│   ├── pages/
+│   │   ├── LoginScreen.js
+│   │   └── PasswordScreen.js
+│   ├── App.js
+│   ├── theme.js
+│   └── index.js
+├── package.json
+└── README.md
+```
+
+---
+
+## Como Testar
+
+### 1. Crie o Banco de Dados
+
+Siga os passos de [Setup do PostgreSQL com Docker](#setup-do-postgresql-com-docker).
+
+### 2. Build e Execução dos Módulos
+
+Na raiz do projeto (`dogbank/`), rode:
+
+```bash
+mvn clean install
+```
+
+Depois, para **iniciar cada módulo** manualmente:
+
+```bash
+mvn spring-boot:run -pl auth-module
+mvn spring-boot:run -pl account-module
+...
+```
+
+ou use o script `run-all.sh` (veja [Rodando Todos os Módulos Localmente](#rodando-todos-os-módulos-localmente)).
+
+### 3. Inserir Dados de Teste
+
+Na base `banco_db`, tabela `usuarios`, insira um usuário para teste:
+
+```sql
+INSERT INTO usuarios (cpf, senha, nome, email, chave_pix)
+VALUES ('12345678915', '123456', 'yuki itadori', 'yuki.itadori@gmail.com', 'yuki.itadori@gmail.com');
+```
+
+> **Importante:**  
+> - Sem coluna `login` (foi removida).  
+> - Campo `cpf` é `unique`, assim como `chave_pix` e `email`.
+
+### 4. Testar o Login (auth-module)
+
+Use cURL ou Postman contra a porta **8088**:
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"cpf": "12345678915","password":"123456"}' \
+  http://localhost:8088/api/auth/login
+```
+
+Se tudo der certo, você receberá:
+```json
+{
+  "message": "Login successful",
+  "nome": "yuki itadori",
+  "chavePix": "yuki.itadori@gmail.com"
+}
+```
+
+### 5. Testar Outros Módulos
+
+- **account-module** (porta 8082): Exemplo `GET http://localhost:8082/api/accounts`  
+- **transaction-module** (porta 8083): Exemplo `POST http://localhost:8083/api/transactions`  
+- **integration-module** (porta 8084): Exemplo `GET http://localhost:8084/api/integration/pix?chavePix=yuki.itadori@gmail.com`  
+- **notification-module** (porta 8085): Exemplo `POST http://localhost:8085/api/notifications?message=Teste`
+
+
+curl -v -X GET "http://localhost:8084/api/transactions/account/9"
+
+curl -v -X GET http://localhost:8089/api/accounts/user/66666666666
+---
+
+## Rodando Todos os Módulos Localmente
+
+Para rodar todos ao mesmo tempo, use o script `run-all.sh` (exemplo abaixo). Ele mata qualquer processo que esteja ocupando as portas 8081, 8082, 8083, 8084, 8085 e 8088, depois inicia cada módulo em segundo plano.
+
+```bash
+#!/bin/bash
+
+# Lista de portas que queremos liberar
+for port in 8081 8082 8083 8084 8085 8088
+do
+  pid=$(lsof -t -i :$port)
+  if [ -n "$pid" ]; then
+    echo "Matando processo $pid que está usando a porta $port"
+    kill -9 $pid
+  fi
+done
+
+# Inicia os módulos em background
+echo "Iniciando auth-module..."
+(cd auth-module && mvn spring-boot:run) &
+
+echo "Iniciando account-module..."
+(cd account-module && mvn spring-boot:run) &
+
+echo "Iniciando transaction-module..."
+(cd transaction-module && mvn spring-boot:run) &
+
+echo "Iniciando integration-module..."
+(cd integration-module && mvn spring-boot:run) &
+
+echo "Iniciando notification-module..."
+(cd notification-module && mvn spring-boot:run) &
+
+wait
+```
+
+### Executando o script
+```bash
+chmod +x run-all.sh
+./run-all.sh
+```
+
+Se nenhuma porta estiver em conflito, você poderá acessar cada módulo em seu respectivo endpoint/porta.
+
+---
+
+## Conclusão
+
+Este README descreve como criar o ambiente Docker para o PostgreSQL, rodar cada módulo do projeto DogBank e testar o fluxo de login usando CPF e senha em texto puro (apenas para demonstração). Para uso em produção, recomenda-se implementar **criptografia** (ex. BCrypt) e melhores práticas de segurança.
+
+Boa codificação e bons testes com o DogBank! 
+```
+
+---
+
+### Observações de Destaque
+
+1. **Porta do `auth-module`:** Atualizada para **8088**.  
+2. **Remoção da coluna** `login` no banco.  
+3. **Senha em texto puro** no `auth-module`: Explicitado que é apenas para testes, sem criptografia.  
+4. **Script** `run-all.sh` inclui **8088** na lista de portas a serem liberadas.  
+
+Com isso, seu `README.md` fica coerente com as alterações recentes.
+
+
+
+
+Simulação da API do Banco Central (bancocentral-module)
+Para tornar o fluxo de transferência via Pix mais realista e possibilitar a demonstração de cenários de erro, foi criado um módulo bancocentral-module que simula a API do Banco Central. Esse módulo expõe um endpoint para validação de transações que, dependendo dos parâmetros enviados, retorna diferentes códigos e mensagens de erro. Essa abordagem permite testar o comportamento do sistema em condições diversas.
+
+Endpoint de Validação
+URL: http://localhost:8085/api/bancocentral/pix/validate
+
+Método HTTP: POST
+
+Payload (JSON):
+
+json
+Copy
+Edit
+{
+  "pixKey": "exemplo@dominio.com",
+  "amount": 500.00
+}
+Comportamento do Endpoint
+A resposta da API varia conforme os seguintes cenários:
+
+Transação Aprovada:
+Se nenhum cenário de erro for acionado, a API retorna:
+
+json
+Copy
+Edit
+{
+  "pixKey": "exemplo@dominio.com",
+  "amount": 500.00,
+  "status": "APPROVED"
+}
+Erros Simulados:
+
+PIX-LIMITE-EXCEDIDO:
+Condição: Se o valor for exatamente 1000.00.
+Resposta:
+json
+Copy
+Edit
+{
+  "status": "FAILED",
+  "error": "Limite de transação excedido",
+  "errorCode": "PIX-LIMITE-EXCEDIDO"
+}
+PIX-CHAVE-INVALIDA:
+Condição: Se a chave Pix não contiver o caractere @.
+Resposta:
+json
+Copy
+Edit
+{
+  "status": "FAILED",
+  "error": "Chave Pix inválida ou não encontrada",
+  "errorCode": "PIX-CHAVE-INVALIDA"
+}
+PIX-SALDO-INSUFICIENTE:
+Condição: Se o valor for exatamente 5000.00.
+Resposta:
+json
+Copy
+Edit
+{
+  "status": "FAILED",
+  "error": "Saldo insuficiente para a transação",
+  "errorCode": "PIX-SALDO-INSUFICIENTE"
+}
+PIX-CONTA-BLOQUEADA:
+Condição: Se a chave Pix for "ex171@gmail.com".
+Resposta:
+json
+Copy
+Edit
+{
+  "status": "FAILED",
+  "error": "Conta bloqueada por suspeita de fraude",
+  "errorCode": "PIX-CONTA-BLOQUEADA"
+}
+PIX-HORARIO-NAO-PERMITIDO:
+Condição: Se a transação for iniciada fora do horário bancário (entre 22h e 6h).
+Resposta:
+json
+Copy
+Edit
+{
+  "status": "FAILED",
+  "error": "Transação não permitida fora do horário bancário",
+  "errorCode": "PIX-HORARIO-NAO-PERMITIDO"
+}
+PIX-CPF-CNPJ-BLOQUEADO:
+Condição: Se a chave Pix for "66447697119".
+Resposta:
+json
+Copy
+Edit
+{
+  "status": "FAILED",
+  "error": "CPF/CNPJ do destinatário bloqueado pela Receita Federal",
+  "errorCode": "PIX-CPF-CNPJ-BLOQUEADO"
+}
+PIX-DESTINATARIO-INVALIDO:
+Condição: Se a chave Pix for "containexistente@example.com".
+Resposta:
+json
+Copy
+Edit
+{
+  "status": "FAILED",
+  "error": "Conta do destinatário não encontrada",
+  "errorCode": "PIX-DESTINATARIO-INVALIDO"
+}
+PIX-ERRO-INTERNO:
+Condição: Se o valor for exatamente 666.66.
+Resposta:
+json
+Copy
+Edit
+{
+  "status": "FAILED",
+  "error": "Erro interno do Banco Central",
+  "errorCode": "PIX-ERRO-INTERNO"
+}

