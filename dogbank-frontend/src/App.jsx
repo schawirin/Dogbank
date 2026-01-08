@@ -16,6 +16,7 @@ import PixTransferPage from './pages/PixTransferPage';
 import PixConfirmPage from './pages/PixConfirmPage';
 import PixReceiptPage from './pages/PixReceiptPage';
 import NotFoundPage from './pages/NotFoundPage';
+import ProfilePage from './pages/ProfilePage';
 
 import { datadogRum } from '@datadog/browser-rum';
 
@@ -47,6 +48,7 @@ const App = () => (
         <Route index element={<DashboardPage />} />
         <Route path="extrato" element={<ExtractPage />} />
         <Route path="cartoes" element={<CardsPage />} />
+        <Route path="perfil" element={<ProfilePage />} />
 
         {/* Fluxo PIX - rotas aninhadas dentro de /dashboard */}
         <Route path="pix" element={<PixTransferPage />} />
@@ -63,6 +65,8 @@ const App = () => (
       <Route path="/pix/receipt" element={<Navigate to="/dashboard/pix/receipt" replace />} />
       <Route path="/cartoes" element={<Navigate to="/dashboard/cartoes" replace />} />
       <Route path="/extrato" element={<Navigate to="/dashboard/extrato" replace />} />
+      <Route path="/perfil" element={<Navigate to="/dashboard/perfil" replace />} />
+      <Route path="/profile" element={<Navigate to="/dashboard/perfil" replace />} />
     </Routes>
   </AuthProvider>
 );

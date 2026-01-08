@@ -47,7 +47,7 @@ const Header = () => {
                 </button>
                 
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 hidden group-hover:block z-10">
-                  <Link to="/profile" className="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100">
+                  <Link to="/dashboard/perfil" className="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100">
                     Meu Perfil
                   </Link>
                   <Link to="/settings" className="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100">
