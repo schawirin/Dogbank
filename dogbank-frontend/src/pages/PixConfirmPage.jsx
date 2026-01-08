@@ -21,6 +21,11 @@ const PixConfirmPage = () => {
     return (
       <div className="py-6">
         <Alert type="error" message="Dados do PIX ausentes." />
+        <div className="mt-4">
+          <Button onClick={() => navigate('/dashboard/pix')}>
+            Voltar para PIX
+          </Button>
+        </div>
       </div>
     );
   }
@@ -50,11 +55,11 @@ const PixConfirmPage = () => {
         amount,
         description: state.description || '',
         password,
-        sourceAccountId: state.sourceAccountId ?? user.accountId,
+        sourceAccountId: state.sourceAccountId ?? user?.accountId ?? localStorage.getItem('accountId'),
       });
 
-      // Redireciona para recibo
-      navigate('/pix/receipt', { state: receipt });
+      // ✅ CORREÇÃO: Usar rota correta para o recibo
+      navigate('/dashboard/pix/receipt', { state: receipt });
     } catch (err) {
       console.error('Erro na confirmação PIX:', err);
       const msg = err.response?.data?.error || err.message || 'Falha na confirmação.';
@@ -76,7 +81,7 @@ const PixConfirmPage = () => {
       {/* Header moderno */}
       <div className="mb-8">
         <button 
-          onClick={() => navigate('/pix')}
+          onClick={() => navigate('/dashboard/pix')}
           className="flex items-center text-primary-600 hover:text-primary-700 mb-4 transition-colors"
           disabled={loading}
         >
@@ -128,10 +133,6 @@ const PixConfirmPage = () => {
                 </div>
               </div>
             </div>
-            
-            {/* CSS simplificado - apenas para os pontinhos */}
-            <style jsx>{`
-            `}</style>
             
             <div className="space-y-3">
               <h3 className="text-xl font-bold text-neutral-900">
