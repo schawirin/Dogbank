@@ -59,6 +59,29 @@ public class AccountController {
     }
     
     /**
+     * Buscar conta por CPF do usuário
+     */
+    @GetMapping("/user/cpf/{cpf}")
+    public ResponseEntity<Account> getAccountByCpf(@PathVariable String cpf) {
+        return accountService.findByUserCpf(cpf)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+    
+    /**
+     * Buscar saldo da conta por ID
+     */
+    @GetMapping("/{id}/balance")
+    public ResponseEntity<?> getBalance(@PathVariable Long id) {
+        return accountService.findById(id)
+                .map(account -> ResponseEntity.ok(Map.of(
+                    "balance", account.getBalance(),
+                    "saldo", account.getBalance()
+                )))
+                .orElse(ResponseEntity.notFound().build());
+    }
+    
+    /**
      * Atualizar saldo da conta
      */
     @PutMapping("/{id}/balance")

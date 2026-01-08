@@ -45,6 +45,13 @@ public class AccountService {
     }
     
     /**
+     * Buscar conta por CPF do usuário
+     */
+    public Optional<Account> findByUserCpf(String cpf) {
+        return accountRepository.findByUserCpf(cpf);
+    }
+    
+    /**
      * Atualizar saldo da conta
      */
     @Transactional
