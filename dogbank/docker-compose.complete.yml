@@ -93,7 +93,7 @@ services:
       SERVER_PORT: 8085
       # Datadog APM (opcional)
       DD_SERVICE: bancocentral-service
-      DD_ENV: ${DD_ENV:-development}
+      DD_ENV: ${DD_ENV:-dogbank}
     depends_on:
       postgres:
         condition: service_healthy
@@ -135,7 +135,7 @@ services:
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
       # Datadog APM
       DD_SERVICE: auth-service
-      DD_ENV: ${DD_ENV:-development}
+      DD_ENV: ${DD_ENV:-dogbank}
     depends_on:
       postgres:
         condition: service_healthy
@@ -173,7 +173,7 @@ services:
       SERVER_PORT: 8089
       # Datadog APM
       DD_SERVICE: account-service
-      DD_ENV: ${DD_ENV:-development}
+      DD_ENV: ${DD_ENV:-dogbank}
     depends_on:
       postgres:
         condition: service_healthy
@@ -218,7 +218,7 @@ services:
       TRANSACTION_LIMIT_SINGLE: ${TRANSACTION_LIMIT_SINGLE:-10000}
       # Datadog APM
       DD_SERVICE: autorizador-service
-      DD_ENV: ${DD_ENV:-development}
+      DD_ENV: ${DD_ENV:-dogbank}
     depends_on:
       postgres:
         condition: service_healthy
@@ -260,7 +260,7 @@ services:
       ACCOUNT_SERVICE_URL: http://account-service:8089
       # Datadog APM
       DD_SERVICE: ledger-service
-      DD_ENV: ${DD_ENV:-development}
+      DD_ENV: ${DD_ENV:-dogbank}
     depends_on:
       postgres:
         condition: service_healthy
@@ -304,7 +304,7 @@ services:
       NOTIFICATION_SERVICE_URL: http://notification-service:8083
       # Datadog APM
       DD_SERVICE: transaction-service
-      DD_ENV: ${DD_ENV:-development}
+      DD_ENV: ${DD_ENV:-dogbank}
     depends_on:
       postgres:
         condition: service_healthy
@@ -349,7 +349,7 @@ services:
       DD_API_KEY: ${DD_API_KEY:-}
       DD_SITE: ${DD_SITE:-datadoghq.com}
       DD_SERVICE: integration-service
-      DD_ENV: ${DD_ENV:-development}
+      DD_ENV: ${DD_ENV:-dogbank}
     depends_on:
       postgres:
         condition: service_healthy
@@ -389,7 +389,7 @@ services:
       SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD:-}
       # Datadog APM
       DD_SERVICE: notification-service
-      DD_ENV: ${DD_ENV:-development}
+      DD_ENV: ${DD_ENV:-dogbank}
     depends_on:
       postgres:
         condition: service_healthy

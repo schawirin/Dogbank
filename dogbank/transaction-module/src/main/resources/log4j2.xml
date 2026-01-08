@@ -4,7 +4,7 @@
         <!-- Propriedades para Datadog -->
         <Property name="serviceName">${env:DD_SERVICE:-transaction-service}</Property>
         <Property name="serviceVersion">${env:DD_VERSION:-1.0.0}</Property>
-        <Property name="environment">${env:DD_ENV:-development}</Property>
+        <Property name="environment">${env:DD_ENV:-dogbank}</Property>
     </Properties>
 
     <Appenders>

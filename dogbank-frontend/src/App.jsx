@@ -26,7 +26,7 @@ datadogRum.init({
     // see https://docs.datadoghq.com/getting_started/site/
     site: 'datadoghq.com',
     service: 'dogbank',
-    env: 'prod',
+    env: 'dogbank',
     // Specify a version number to identify the deployed version of your application in Datadog
     // version: '1.0.0',
     sessionSampleRate: 100,
@@ -57,10 +57,12 @@ const App = () => (
         <Route path="*" element={<NotFoundPage />} />
       </Route>
 
-      {/* Rotas alternativas para PIX (para compatibilidade com navegação direta) */}
+      {/* Rotas alternativas para compatibilidade com navegação direta */}
       <Route path="/pix" element={<Navigate to="/dashboard/pix" replace />} />
       <Route path="/pix/confirm" element={<Navigate to="/dashboard/pix/confirm" replace />} />
       <Route path="/pix/receipt" element={<Navigate to="/dashboard/pix/receipt" replace />} />
+      <Route path="/cartoes" element={<Navigate to="/dashboard/cartoes" replace />} />
+      <Route path="/extrato" element={<Navigate to="/dashboard/extrato" replace />} />
     </Routes>
   </AuthProvider>
 );
