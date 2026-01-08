@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import pixService from '../services/pixService';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
-import Alert from '../components/common/Alert';
+import PixErrorModal from '../components/common/PixErrorModal';
 
 const PixConfirmPage = () => {
   const { state } = useLocation();
@@ -15,17 +15,20 @@ const PixConfirmPage = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [counter, setCounter] = useState(null);
-  const [error, setError] = useState('');
+  
+  // Estado do modal de erro
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorType, setErrorType] = useState('generic');
 
   if (!state) {
     return (
-      <div className="py-6">
-        <Alert type="error" message="Dados do PIX ausentes." />
-        <div className="mt-4">
-          <Button onClick={() => navigate('/dashboard/pix')}>
-            Voltar para PIX
-          </Button>
-        </div>
+      <div className="py-6 text-center">
+        <div className="text-6xl mb-4">🐕</div>
+        <h2 className="text-xl font-bold text-neutral-900 mb-2">Dados do PIX ausentes</h2>
+        <p className="text-neutral-600 mb-6">Volte e inicie uma nova transferência.</p>
+        <Button onClick={() => navigate('/dashboard/pix')}>
+          Voltar para PIX
+        </Button>
       </div>
     );
   }
@@ -34,9 +37,69 @@ const PixConfirmPage = () => {
   const rawAmount = state.amount;
   const amount = typeof rawAmount === 'string' ? parseFloat(rawAmount) : rawAmount;
 
+  /**
+   * Determina o tipo de erro para exibir no modal
+   * Os detalhes técnicos são logados para o Datadog
+   */
+  const handleError = (err) => {
+    // ========================================
+    // LOG DETALHADO PARA DATADOG (APM + Logs)
+    // ========================================
+    const errorDetails = {
+      timestamp: new Date().toISOString(),
+      errorType: 'PIX_TRANSFER_ERROR',
+      message: err.message,
+      pixKey: state.pixKey,
+      amount: amount,
+      userId: user?.id || localStorage.getItem('userId'),
+      accountId: state.sourceAccountId ?? user?.accountId ?? localStorage.getItem('accountId'),
+      responseStatus: err.response?.status,
+      responseData: err.response?.data,
+      stack: err.stack,
+    };
+
+    // Log para console (será capturado pelo Datadog RUM/Logs)
+    console.error('[PIX_ERROR] Falha na transferência PIX:', errorDetails);
+    
+    // Log estruturado adicional para facilitar busca no Datadog
+    console.error('[DATADOG_TRACE]', JSON.stringify({
+      dd: {
+        service: 'dogbank-frontend',
+        env: 'dogbank',
+      },
+      error: {
+        kind: 'PIX_TRANSFER_FAILURE',
+        message: err.message,
+        stack: err.stack,
+      },
+      context: {
+        pixKey: state.pixKey,
+        amount: amount,
+        timestamp: new Date().toISOString(),
+      }
+    }));
+
+    // ========================================
+    // DETERMINA TIPO DE ERRO PARA O MODAL
+    // ========================================
+    const msg = err.message || err.response?.data?.error || '';
+    
+    if (msg.includes('timeout') || msg.includes('Timeout') || msg.includes('não respondeu') || msg.includes('ECONNABORTED')) {
+      setErrorType('timeout');
+    } else if (msg.includes('Limite') || msg.includes('limit')) {
+      setErrorType('limit');
+    } else if (msg.includes('Saldo') || msg.includes('saldo') || msg.includes('balance')) {
+      setErrorType('balance');
+    } else {
+      setErrorType('generic');
+    }
+
+    // Mostra o modal amigável
+    setShowErrorModal(true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
     setCounter(3);
 
@@ -59,32 +122,24 @@ const PixConfirmPage = () => {
         sourceAccountId: state.sourceAccountId ?? user?.accountId ?? localStorage.getItem('accountId'),
       });
 
-      // ✅ CORREÇÃO: Usar rota correta para o recibo
+      // ✅ Sucesso - vai para o recibo
       navigate('/dashboard/pix/receipt', { state: receipt });
     } catch (err) {
-      console.error('Erro na confirmação PIX:', err);
-      
-      // Trata mensagens de erro específicas
-      let msg = err.message || 'Falha na confirmação.';
-      
-      // Se for erro de resposta da API, pega a mensagem
-      if (err.response?.data?.error) {
-        msg = err.response.data.error;
-      }
-      
-      // Mensagens mais amigáveis para erros comuns
-      if (msg.includes('timeout') || msg.includes('Timeout') || msg.includes('não respondeu')) {
-        msg = 'Não foi possível realizar o PIX. O Banco Central não respondeu a tempo. Tente novamente mais tarde.';
-      } else if (msg.includes('Limite')) {
-        msg = 'Limite de transação excedido. Tente um valor menor.';
-      } else if (msg.includes('Saldo')) {
-        msg = 'Saldo insuficiente para realizar esta transferência.';
-      }
-      
-      setError(msg);
+      // Trata o erro com modal amigável + log detalhado
+      handleError(err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRetry = () => {
+    setShowErrorModal(false);
+    setPassword('');
+  };
+
+  const handleCloseModal = () => {
+    setShowErrorModal(false);
+    navigate('/dashboard');
   };
 
   const formatCurrency = (value) => {
@@ -96,6 +151,14 @@ const PixConfirmPage = () => {
 
   return (
     <div className="py-6">
+      {/* Modal de erro amigável */}
+      <PixErrorModal
+        isOpen={showErrorModal}
+        onClose={handleCloseModal}
+        onRetry={handleRetry}
+        errorType={errorType}
+      />
+
       {/* Header moderno */}
       <div className="mb-8">
         <button 
@@ -111,10 +174,6 @@ const PixConfirmPage = () => {
         <h1 className="text-3xl font-bold text-neutral-900 mb-2">Confirmar PIX</h1>
         <p className="text-neutral-600">Revise os dados e confirme sua transferência</p>
       </div>
-
-      {error && (
-        <Alert type="error" message={error} className="mb-6" />
-      )}
 
       {/* Loading Screen - Círculo simples */}
       {loading && (
