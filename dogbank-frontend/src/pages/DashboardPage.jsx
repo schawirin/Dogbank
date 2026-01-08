@@ -8,6 +8,7 @@ import TransactionHistory from '../components/dashboard/TransactionHistory';
 import QuickActions from '../components/dashboard/QuickActions';
 import Card from '../components/common/Card';
 import Alert from '../components/common/Alert';
+import { CreditCard, Lightbulb, TrendingUp, PiggyBank } from 'lucide-react';
 
 const DashboardPage = () => {
   const { user, loading: authLoading } = useAuth();
@@ -17,22 +18,20 @@ const DashboardPage = () => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isVisible, setIsVisible] = useState(false);
 
-  // Protege a rota
   useEffect(() => {
+    setIsVisible(true);
     if (!authLoading && !user) {
       navigate('/login', { replace: true });
     }
   }, [authLoading, user, navigate]);
 
-  // Busca dados da conta e extrato
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // 1) tenta pegar do contexto
         let chave = user?.cpf;
-        // 2) se não existir, tenta do localStorage
         if (!chave) {
           chave = localStorage.getItem('cpf');
         }
@@ -40,11 +39,9 @@ const DashboardPage = () => {
           throw new Error('CPF não encontrado no contexto do usuário');
         }
 
-        // 3) chama o serviço de conta
         const acct = await accountService.getAccountInfo(chave);
         setAccountData(acct);
 
-        // 4) chama o serviço de histórico (se tiver id)
         if (acct?.id) {
           const hx = await pixService.getTransactionHistory(acct.id);
           setTransactions(hx || []);
@@ -64,22 +61,39 @@ const DashboardPage = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-12">
+      <div className="flex justify-center items-center py-20">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4" />
-          <p className="text-neutral-600">Carregando...</p>
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-purple-200 rounded-full animate-spin border-t-purple-600 mx-auto mb-6" />
+          </div>
+          <p className="text-slate-600 font-medium">Carregando seus dados...</p>
         </div>
       </div>
     );
   }
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Bom dia';
+    if (hour < 18) return 'Boa tarde';
+    return 'Boa noite';
+  };
+
   return (
-    <div className="py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-neutral-800">
-          Olá, {user?.nome || 'Cliente'}
-        </h1>
-        <p className="text-neutral-500">Bem-vindo ao seu painel do DogBank</p>
+    <div className={`py-8 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center gap-4 mb-2">
+          <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-purple-500/25">
+            {(user?.nome || 'C').charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">
+              {getGreeting()}, {user?.nome?.split(' ')[0] || 'Cliente'}
+            </h1>
+            <p className="text-slate-500">Bem-vindo ao seu painel do DogBank</p>
+          </div>
+        </div>
       </div>
 
       {error && (
@@ -91,50 +105,95 @@ const DashboardPage = () => {
         />
       )}
 
-      <div className="mb-6">
+      {/* Account Summary */}
+      <div className="mb-8">
         <AccountSummary accountData={accountData} />
       </div>
 
-      <div className="mb-6">
+      {/* Quick Actions */}
+      <div className="mb-8">
         <QuickActions />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        <div className="md:col-span-7">
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Transaction History */}
+        <div className="lg:col-span-7">
           <TransactionHistory transactions={transactions.slice(0, 5)} />
         </div>
 
-        <div className="md:col-span-5">
-          <Card title="Meus cartões" className="mb-6">
-            <div className="py-4 px-2 text-center text-neutral-500">
-              <p>Você ainda não possui cartões.</p>
-              <button
-                onClick={() => navigate('/cartoes')}
-                className="text-primary-500 text-sm font-medium hover:text-primary-600 mt-2 inline-block transition-colors cursor-pointer"
-              >
-                Solicitar cartão
-              </button>
+        {/* Sidebar */}
+        <div className="lg:col-span-5 space-y-6">
+          {/* Cards Section */}
+          <Card 
+            variant="default"
+            className="overflow-hidden"
+          >
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
+                  <CreditCard className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900">Meus cartões</h3>
+              </div>
+              
+              <div className="py-6 text-center">
+                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <CreditCard className="w-8 h-8 text-slate-400" />
+                </div>
+                <p className="text-slate-500 mb-4">Você ainda não possui cartões.</p>
+                <button
+                  onClick={() => navigate('/dashboard/cartoes')}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-medium text-sm hover:from-violet-500 hover:to-purple-500 transition-all shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40"
+                >
+                  Solicitar cartão
+                </button>
+              </div>
             </div>
           </Card>
 
-          <Card title="Dicas financeiras">
-            <div className="space-y-4">
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <h4 className="font-medium text-blue-800 mb-1">
-                  Economize com PIX
-                </h4>
-                <p className="text-sm text-blue-600">
-                  Fazer transferências via PIX é gratuito e instantâneo, 24h por dia.
-                </p>
+          {/* Tips Section */}
+          <Card variant="default">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center">
+                  <Lightbulb className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900">Dicas financeiras</h3>
               </div>
 
-              <div className="p-3 bg-green-50 rounded-lg">
-                <h4 className="font-medium text-green-800 mb-1">
-                  Reserve uma parte do seu salário
-                </h4>
-                <p className="text-sm text-green-600">
-                  Procure guardar pelo menos 10% do seu salário todo mês.
-                </p>
+              <div className="space-y-4">
+                <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <TrendingUp className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-blue-900 mb-1">
+                        Economize com PIX
+                      </h4>
+                      <p className="text-sm text-blue-700/80">
+                        Transferências via PIX são gratuitas e instantâneas, 24h por dia.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl border border-emerald-100">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <PiggyBank className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-emerald-900 mb-1">
+                        Reserve parte do salário
+                      </h4>
+                      <p className="text-sm text-emerald-700/80">
+                        Procure guardar pelo menos 10% do seu salário todo mês.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </Card>
