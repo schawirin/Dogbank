@@ -1,11 +1,12 @@
 # =============================================================================
-# Docker Compose Full Stack - DogBank
+# Docker Compose Full Stack - DogBank com Datadog APM
 # =============================================================================
-# Este arquivo sobe TUDO: Frontend + Backend + Banco de Dados
+# Este arquivo sobe TUDO: Frontend + Backend + Banco de Dados + Datadog
 #
 # Serviços incluídos:
 # - PostgreSQL (banco de dados)
 # - Redis (cache)
+# - Datadog Agent (APM, métricas, logs)
 # - Auth Service (autenticação)
 # - Account Service (contas)
 # - Transaction Service (transações PIX)
@@ -15,6 +16,9 @@
 #
 # =============================================================================
 # USO:
+#   # Configurar API Key do Datadog
+#   export DD_API_KEY="sua-api-key-aqui"
+#   
 #   docker-compose -f docker-compose.full.yml up -d
 #
 # PARAR TUDO:
@@ -57,6 +61,11 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+    labels:
+      com.datadoghq.ad.check_names: '["postgres"]'
+      com.datadoghq.ad.init_configs: '[{}]'
+      com.datadoghq.ad.instances: '[{"host":"%%host%%", "port":"5432", "username":"dogbank", "password":"dog1234", "dbname":"dogbank"}]'
+      com.datadoghq.ad.logs: '[{"source": "postgresql", "service": "dogbank-postgres"}]'
 
   # ===========================================================================
   # 🔴 CACHE - Redis
@@ -78,6 +87,51 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    labels:
+      com.datadoghq.ad.check_names: '["redisdb"]'
+      com.datadoghq.ad.init_configs: '[{}]'
+      com.datadoghq.ad.instances: '[{"host":"%%host%%", "port":"6379"}]'
+      com.datadoghq.ad.logs: '[{"source": "redis", "service": "dogbank-redis"}]'
+
+  # ===========================================================================
+  # 🐕 DATADOG AGENT
+  # ===========================================================================
+  
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:latest
+    container_name: datadog-agent
+    environment:
+      # API Key (obrigatório)
+      DD_API_KEY: ${DD_API_KEY:-}
+      # Site do Datadog (us1.datadoghq.com para US, datadoghq.eu para EU)
+      DD_SITE: ${DD_SITE:-datadoghq.com}
+      # Hostname
+      DD_HOSTNAME: dogbank-docker
+      # APM
+      DD_APM_ENABLED: "true"
+      DD_APM_NON_LOCAL_TRAFFIC: "true"
+      # Logs
+      DD_LOGS_ENABLED: "true"
+      DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL: "true"
+      # Process monitoring
+      DD_PROCESS_AGENT_ENABLED: "true"
+      # Container monitoring
+      DD_CONTAINER_EXCLUDE: "name:datadog-agent"
+      # Tags
+      DD_TAGS: "env:development project:dogbank"
+      # Dogstatsd
+      DD_DOGSTATSD_NON_LOCAL_TRAFFIC: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    ports:
+      - "8126:8126"  # APM traces
+      - "8125:8125/udp"  # DogStatsD
+    networks:
+      - dogbank-network
+    restart: unless-stopped
 
   # ===========================================================================
   # 🏛️ BANCO CENTRAL SERVICE
@@ -94,9 +148,16 @@ services:
       SPRING_DATASOURCE_USERNAME: dogbank
       SPRING_DATASOURCE_PASSWORD: dog1234
       SERVER_PORT: 8085
+      # Datadog
+      DD_AGENT_HOST: datadog-agent
+      DD_SERVICE: bancocentral-service
+      DD_ENV: development
+      DD_VERSION: "1.0.0"
     depends_on:
       postgres:
         condition: service_healthy
+      datadog-agent:
+        condition: service_started
     networks:
       - dogbank-network
     healthcheck:
@@ -106,6 +167,8 @@ services:
       retries: 3
       start_period: 90s
     restart: unless-stopped
+    labels:
+      com.datadoghq.ad.logs: '[{"source": "java", "service": "bancocentral-service"}]'
 
   # ===========================================================================
   # 🔑 AUTH SERVICE
@@ -126,11 +189,18 @@ services:
       SERVER_PORT: 8088
       JWT_SECRET: dogbank-secret-key-change-in-production
       JWT_EXPIRATION: 86400000
+      # Datadog
+      DD_AGENT_HOST: datadog-agent
+      DD_SERVICE: auth-service
+      DD_ENV: development
+      DD_VERSION: "1.0.0"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      datadog-agent:
+        condition: service_started
     networks:
       - dogbank-network
     healthcheck:
@@ -140,6 +210,8 @@ services:
       retries: 3
       start_period: 90s
     restart: unless-stopped
+    labels:
+      com.datadoghq.ad.logs: '[{"source": "java", "service": "auth-service"}]'
 
   # ===========================================================================
   # 💳 ACCOUNT SERVICE
@@ -156,11 +228,18 @@ services:
       SPRING_DATASOURCE_USERNAME: dogbank
       SPRING_DATASOURCE_PASSWORD: dog1234
       SERVER_PORT: 8089
+      # Datadog
+      DD_AGENT_HOST: datadog-agent
+      DD_SERVICE: account-service
+      DD_ENV: development
+      DD_VERSION: "1.0.0"
     depends_on:
       postgres:
         condition: service_healthy
       auth-service:
         condition: service_healthy
+      datadog-agent:
+        condition: service_started
     networks:
       - dogbank-network
     healthcheck:
@@ -170,6 +249,8 @@ services:
       retries: 3
       start_period: 90s
     restart: unless-stopped
+    labels:
+      com.datadoghq.ad.logs: '[{"source": "java", "service": "account-service"}]'
 
   # ===========================================================================
   # 💸 TRANSACTION SERVICE
@@ -188,6 +269,11 @@ services:
       SERVER_PORT: 8084
       BANCOCENTRAL_API_URL: http://bancocentral-service:8085/api/bancocentral/pix/validate
       ACCOUNT_SERVICE_URL: http://account-service:8089
+      # Datadog
+      DD_AGENT_HOST: datadog-agent
+      DD_SERVICE: transaction-service
+      DD_ENV: development
+      DD_VERSION: "1.0.0"
     depends_on:
       postgres:
         condition: service_healthy
@@ -195,6 +281,8 @@ services:
         condition: service_healthy
       account-service:
         condition: service_healthy
+      datadog-agent:
+        condition: service_started
     networks:
       - dogbank-network
     healthcheck:
@@ -204,6 +292,8 @@ services:
       retries: 3
       start_period: 90s
     restart: unless-stopped
+    labels:
+      com.datadoghq.ad.logs: '[{"source": "java", "service": "transaction-service"}]'
 
   # ===========================================================================
   # 🌐 FRONTEND - React + Nginx
@@ -223,6 +313,8 @@ services:
       retries: 3
       start_period: 60s
     restart: unless-stopped
+    labels:
+      com.datadoghq.ad.logs: '[{"source": "nginx", "service": "dogbank-frontend"}]'
 
   # ===========================================================================
   # 🚪 NGINX GATEWAY - Proxy Reverso
@@ -249,6 +341,11 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    labels:
+      com.datadoghq.ad.check_names: '["nginx"]'
+      com.datadoghq.ad.init_configs: '[{}]'
+      com.datadoghq.ad.instances: '[{"nginx_status_url": "http://%%host%%:80/nginx_status"}]'
+      com.datadoghq.ad.logs: '[{"source": "nginx", "service": "dogbank-nginx"}]'
 
 # =============================================================================
 # 🌐 NETWORKS
