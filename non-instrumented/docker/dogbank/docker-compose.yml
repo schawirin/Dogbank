@@ -1,0 +1,261 @@
+# =============================================================================
+# Docker Compose - DogBank (Non-Instrumented Version)
+# =============================================================================
+# This file runs the complete DogBank stack WITHOUT Datadog instrumentation.
+# Use this for local development or when you don't need observability.
+#
+# Services included:
+# - PostgreSQL (database)
+# - Redis (cache)
+# - Auth Service (authentication)
+# - Account Service (accounts)
+# - Transaction Service (PIX transactions)
+# - Banco Central Service (PIX validation)
+# - Frontend (React + Nginx)
+# - Nginx Gateway (reverse proxy)
+#
+# =============================================================================
+# USAGE:
+#   docker-compose up -d --build
+#
+# STOP:
+#   docker-compose down
+#
+# CLEAN (including data):
+#   docker-compose down -v
+#
+# VIEW LOGS:
+#   docker-compose logs -f
+#
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # 💾 DATABASE - PostgreSQL
+  # ===========================================================================
+  
+  postgres:
+    image: postgres:15-alpine
+    container_name: dogbank-postgres
+    environment:
+      POSTGRES_DB: dogbank
+      POSTGRES_USER: dogbank
+      POSTGRES_PASSWORD: dog1234
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d:ro
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dogbank -d dogbank"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # ===========================================================================
+  # 🔴 CACHE - Redis
+  # ===========================================================================
+  
+  redis:
+    image: redis:7-alpine
+    container_name: dogbank-redis
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ===========================================================================
+  # 🔐 AUTH SERVICE - Authentication & User Management
+  # ===========================================================================
+  
+  auth-service:
+    build:
+      context: ./auth-module
+      dockerfile: Dockerfile
+    container_name: dogbank-auth-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/dogbank
+      SPRING_DATASOURCE_USERNAME: dogbank
+      SPRING_DATASOURCE_PASSWORD: dog1234
+      SERVER_PORT: 8086
+    ports:
+      - "8086:8086"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # ===========================================================================
+  # 💰 ACCOUNT SERVICE - Account Management
+  # ===========================================================================
+  
+  account-service:
+    build:
+      context: ./account-module
+      dockerfile: Dockerfile
+    container_name: dogbank-account-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/dogbank
+      SPRING_DATASOURCE_USERNAME: dogbank
+      SPRING_DATASOURCE_PASSWORD: dog1234
+      SERVER_PORT: 8089
+    ports:
+      - "8089:8089"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # ===========================================================================
+  # 💸 TRANSACTION SERVICE - PIX Transactions
+  # ===========================================================================
+  
+  transaction-service:
+    build:
+      context: ./transaction-module
+      dockerfile: Dockerfile
+    container_name: dogbank-transaction-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/dogbank
+      SPRING_DATASOURCE_USERNAME: dogbank
+      SPRING_DATASOURCE_PASSWORD: dog1234
+      SERVER_PORT: 8087
+      AUTH_SERVICE_URL: http://auth-service:8086
+      ACCOUNT_SERVICE_URL: http://account-service:8089
+      BANCOCENTRAL_API_URL: http://bancocentral-service:8085/api/bancocentral
+    ports:
+      - "8087:8087"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      account-service:
+        condition: service_healthy
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # ===========================================================================
+  # 🏦 BANCO CENTRAL SERVICE - PIX Validation
+  # ===========================================================================
+  
+  bancocentral-service:
+    build:
+      context: ./bancocentral-module
+      dockerfile: Dockerfile
+    container_name: dogbank-bancocentral-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8085
+    ports:
+      - "8085:8085"
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # ===========================================================================
+  # 🌐 FRONTEND - React Application
+  # ===========================================================================
+  
+  frontend:
+    build:
+      context: ../dogbank-frontend
+      dockerfile: Dockerfile
+    container_name: dogbank-frontend
+    ports:
+      - "3000:80"
+    networks:
+      - dogbank-network
+    depends_on:
+      - auth-service
+      - account-service
+      - transaction-service
+    restart: unless-stopped
+
+  # ===========================================================================
+  # 🚪 NGINX GATEWAY - Reverse Proxy
+  # ===========================================================================
+  
+  nginx:
+    image: nginx:alpine
+    container_name: dogbank-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - auth-service
+      - account-service
+      - transaction-service
+      - bancocentral-service
+    networks:
+      - dogbank-network
+    restart: unless-stopped
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+
+networks:
+  dogbank-network:
+    driver: bridge
+    name: dogbank-network
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+
+volumes:
+  postgres_data:
+    name: dogbank-postgres-data
+  redis_data:
+    name: dogbank-redis-data

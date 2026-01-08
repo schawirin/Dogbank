@@ -1,0 +1,66 @@
+flowchart TB
+    subgraph CLIENTS["🌐 CLIENTS"]
+        WEB["🖥️ Web App"]
+        MOBILE["📱 Mobile"]
+    end
+
+    subgraph GATEWAY["🔒 NGINX GATEWAY"]
+        HTTP["HTTP :80"]
+        HTTPS["HTTPS :443<br/>TLS 1.3 | HTTP/2"]
+        SECURITY["🛡️ Security<br/>Rate Limit | CORS | Headers"]
+    end
+
+    subgraph SERVICES["⚙️ MICROSERVICES"]
+        AUTH["🔑 Auth<br/>:8088"]
+        ACCOUNT["💳 Account<br/>:8089"]
+        TRANSACTION["💸 Transaction<br/>:8084"]
+        AUTORIZADOR["✅ Autorizador<br/>:8090"]
+        LEDGER["📒 Ledger<br/>:8091"]
+        BANCOCENTRAL["🏛️ Banco Central<br/>:8085"]
+        INTEGRATION["🔗 Integration<br/>:8082"]
+        NOTIFICATION["📢 Notification<br/>:8083"]
+    end
+
+    subgraph DATA["💾 DATA"]
+        POSTGRES[("🐘 PostgreSQL<br/>:5432")]
+        REDIS[("⚡ Redis<br/>:6379")]
+    end
+
+    subgraph OBS["📊 OBSERVABILITY"]
+        DATADOG["🐕 Datadog"]
+    end
+
+    WEB --> HTTPS
+    MOBILE --> HTTPS
+    HTTP -.->|redirect| HTTPS
+    HTTPS --> SECURITY
+    
+    SECURITY --> AUTH
+    SECURITY --> ACCOUNT
+    SECURITY --> TRANSACTION
+    SECURITY --> AUTORIZADOR
+    SECURITY --> LEDGER
+    SECURITY --> BANCOCENTRAL
+    SECURITY --> INTEGRATION
+    SECURITY --> NOTIFICATION
+
+    AUTH --> POSTGRES
+    ACCOUNT --> POSTGRES
+    TRANSACTION --> POSTGRES
+    AUTORIZADOR --> POSTGRES
+    LEDGER --> POSTGRES
+    BANCOCENTRAL --> POSTGRES
+    NOTIFICATION --> POSTGRES
+    
+    TRANSACTION --> BANCOCENTRAL
+    TRANSACTION --> AUTORIZADOR
+    TRANSACTION --> LEDGER
+    TRANSACTION --> ACCOUNT
+    
+    AUTH -.-> REDIS
+    AUTORIZADOR -.-> REDIS
+    
+    INTEGRATION --> DATADOG
+
+    classDef new fill:#00b894,stroke:#fff,stroke-width:2px,color:#fff
+    class AUTORIZADOR,LEDGER new

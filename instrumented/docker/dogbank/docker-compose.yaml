@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: dogbank
+      POSTGRES_DB: dogbank
+    volumes:
+      - ./init-db:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+
+  auth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: auth-module
+    container_name: auth-module
+    ports:
+      - "8088:8088"
+    env_file:
+      - .env
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/dogbank"
+      SPRING_DATASOURCE_USERNAME: "${DB_USER}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+    depends_on:
+      - postgres
+
+  account:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: account-module
+    container_name: account-module
+    ports:
+      - "8089:8089"
+    env_file:
+      - .env
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/dogbank"
+      SPRING_DATASOURCE_USERNAME: "${DB_USER}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+    depends_on:
+      - postgres
+
+  integration:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: integration-module
+    container_name: integration-module
+    ports:
+      - "8082:8082"
+    env_file:
+      - .env
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/dogbank"
+      SPRING_DATASOURCE_USERNAME: "${DB_USER}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+    depends_on:
+      - postgres
+
+  notification:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: notification-module
+    container_name: notification-module
+    ports:
+      - "8083:8083"
+    env_file:
+      - .env
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/dogbank"
+      SPRING_DATASOURCE_USERNAME: "${DB_USER}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+    depends_on:
+      - postgres
+
+  transaction:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: transaction-module
+    container_name: transaction-module
+    ports:
+      - "8084:8084"
+    env_file:
+      - .env
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/dogbank"
+      SPRING_DATASOURCE_USERNAME: "${DB_USER}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+    depends_on:
+      - postgres
+
+  bancocentral:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: bancocentral-module
+    container_name: bancocentral-module
+    ports:
+      - "8085:8085"
+    env_file:
+      - .env
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/dogbank"
+      SPRING_DATASOURCE_USERNAME: "${DB_USER}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+    depends_on:
+      - postgres
+

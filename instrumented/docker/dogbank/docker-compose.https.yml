@@ -1,0 +1,201 @@
+version: '3.8'
+
+# =============================================================================
+# Docker Compose com HTTPS para DogBank
+# =============================================================================
+# Este arquivo configura todos os serviços com HTTPS habilitado.
+# Para usar: docker-compose -f docker-compose.https.yml up -d
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # Banco de dados PostgreSQL
+  # ===========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: dogbank-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dogbank}
+      POSTGRES_USER: ${POSTGRES_USER:-dogbank}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dog1234}
+    ports:
+      - "127.0.0.1:5432:5432"  # Apenas localhost pode acessar
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dogbank} -d ${POSTGRES_DB:-dogbank}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Banco Central Module
+  # ===========================================================================
+  bancocentral-service:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.bancocentral
+    container_name: bancocentral-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dogbank}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-dogbank}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-dog1234}
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dogbank-network
+    restart: unless-stopped
+    # Não expor porta diretamente - acessar via Nginx
+
+  # ===========================================================================
+  # Auth Module
+  # ===========================================================================
+  auth-service:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.auth
+    container_name: auth-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dogbank}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-dogbank}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-dog1234}
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dogbank-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Account Module
+  # ===========================================================================
+  account-service:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.account
+    container_name: account-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dogbank}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-dogbank}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-dog1234}
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    networks:
+      - dogbank-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Notification Module
+  # ===========================================================================
+  notification-service:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.notification
+    container_name: notification-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dogbank}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-dogbank}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-dog1234}
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dogbank-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Integration Module
+  # ===========================================================================
+  integration-service:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.integration
+    container_name: integration-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dogbank}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-dogbank}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-dog1234}
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dogbank-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Transaction Module
+  # ===========================================================================
+  transaction-service:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.transaction
+    container_name: transaction-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dogbank}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-dogbank}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-dog1234}
+      SPRING_PROFILES_ACTIVE: docker
+      BANCOCENTRAL_API_URL: http://bancocentral-service:8085/api/bancocentral/pix/validate
+    depends_on:
+      postgres:
+        condition: service_healthy
+      bancocentral-service:
+        condition: service_started
+      account-service:
+        condition: service_started
+    networks:
+      - dogbank-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Nginx API Gateway com HTTPS
+  # ===========================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: dogbank-gateway
+    ports:
+      - "80:80"      # HTTP (redireciona para HTTPS)
+      - "443:443"    # HTTPS
+    volumes:
+      - ./nginx/nginx-https.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - auth-service
+      - account-service
+      - transaction-service
+      - bancocentral-service
+      - integration-service
+      - notification-service
+    networks:
+      - dogbank-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  dogbank-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

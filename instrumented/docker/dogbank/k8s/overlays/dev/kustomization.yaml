@@ -1,0 +1,35 @@
+# Configurações específicas para ambiente de desenvolvimento
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: dogbank
+
+resources:
+- ../../base
+
+patchesStrategicMerge:
+- replica-patch.yaml
+- resource-patch.yaml
+
+configMapGenerator:
+- name: dogbank-config-dev
+  literals:
+  - SPRING_PROFILES_ACTIVE=dev,kubernetes
+  - JAVA_OPTS=-Xms128m -Xmx256m -XX:+UseG1GC -XX:+UseContainerSupport
+  behavior: merge
+
+images:
+- name: dogbank/auth-service
+  newTag: dev
+- name: dogbank/account-service
+  newTag: dev
+- name: dogbank/transaction-service
+  newTag: dev
+- name: dogbank/bancocentral-service
+  newTag: dev
+- name: dogbank/integration-service
+  newTag: dev
+- name: dogbank/notification-service
+  newTag: dev
+

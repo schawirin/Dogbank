@@ -1,0 +1,217 @@
+# ---------- NAMESPACE DA APLICAÇÃO ----------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: production
+
+# ---------- FRONTEND (NGINX ESTÁTICO) ----------
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dogbank-frontend-nginx-conf
+  namespace: production
+data:
+  nginx.conf: |-
+    server {
+      listen 8080;
+      server_name _;
+      root /usr/share/nginx/html;
+      index index.html index.htm;
+
+      location / {
+        try_files $uri $uri/ /index.html;
+      }
+
+      location /health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+      }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dogbank-frontend
+  namespace: production
+  labels: { app: dogbank-frontend, version: v1.3 }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: dogbank-frontend } }
+  template:
+    metadata:
+      labels: { app: dogbank-frontend, version: v1.3 }
+    spec:
+      containers:
+        - name: dogbank-frontend
+          image: schawirin/dogbank-frontend:v1.3
+          ports: [ { containerPort: 8080, name: http } ]
+          livenessProbe:  { httpGet: { path: /health, port: 8080 }, initialDelaySeconds: 30, periodSeconds: 10 }
+          readinessProbe: { httpGet: { path: /health, port: 8080 }, initialDelaySeconds: 5,  periodSeconds: 5  }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits:   { cpu: 500m, memory: 512Mi }
+          volumeMounts:
+            - { name: nginx-config, mountPath: /etc/nginx/conf.d/nginx.conf, subPath: nginx.conf }
+      volumes:
+        - name: nginx-config
+          configMap: { name: dogbank-frontend-nginx-conf }
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dogbank-frontend-service
+  namespace: production
+  labels: { app: dogbank-frontend }
+spec:
+  selector: { app: dogbank-frontend }
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  type: ClusterIP
+
+# ---------- TRAEFIK (CONTROLLER + LB INTERNET-FACING NAS SUBNETS PÚBLICAS) ----------
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: traefik
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: traefik
+  namespace: traefik
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: traefik
+rules:
+  - apiGroups: [""]
+    resources: ["services","endpoints","secrets","nodes"]
+    verbs: ["get","list","watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses","ingressclasses"]
+    verbs: ["get","list","watch"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get","list","watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: traefik
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: traefik
+subjects:
+  - kind: ServiceAccount
+    name: traefik
+    namespace: traefik
+
+---
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: traefik
+spec:
+  controller: traefik.io/ingress-controller
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traefik-ingress-controller
+  namespace: traefik
+  labels: { app: traefik }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: traefik } }
+  template:
+    metadata:
+      labels: { app: traefik }
+    spec:
+      serviceAccountName: traefik
+      containers:
+        - name: traefik
+          image: traefik:v2.10
+          args:
+            - --entrypoints.web.address=:80
+            - --providers.kubernetesingress=true
+            - --api.insecure=true
+            - --log.level=INFO
+          ports:
+            - { name: web,   containerPort: 80 }
+            - { name: admin, containerPort: 8080 } # dashboard interno
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik
+  namespace: traefik
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    # ⬇️ FORÇA SUBNETS PÚBLICAS (SUBSTITUA PELOS SEUS IDs)
+    service.beta.kubernetes.io/aws-load-balancer-subnets: subnet-AAAA,subnet-BBBB
+spec:
+  type: LoadBalancer
+  selector: { app: traefik }
+  ports:
+    - name: web
+      port: 80
+      targetPort: 80
+    - name: admin
+      port: 9000
+      targetPort: 8080
+
+# ---------- INGRESS (padrão) PARA FRONT + APIS ----------
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dogbank-traefik-ingress
+  namespace: production
+spec:
+  ingressClassName: traefik
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service: { name: dogbank-frontend-service, port: { number: 80 } }
+      - path: /api/auth
+        pathType: Prefix
+        backend:
+          service: { name: auth-service, port: { number: 8088 } }
+      - path: /api/accounts
+        pathType: Prefix
+        backend:
+          service: { name: account-service, port: { number: 8089 } }
+      - path: /api/transactions
+        pathType: Prefix
+        backend:
+          service: { name: transaction-service, port: { number: 8084 } }
+      - path: /api/bancocentral
+        pathType: Prefix
+        backend:
+          service: { name: bancocentral-service, port: { number: 8085 } }
+      - path: /api/integration
+        pathType: Prefix
+        backend:
+          service: { name: integration-service, port: { number: 8082 } }
+      - path: /api/notifications
+        pathType: Prefix
+        backend:
+          service: { name: notification-service, port: { number: 8083 } }

@@ -1,0 +1,720 @@
+---
+# =====================================================
+# DOGBANK COMPLETE DEPLOYMENT - HTTPS COM LET'S ENCRYPT
+# =====================================================
+# Domínio: lab.dogbank.com
+# Certificado: Let's Encrypt (auto-renovação)
+# Deploy completo: Traefik + Backend Services + Frontend
+# =====================================================
+
+---
+# Namespace: production
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: production
+
+---
+# Secret: PostgreSQL credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dogbank-postgres-secret
+  namespace: production
+type: Opaque
+data:
+  POSTGRES_DB: ZG9nYmFuaw==        # dogbank
+  POSTGRES_USER: ZG9nYmFuaw==      # dogbank
+  POSTGRES_PASSWORD: ZG9nMTIzNA==  # dog1234
+
+---
+# PersistentVolumeClaim para certificados Let's Encrypt
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: traefik-acme-pvc
+  namespace: kube-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# ConfigMap: Traefik com Let's Encrypt
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traefik-config
+  namespace: kube-system
+data:
+  traefik.yaml: |
+    global:
+      checkNewVersion: false
+      sendAnonymousUsage: false
+
+    entryPoints:
+      web:
+        address: ":80"
+        http:
+          redirections:
+            entryPoint:
+              to: websecure
+              scheme: https
+              permanent: true
+      websecure:
+        address: ":443"
+
+    api:
+      dashboard: true
+      insecure: true
+
+    providers:
+      kubernetesCRD:
+        ingressClass: traefik
+        allowCrossNamespace: true
+        allowEmptyServices: true
+      kubernetesIngress:
+        ingressClass: traefik
+        allowEmptyServices: true
+
+    certificatesResolvers:
+      letsencrypt:
+        acme:
+          email: admin@dogbank.com
+          storage: /acme/acme.json
+          httpChallenge:
+            entryPoint: web
+          # STAGING - Para testes (comente em produção)
+          caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+          # PRODUÇÃO - Descomente para usar certificado real
+          # caServer: https://acme-v02.api.letsencrypt.org/directory
+
+    log:
+      level: INFO
+    accessLog: {}
+
+---
+# Traefik Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traefik
+  namespace: kube-system
+  labels:
+    app: traefik
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traefik
+  template:
+    metadata:
+      labels:
+        app: traefik
+    spec:
+      serviceAccountName: traefik
+      containers:
+        - name: traefik
+          image: traefik:v2.10
+          args:
+            - --configfile=/config/traefik.yaml
+          ports:
+            - name: web
+              containerPort: 80
+            - name: websecure
+              containerPort: 443
+            - name: admin
+              containerPort: 8080
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: acme
+              mountPath: /acme
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+      volumes:
+        - name: config
+          configMap:
+            name: traefik-config
+        - name: acme
+          persistentVolumeClaim:
+            claimName: traefik-acme-pvc
+
+---
+# Traefik Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  type: LoadBalancer
+  selector:
+    app: traefik
+  ports:
+    - name: web
+      port: 80
+      targetPort: 80
+      protocol: TCP
+    - name: websecure
+      port: 443
+      targetPort: 443
+      protocol: TCP
+    - name: admin
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+
+---
+# Middleware: CORS Headers
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: cors-headers
+  namespace: production
+spec:
+  headers:
+    accessControlAllowOriginList:
+      - "http://localhost:3000"
+      - "https://lab.dogbank.com"
+      - "http://lab.dogbank.com"
+    accessControlAllowMethods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "OPTIONS"
+      - "PATCH"
+      - "HEAD"
+    accessControlAllowHeaders:
+      - "*"
+    accessControlAllowCredentials: false
+    accessControlMaxAge: 3600
+    accessControlExposeHeaders:
+      - "*"
+
+---
+# PostgreSQL ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-script
+  namespace: production
+data:
+  01-init.sql: |
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id SERIAL PRIMARY KEY,
+        cpf VARCHAR(14) UNIQUE NOT NULL,
+        senha VARCHAR(255) NOT NULL,
+        nome VARCHAR(100) NOT NULL,
+        email VARCHAR(100) UNIQUE NOT NULL,
+        chave_pix VARCHAR(100),
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS contas (
+        id SERIAL PRIMARY KEY,
+        usuario_id INTEGER REFERENCES usuarios(id),
+        numero_conta VARCHAR(20) UNIQUE NOT NULL,
+        saldo DECIMAL(10,2) DEFAULT 0.00,
+        banco VARCHAR(50) DEFAULT 'DogBank',
+        user_name VARCHAR(100),
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS transacoes_pix (
+        id SERIAL PRIMARY KEY,
+        conta_origem INTEGER REFERENCES contas(id),
+        conta_destino INTEGER REFERENCES contas(id),
+        valor_transacionado DECIMAL(10,2) NOT NULL,
+        chave_pix_destino VARCHAR(100),
+        data_transacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(20) DEFAULT 'CONCLUIDA'
+    );
+
+    INSERT INTO usuarios (cpf, senha, nome, email, chave_pix) VALUES
+    ('12345678915', '123456', 'Julia Medina', 'julia.medina@email.com', 'julia.pix@email.com'),
+    ('98765432101', '123456', 'Pedro Silva', 'pedro.silva@email.com', 'pedro.pix@email.com'),
+    ('66666666666', '123456', 'Usuário Teste', 'teste@email.com', 'teste.pix@email.com')
+    ON CONFLICT (cpf) DO NOTHING;
+
+    INSERT INTO contas (usuario_id, numero_conta, saldo, user_name)
+    SELECT u.id, 'DB' || LPAD(u.id::TEXT, 8, '0'), 10000.00, u.nome
+    FROM usuarios u
+    WHERE NOT EXISTS (SELECT 1 FROM contas c WHERE c.usuario_id = u.id);
+
+---
+# PostgreSQL PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: production
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# PostgreSQL Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: production
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: dogbank-postgres-secret
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+            - name: init-script
+              mountPath: /docker-entrypoint-initdb.d
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+        - name: init-script
+          configMap:
+            name: postgres-init-script
+
+---
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: production
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP
+
+---
+# Auth Module Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-module
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-module
+  template:
+    metadata:
+      labels:
+        app: auth-module
+    spec:
+      containers:
+        - name: auth-module
+          image: schawirin/dogbank-auth-service:v1.2
+          ports:
+            - containerPort: 8088
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres:5432/dogbank"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-postgres-secret
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-postgres-secret
+                  key: POSTGRES_PASSWORD
+
+---
+# Auth Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: production
+spec:
+  selector:
+    app: auth-module
+  ports:
+    - port: 8088
+      targetPort: 8088
+
+---
+# Account Module Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: account-module
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: account-module
+  template:
+    metadata:
+      labels:
+        app: account-module
+    spec:
+      containers:
+        - name: account-module
+          image: schawirin/dogbank-account-service:v1.2
+          ports:
+            - containerPort: 8089
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres:5432/dogbank"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-postgres-secret
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-postgres-secret
+                  key: POSTGRES_PASSWORD
+
+---
+# Account Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: accounts-service
+  namespace: production
+spec:
+  selector:
+    app: account-module
+  ports:
+    - port: 8089
+      targetPort: 8089
+
+---
+# Transaction Module Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transaction-module
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: transaction-module
+  template:
+    metadata:
+      labels:
+        app: transaction-module
+    spec:
+      containers:
+        - name: transaction-module
+          image: schawirin/dogbank-transaction-service:v1.2
+          ports:
+            - containerPort: 8084
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres:5432/dogbank"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-postgres-secret
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-postgres-secret
+                  key: POSTGRES_PASSWORD
+
+---
+# Transaction Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: transactions-service
+  namespace: production
+spec:
+  selector:
+    app: transaction-module
+  ports:
+    - port: 8084
+      targetPort: 8084
+
+---
+# BancoCentral Module Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bancocentral-module
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bancocentral-module
+  template:
+    metadata:
+      labels:
+        app: bancocentral-module
+    spec:
+      containers:
+        - name: bancocentral-module
+          image: schawirin/dogbank-bancocentral-service:v1.2
+          ports:
+            - containerPort: 8085
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres:5432/dogbank"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-postgres-secret
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-postgres-secret
+                  key: POSTGRES_PASSWORD
+
+---
+# BancoCentral Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: bancocentral-service
+  namespace: production
+spec:
+  selector:
+    app: bancocentral-module
+  ports:
+    - port: 8085
+      targetPort: 8085
+
+---
+# Integration Module Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: integration-module
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: integration-module
+  template:
+    metadata:
+      labels:
+        app: integration-module
+    spec:
+      containers:
+        - name: integration-module
+          image: schawirin/dogbank-integration-service:v1.2
+          ports:
+            - containerPort: 8082
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres:5432/dogbank"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-postgres-secret
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-postgres-secret
+                  key: POSTGRES_PASSWORD
+
+---
+# Integration Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: integration-service
+  namespace: production
+spec:
+  selector:
+    app: integration-module
+  ports:
+    - port: 8082
+      targetPort: 8082
+
+---
+# Notification Module Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-module
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-module
+  template:
+    metadata:
+      labels:
+        app: notification-module
+    spec:
+      containers:
+        - name: notification-module
+          image: schawirin/dogbank-notification-service:v1.2
+          ports:
+            - containerPort: 8083
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres:5432/dogbank"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-postgres-secret
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-postgres-secret
+                  key: POSTGRES_PASSWORD
+
+---
+# Notification Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: notifications-service
+  namespace: production
+spec:
+  selector:
+    app: notification-module
+  ports:
+    - port: 8083
+      targetPort: 8083
+
+---
+# IngressRoute: Backend APIs HTTPS
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: backend-apis-https
+  namespace: production
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`lab.dogbank.com`) && PathPrefix(`/api/auth`)
+      kind: Rule
+      services:
+        - name: auth-service
+          port: 8088
+      middlewares:
+        - name: cors-headers
+      priority: 100
+
+    - match: Host(`lab.dogbank.com`) && PathPrefix(`/api/accounts`)
+      kind: Rule
+      services:
+        - name: accounts-service
+          port: 8089
+      middlewares:
+        - name: cors-headers
+      priority: 100
+
+    - match: Host(`lab.dogbank.com`) && PathPrefix(`/api/transactions`)
+      kind: Rule
+      services:
+        - name: transactions-service
+          port: 8084
+      middlewares:
+        - name: cors-headers
+      priority: 100
+
+    - match: Host(`lab.dogbank.com`) && PathPrefix(`/api/bancocentral`)
+      kind: Rule
+      services:
+        - name: bancocentral-service
+          port: 8085
+      middlewares:
+        - name: cors-headers
+      priority: 100
+
+    - match: Host(`lab.dogbank.com`) && PathPrefix(`/api/integration`)
+      kind: Rule
+      services:
+        - name: integration-service
+          port: 8082
+      middlewares:
+        - name: cors-headers
+      priority: 100
+
+    - match: Host(`lab.dogbank.com`) && PathPrefix(`/api/notifications`)
+      kind: Rule
+      services:
+        - name: notifications-service
+          port: 8083
+      middlewares:
+        - name: cors-headers
+      priority: 100
+
+  tls:
+    certResolver: letsencrypt
+    domains:
+      - main: lab.dogbank.com
+
+---
+# IngressRoute: Frontend HTTPS
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: frontend-https
+  namespace: production
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`lab.dogbank.com`) && PathPrefix(`/`)
+      kind: Rule
+      services:
+        - name: dogbank-frontend-service
+          port: 80
+      priority: 1
+
+  tls:
+    certResolver: letsencrypt
+    domains:
+      - main: lab.dogbank.com

@@ -1,0 +1,55 @@
+# =============================================================================
+# Dockerfile para bancocentral-module com Datadog APM
+# =============================================================================
+# Build independente - cada módulo tem seu próprio POM
+# =============================================================================
+
+FROM maven:3.9.7-eclipse-temurin-21 AS builder
+WORKDIR /app
+
+# Copia apenas o módulo bancocentral
+COPY bancocentral-module/ .
+
+# Build do bancocentral-module (independente)
+RUN mvn clean package -DskipTests
+
+# =============================================================================
+# Runtime stage
+# =============================================================================
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+
+# Instala wget e curl para health checks e download do agent
+RUN apt-get update && apt-get install -y wget curl && rm -rf /var/lib/apt/lists/*
+
+# Download Datadog Java Agent
+RUN curl -Lo dd-java-agent.jar https://dtdg.co/latest-java-tracer
+
+# Cria usuário não-root para segurança
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser
+
+# Copia o JAR do build stage
+COPY --from=builder /app/target/bancocentral-module-*.jar app.jar
+
+# Configura ownership
+RUN chown appuser:appgroup app.jar dd-java-agent.jar
+
+# Muda para usuário não-root
+USER appuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8085/actuator/health || exit 1
+
+# Configurações JVM otimizadas com Datadog Agent
+ENV JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC -XX:+UseContainerSupport"
+ENV DD_AGENT_HOST="datadog-agent"
+ENV DD_SERVICE="bancocentral-service"
+ENV DD_ENV="development"
+ENV DD_VERSION="1.0.0"
+ENV DD_LOGS_INJECTION="true"
+ENV DD_TRACE_SAMPLE_RATE="1"
+ENV DD_PROFILING_ENABLED="true"
+
+EXPOSE 8085
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -javaagent:/app/dd-java-agent.jar -jar app.jar"]
