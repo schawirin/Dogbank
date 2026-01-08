@@ -32,8 +32,10 @@ const PixTransferPage = () => {
   useEffect(() => {
     const loadAccount = async () => {
       try {
-        if (user?.cpf) {
-          const data = await accountService.getAccountInfo(user.cpf);
+        // Tenta pegar CPF do contexto ou do localStorage
+        const cpf = user?.cpf || localStorage.getItem('cpf');
+        if (cpf) {
+          const data = await accountService.getAccountInfo(cpf);
           setAccountData(data);
         }
       } catch (err) {
@@ -113,7 +115,8 @@ const PixTransferPage = () => {
 
     const numericAmount = parseFloat(amount.replace(/\./g, '').replace(',', '.'));
 
-    navigate('/pix/confirm', {
+    // ✅ CORREÇÃO: Usar rota relativa para funcionar dentro do MainLayout
+    navigate('/dashboard/pix/confirm', {
       state: {
         pixKey,
         amount: numericAmount.toFixed(2),

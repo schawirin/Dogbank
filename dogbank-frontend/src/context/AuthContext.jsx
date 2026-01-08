@@ -14,14 +14,28 @@ export const AuthProvider = ({ children }) => {
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
 
-    if (token && userData) {
+    // ✅ CORREÇÃO: Verificar se o token existe E não é undefined/null/vazio
+    if (token && token !== 'undefined' && token !== 'null' && userData) {
       try {
         const parsed = JSON.parse(userData);
-        setUser(parsed);
-        setIsAuthenticated(true);
+        // ✅ Verificar se os dados do usuário são válidos
+        if (parsed && (parsed.cpf || parsed.accountId)) {
+          setUser(parsed);
+          setIsAuthenticated(true);
+          console.log('✅ Sessão restaurada com sucesso:', parsed.nome || parsed.cpf);
+        } else {
+          console.warn('⚠️ Dados do usuário inválidos, limpando localStorage');
+          localStorage.removeItem('user');
+          localStorage.removeItem('token');
+        }
       } catch (e) {
         console.error('Erro ao processar dados do usuário:', e);
         localStorage.removeItem('user');
+        localStorage.removeItem('token');
+      }
+    } else {
+      // Limpar dados inválidos se existirem
+      if (token === 'undefined' || token === 'null') {
         localStorage.removeItem('token');
       }
     }
@@ -31,11 +45,19 @@ export const AuthProvider = ({ children }) => {
 
   // Função genérica de login
   const login = (userData, token) => {
+    // ✅ CORREÇÃO: Validar os dados antes de salvar
+    if (!userData || !token) {
+      console.error('❌ Tentativa de login com dados inválidos:', { userData, token });
+      return false;
+    }
+
     // espera que userData contenha { cpf, nome, ... }
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
     setIsAuthenticated(true);
+    console.log('✅ Login realizado com sucesso:', userData.nome || userData.cpf);
+    return true;
   };
 
   // Autentica via API (CPF + PIN) e já faz login automático
@@ -56,8 +78,14 @@ export const AuthProvider = ({ children }) => {
 
   // Desloga e limpa tudo
   const logout = () => {
+    console.log('🚪 Fazendo logout');
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    // Também limpar os dados do authService
+    localStorage.removeItem('cpf');
+    localStorage.removeItem('nome');
+    localStorage.removeItem('chavePix');
+    localStorage.removeItem('accountId');
     setUser(null);
     setIsAuthenticated(false);
   };

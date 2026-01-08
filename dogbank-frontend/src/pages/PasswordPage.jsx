@@ -67,8 +67,21 @@ const PasswordPage = () => {
     try {
       // Chama a API de login
       const resp = await authService.login(cpf, pin);
-      const token = resp.token ?? resp.accessToken;
-      const userObj = resp.user ?? resp.usuario ?? resp;
+      
+      // ✅ CORREÇÃO: O authService.login() retorna { nome, chavePix, accountId }
+      // Precisamos construir o objeto user corretamente e gerar um token placeholder
+      // já que o backend não retorna um token JWT neste endpoint
+      
+      const userObj = {
+        cpf: cpf,
+        nome: resp.nome,
+        chavePix: resp.chavePix,
+        accountId: resp.accountId
+      };
+      
+      // Gera um token simples baseado no timestamp (ou use um token real se o backend fornecer)
+      // Em produção, o backend deveria retornar um JWT token
+      const token = resp.token || resp.accessToken || `dogbank_session_${Date.now()}_${resp.accountId}`;
 
       // Passa para o contexto de autenticação
       login(userObj, token);

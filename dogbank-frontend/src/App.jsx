@@ -11,7 +11,7 @@ import LoginPage from './pages/LoginPage';
 import PasswordPage from './pages/PasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import ExtractPage from './pages/ExtractPage';
-import CardsPage from './pages/CardsPage';               // NOVA PÁGINA
+import CardsPage from './pages/CardsPage';
 import PixTransferPage from './pages/PixTransferPage';
 import PixConfirmPage from './pages/PixConfirmPage';
 import PixReceiptPage from './pages/PixReceiptPage';
@@ -42,13 +42,13 @@ const App = () => (
       <Route path="/login" element={<LoginPage />} />
       <Route path="/password" element={<PasswordPage />} />
 
-      {/* Rotas protegidas */}
+      {/* Rotas protegidas dentro do MainLayout */}
       <Route path="/dashboard" element={<MainLayout />}>
         <Route index element={<DashboardPage />} />
         <Route path="extrato" element={<ExtractPage />} />
         <Route path="cartoes" element={<CardsPage />} />
 
-        {/* Fluxo PIX */}
+        {/* Fluxo PIX - rotas aninhadas dentro de /dashboard */}
         <Route path="pix" element={<PixTransferPage />} />
         <Route path="pix/confirm" element={<PixConfirmPage />} />
         <Route path="pix/receipt" element={<PixReceiptPage />} />
@@ -56,6 +56,11 @@ const App = () => (
         {/* Outros */}
         <Route path="*" element={<NotFoundPage />} />
       </Route>
+
+      {/* Rotas alternativas para PIX (para compatibilidade com navegação direta) */}
+      <Route path="/pix" element={<Navigate to="/dashboard/pix" replace />} />
+      <Route path="/pix/confirm" element={<Navigate to="/dashboard/pix/confirm" replace />} />
+      <Route path="/pix/receipt" element={<Navigate to="/dashboard/pix/receipt" replace />} />
     </Routes>
   </AuthProvider>
 );
