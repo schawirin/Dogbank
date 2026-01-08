@@ -1,24 +1,25 @@
-# Multi-stage build para transaction-module com Datadog APM
+# =============================================================================
+# Dockerfile para transaction-module com Datadog APM
+# =============================================================================
+# Build independente - cada módulo tem seu próprio POM
+# =============================================================================
+
 FROM maven:3.9.7-eclipse-temurin-21 AS builder
 WORKDIR /app
-# Copia todo o projeto
-COPY . .
-# Instala o POM pai primeiro
-RUN mvn -f pom.xml clean install -DskipTests -N
-# Build do bancocentral-module primeiro (dependência)
-RUN mvn -f bancocentral-module/pom.xml clean install -DskipTests
-# Build do account-module (dependência direta)
-RUN mvn -f account-module/pom.xml clean install -DskipTests
-# Build do auth-module (possível dependência)
-RUN mvn -f auth-module/pom.xml clean install -DskipTests
-# Build do transaction-module
-RUN mvn -f transaction-module/pom.xml clean package -DskipTests
 
+# Copia apenas o módulo transaction
+COPY transaction-module/ .
+
+# Build do transaction-module (independente)
+RUN mvn clean package -DskipTests
+
+# =============================================================================
 # Runtime stage
+# =============================================================================
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-# Instala wget para health checks
+# Instala wget e curl para health checks e download do agent
 RUN apt-get update && apt-get install -y wget curl && rm -rf /var/lib/apt/lists/*
 
 # Download Datadog Java Agent
@@ -28,7 +29,7 @@ RUN curl -Lo dd-java-agent.jar https://dtdg.co/latest-java-tracer
 RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 
 # Copia o JAR do build stage
-COPY --from=builder /app/transaction-module/target/transaction-module-*.jar app.jar
+COPY --from=builder /app/target/transaction-module-*.jar app.jar
 
 # Configura ownership
 RUN chown appuser:appgroup app.jar dd-java-agent.jar
