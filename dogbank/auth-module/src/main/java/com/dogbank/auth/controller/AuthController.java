@@ -115,6 +115,29 @@ public class AuthController {
         ));
     }
 
+    /**
+     * Busca usuário por chave PIX - Endpoint usado pelo transaction-service
+     * GET /api/auth/pix-key/{pixKey}
+     */
+    @GetMapping("/pix-key/{pixKey}")
+    public ResponseEntity<?> getUserByPixKey(@PathVariable String pixKey) {
+        Optional<User> userOpt = userRepository.findByChavePix(pixKey.trim());
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Chave PIX não encontrada", "pixKey", pixKey));
+        }
+        
+        User user = userOpt.get();
+        // Retorna dados do usuário sem a senha
+        return ResponseEntity.ok(Map.of(
+                "id", user.getId(),
+                "nome", user.getNome(),
+                "cpf", user.getCpf(),
+                "email", user.getEmail() != null ? user.getEmail() : "",
+                "chavePix", user.getChavePix()
+        ));
+    }
+
     @GetMapping("/health")
     public Map<String, String> health() {
         return Map.of("status", "ok");
