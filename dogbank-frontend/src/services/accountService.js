@@ -5,22 +5,22 @@ import { accountApi } from './api';
  */
 const accountService = {
   /**
-   * Obtém as informações da conta do usuário pelo userId
-   * @param {string|number} userId - ID do usuário
+   * Obtém as informações da conta do usuário pelo CPF
+   * @param {string} cpf - CPF do usuário
    * @returns {Promise} - Promessa com os dados da conta
    */
-  getAccountInfo: async (userId) => {
+  getAccountInfo: async (cpf) => {
     try {
-      console.log(`🔍 Buscando informações da conta para userId: ${userId}`);
-      
-      const response = await accountApi.get(`/user/${userId}`);
+      console.log(`🔍 Buscando informações da conta para CPF: ${cpf}`);
+
+      const response = await accountApi.get(`/user/cpf/${cpf}`);
       console.log('✅ Resposta de dados da conta:', response.data);
       
       // Normalizar a resposta da API para garantir consistência
       const accountData = {
         ...response.data,
-        saldo: response.data.balance,
-        numero_conta: response.data.accountNumber
+        saldo: response.data.balance,  // Adicionar campo "saldo" com valor de "balance"
+        numero_conta: response.data.accountNumber  // Normalizar outros campos se necessário
       };
       
       return accountData;
@@ -35,7 +35,7 @@ const accountService = {
           accountNumber: '12345-6',
           saldo: 10000.00,
           balance: 10000.00,
-          userId: userId,
+          cpf: cpf,
           nome: 'Usuário Teste'
         };
       }
@@ -53,7 +53,7 @@ const accountService = {
     try {
       console.log(`💰 Buscando saldo para a conta ID: ${accountId}`);
       
-      const response = await accountApi.get(`/${accountId}/balance`);
+      const response = await accountApi.get(`/${accountId}/balance`); // ✅ CORRIGIDO: era '/api/accounts/${accountId}/balance', agora é só '/${accountId}/balance'
       console.log('✅ Resposta de saldo:', response.data);
       return response.data;
     } catch (error) {
@@ -78,7 +78,7 @@ const accountService = {
     try {
       console.log(`📋 Buscando histórico para a conta ID: ${accountId}`);
       
-      const response = await accountApi.get(`/${accountId}/history`);
+      const response = await accountApi.get(`/${accountId}/history`); // ✅ CORRIGIDO: era '/api/accounts/${accountId}/history', agora é só '/${accountId}/history'
       console.log('✅ Resposta de histórico:', response.data);
       return response.data;
     } catch (error) {
@@ -87,6 +87,7 @@ const accountService = {
       // Para desenvolvimento - simulação de dados
       if (process.env.NODE_ENV === 'development') {
         console.warn('⚠️ Usando histórico simulado');
+        // Mock de dados para teste local
         return [
           {
             id: 1,

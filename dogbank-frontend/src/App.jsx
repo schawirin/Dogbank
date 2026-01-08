@@ -6,21 +6,16 @@ import { AuthProvider } from './context/AuthContext';
 import MainLayout from './components/layout/MainLayout';
 
 // Páginas
-import WelcomePage from './pages/WelcomePage';
-import RegisterPage from './pages/RegisterPage';
+import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import PasswordPage from './pages/PasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import ExtractPage from './pages/ExtractPage';
-import CardsPage from './pages/CardsPage';
+import CardsPage from './pages/CardsPage';               // NOVA PÁGINA
 import PixTransferPage from './pages/PixTransferPage';
 import PixConfirmPage from './pages/PixConfirmPage';
 import PixReceiptPage from './pages/PixReceiptPage';
 import NotFoundPage from './pages/NotFoundPage';
-
-// Modern Styles
-import './styles/animations.css';
-import './styles/modern-effects.css';
 
 import { datadogRum } from '@datadog/browser-rum';
 
@@ -42,20 +37,16 @@ datadogRum.init({
 const App = () => (
   <AuthProvider>
     <Routes>
-      {/* Página inicial */}
-      <Route path="/" element={<WelcomePage />} />
-
       {/* Rotas públicas */}
-      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/password" element={<PasswordPage />} />
 
       {/* Rotas protegidas */}
-      <Route path="/app" element={<MainLayout />}>
-        <Route index element={<Navigate to="/app/dashboard" replace />} />
-        <Route path="dashboard" element={<DashboardPage />} />
+      <Route path="/dashboard" element={<MainLayout />}>
+        <Route index element={<DashboardPage />} />
         <Route path="extrato" element={<ExtractPage />} />
-        <Route path="cartoes" element={<CardsPage />} />     {/* NOVA ROTA */}
+        <Route path="cartoes" element={<CardsPage />} />
 
         {/* Fluxo PIX */}
         <Route path="pix" element={<PixTransferPage />} />

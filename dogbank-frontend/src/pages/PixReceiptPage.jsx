@@ -81,7 +81,7 @@ const PixReceiptPage = () => {
             Comprovante não encontrado
           </h2>
           <p className="text-neutral-600 mb-6">{error}</p>
-          <Button onClick={() => navigate('/app/dashboard')}>
+          <Button onClick={() => navigate('/dashboard')}>
             Voltar ao Dashboard
           </Button>
         </div>
@@ -96,7 +96,7 @@ const PixReceiptPage = () => {
       {/* Header moderno */}
       <div className="mb-8">
         <button 
-          onClick={() => navigate('/app/dashboard')}
+          onClick={() => navigate('/dashboard')}
           className="flex items-center text-primary-600 hover:text-primary-700 mb-4 transition-colors"
         >
           <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -244,7 +244,7 @@ const PixReceiptPage = () => {
       {/* Ações */}
       <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-3">
         <Button 
-          onClick={() => navigate('/app/pix')}
+          onClick={() => navigate('/pix')}
           className="py-3 text-base font-medium rounded-xl"
         >
           Fazer outro PIX

@@ -7,46 +7,59 @@ module.exports = {
     theme: {
       extend: {
         colors: {
+          // Sober Banking LIGHT Theme - Purple Datadog Accent
           primary: {
             50: '#f5f2ff',
-            100: '#ece5ff', 
+            100: '#ece5ff',
             200: '#d9cbff',
             300: '#baa6ff',
             400: '#9776ff',
-            500: '#774af4', // Cor principal - roxo Datadog
+            500: '#774af4', // Roxo principal Datadog
             600: '#6931e6',
             700: '#5a26cc',
             800: '#4a21a5',
             900: '#3f1e85',
           },
           secondary: {
-            50: '#f0f9ff',
-            100: '#e0f2fe',
-            200: '#bae6fd',
-            300: '#7dd3fc',
-            400: '#38bdf8',
-            500: '#0ea5e9',
-            600: '#0284c7',
-            700: '#0369a1',
-            800: '#075985',
-            900: '#0c4a6e',
+            50: '#f5f5f7',   // Light gray (Nubank)
+            100: '#f0f0f2',  // Light gray alternative
+            200: '#e5e5e5',  // Light borders
+            300: '#d1d1d6',  // Muted gray
+            400: '#b0b0b5',  // Medium gray
+            500: '#8b91a0',  // Gray medium
+            600: '#6d7385',
+            700: '#4f556a',
+            800: '#363b51',
+            900: '#f0f0f2',  // Light gray (was black)
           },
           neutral: {
-            50: '#f8fafc',
-            100: '#f1f5f9',
-            200: '#e2e8f0',
-            300: '#cbd5e1',
-            400: '#94a3b8',
-            500: '#64748b',
-            600: '#475569',
-            700: '#334155',
-            800: '#1e293b',
-            900: '#0f172a',
+            50: '#fafafa',   // Almost white
+            100: '#f5f5f5',  // Very light
+            200: '#e5e5e5',  // Light
+            300: '#d4d4d4',  // Light-medium
+            400: '#a3a3a3',  // Medium
+            500: '#737373',  // Medium-dark
+            600: '#525252',
+            700: '#404040',
+            800: '#262626',
+            900: '#171717',
           },
-          success: '#00b42a',
-          warning: '#ff7a00',
-          error: '#ff0022',
-          background: '#f8f9fd',
+          success: '#22c55e',
+          warning: '#fbbf24',
+          error: '#ef4444',
+          background: '#f5f5f7',      // Light gray (Nubank style)
+          foreground: '#1a1a1a',      // Almost black (dark text)
+          card: '#ffffff',            // White cards
+          'card-foreground': '#1a1a1a', // Dark text on white
+          muted: '#f0f0f2',           // Light muted
+          'muted-foreground': '#6b7280', // Gray text
+          accent: '#f5f5f7',          // Light accent
+          'accent-foreground': '#1a1a1a', // Dark text
+          destructive: '#ef4444',     // Red
+          'destructive-foreground': '#ffffff',
+          border: '#e5e5e5',          // Light gray borders
+          input: '#ffffff',           // White input background
+          ring: '#774af4',            // Purple focus ring
         },
         fontFamily: {
           sans: ['Inter', 'sans-serif'],

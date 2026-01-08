@@ -1,20 +1,11 @@
-# =====================================================
-# DOGBANK FRONTEND - DEPLOYMENT COMPLETO
-# =====================================================
-# Traefik será instalado separadamente via Helm
-# Este arquivo contém apenas: Frontend + Middlewares + IngressRoute
-# =====================================================
-
-# ===================== NAMESPACE ======================
+# ---------- NAMESPACE DA APLICAÇÃO ----------
 apiVersion: v1
 kind: Namespace
 metadata:
   name: production
-  labels:
-    name: production
 
+# ---------- FRONTEND (NGINX ESTÁTICO) ----------
 ---
-# ===================== CONFIGMAP NGINX ================
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -28,7 +19,6 @@ data:
       root /usr/share/nginx/html;
       index index.html index.htm;
 
-      # SPA fallback - let React Router handle all routes
       location / {
         try_files $uri $uri/ /index.html;
       }
@@ -41,230 +31,187 @@ data:
     }
 
 ---
-# ===================== DEPLOYMENT FRONTEND ============
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: dogbank-frontend
   namespace: production
-  labels:
-    app: dogbank-frontend
-    version: v1.3
+  labels: { app: dogbank-frontend, version: v1.3 }
 spec:
   replicas: 2
-  selector:
-    matchLabels:
-      app: dogbank-frontend
+  selector: { matchLabels: { app: dogbank-frontend } }
   template:
     metadata:
-      labels:
-        app: dogbank-frontend
-        version: v1.3
+      labels: { app: dogbank-frontend, version: v1.3 }
     spec:
       containers:
-      - name: dogbank-frontend
-        image: schawirin/dogbank-frontend:latest
-        imagePullPolicy: Always
-        ports:
-        - name: http
-          containerPort: 8080
-          protocol: TCP
-        
-        # Health checks
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-        
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 5
-          timeoutSeconds: 3
-          successThreshold: 1
-          failureThreshold: 3
-        
-        # Resources
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 500m
-            memory: 512Mi
-        
-        # Volume mount para nginx config
-        volumeMounts:
-        - name: nginx-config
-          mountPath: /etc/nginx/conf.d/nginx.conf
-          subPath: nginx.conf
-      
+        - name: dogbank-frontend
+          image: schawirin/dogbank-frontend:v1.3
+          ports: [ { containerPort: 8080, name: http } ]
+          livenessProbe:  { httpGet: { path: /health, port: 8080 }, initialDelaySeconds: 30, periodSeconds: 10 }
+          readinessProbe: { httpGet: { path: /health, port: 8080 }, initialDelaySeconds: 5,  periodSeconds: 5  }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits:   { cpu: 500m, memory: 512Mi }
+          volumeMounts:
+            - { name: nginx-config, mountPath: /etc/nginx/conf.d/nginx.conf, subPath: nginx.conf }
       volumes:
-      - name: nginx-config
-        configMap:
-          name: dogbank-frontend-nginx-conf
+        - name: nginx-config
+          configMap: { name: dogbank-frontend-nginx-conf }
 
 ---
-# ===================== SERVICE FRONTEND ===============
 apiVersion: v1
 kind: Service
 metadata:
   name: dogbank-frontend-service
   namespace: production
-  labels:
-    app: dogbank-frontend
+  labels: { app: dogbank-frontend }
 spec:
-  type: ClusterIP
-  selector:
-    app: dogbank-frontend
+  selector: { app: dogbank-frontend }
   ports:
-  - name: http
-    protocol: TCP
-    port: 80
-    targetPort: 8080
+    - name: http
+      port: 80
+      targetPort: 8080
+  type: ClusterIP
+
+# ---------- TRAEFIK (CONTROLLER + LB INTERNET-FACING NAS SUBNETS PÚBLICAS) ----------
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: traefik
 
 ---
-# ===================== MIDDLEWARE STRIP API ===========
-# Remove "/api/<primeiro-segmento>" do path
-apiVersion: traefik.io/v1alpha1
-kind: Middleware
+apiVersion: v1
+kind: ServiceAccount
 metadata:
-  name: strip-api
-  namespace: production
-spec:
-  stripPrefixRegex:
-    regex:
-    - "^/api/[^/]+"
+  name: traefik
+  namespace: traefik
 
 ---
-# ===================== MIDDLEWARE CORS ================
-# Permite CORS para desenvolvimento local
-apiVersion: traefik.io/v1alpha1
-kind: Middleware
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
 metadata:
-  name: cors-allow-localhost
-  namespace: production
-spec:
-  headers:
-    accessControlAllowOriginList:
-    - "http://localhost:3000"
-    - "http://localhost:8080"
-    - "http://dogbank.local"
-    accessControlAllowMethods:
-    - "GET"
-    - "POST"
-    - "PUT"
-    - "PATCH"
-    - "DELETE"
-    - "OPTIONS"
-    accessControlAllowHeaders:
-    - "*"
-    accessControlAllowCredentials: true
-    accessControlMaxAge: 100
-    addVaryHeader: true
+  name: traefik
+rules:
+  - apiGroups: [""]
+    resources: ["services","endpoints","secrets","nodes"]
+    verbs: ["get","list","watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses","ingressclasses"]
+    verbs: ["get","list","watch"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get","list","watch"]
 
 ---
-# ===================== INGRESS ROUTE FRONTEND =========
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
 metadata:
-  name: frontend-route
-  namespace: production
-  labels:
-    app: dogbank-frontend
-spec:
-  entryPoints:
-  - web
-  routes:
-  # Rota principal do frontend (deve ter prioridade MENOR)
-  - match: Host(`dogbank.local`) && PathPrefix(`/`)
-    kind: Rule
-    services:
-    - name: dogbank-frontend-service
-      port: 80
-    priority: 1
+  name: traefik
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: traefik
+subjects:
+  - kind: ServiceAccount
+    name: traefik
+    namespace: traefik
 
 ---
-# ===================== INGRESS ROUTE APIs =============
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
 metadata:
-  name: backend-apis-route
-  namespace: production
-  labels:
-    app: dogbank-backend
+  name: traefik
 spec:
-  entryPoints:
-  - web
-  routes:
-  # AUTH API
-  - match: Host(`dogbank.local`) && PathPrefix(`/api/auth`)
-    kind: Rule
-    services:
-    - name: auth-service
+  controller: traefik.io/ingress-controller
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traefik-ingress-controller
+  namespace: traefik
+  labels: { app: traefik }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: traefik } }
+  template:
+    metadata:
+      labels: { app: traefik }
+    spec:
+      serviceAccountName: traefik
+      containers:
+        - name: traefik
+          image: traefik:v2.10
+          args:
+            - --entrypoints.web.address=:80
+            - --providers.kubernetesingress=true
+            - --api.insecure=true
+            - --log.level=INFO
+          ports:
+            - { name: web,   containerPort: 80 }
+            - { name: admin, containerPort: 8080 } # dashboard interno
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik
+  namespace: traefik
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    # ⬇️ FORÇA SUBNETS PÚBLICAS (SUBSTITUA PELOS SEUS IDs)
+    service.beta.kubernetes.io/aws-load-balancer-subnets: subnet-AAAA,subnet-BBBB
+spec:
+  type: LoadBalancer
+  selector: { app: traefik }
+  ports:
+    - name: web
       port: 80
-    middlewares:
-    - name: strip-api
-    - name: cors-allow-localhost
-    priority: 100
-  
-  # ACCOUNTS API
-  - match: Host(`dogbank.local`) && PathPrefix(`/api/accounts`)
-    kind: Rule
-    services:
-    - name: accounts-service
-      port: 80
-    middlewares:
-    - name: strip-api
-    - name: cors-allow-localhost
-    priority: 100
-  
-  # TRANSACTIONS API
-  - match: Host(`dogbank.local`) && PathPrefix(`/api/transactions`)
-    kind: Rule
-    services:
-    - name: transactions-service
-      port: 80
-    middlewares:
-    - name: strip-api
-    - name: cors-allow-localhost
-    priority: 100
-  
-  # BANCO CENTRAL API
-  - match: Host(`dogbank.local`) && PathPrefix(`/api/bancocentral`)
-    kind: Rule
-    services:
-    - name: bancocentral-service
-      port: 80
-    middlewares:
-    - name: strip-api
-    - name: cors-allow-localhost
-    priority: 100
-  
-  # INTEGRATION API
-  - match: Host(`dogbank.local`) && PathPrefix(`/api/integration`)
-    kind: Rule
-    services:
-    - name: integration-service
-      port: 80
-    middlewares:
-    - name: strip-api
-    - name: cors-allow-localhost
-    priority: 100
-  
-  # NOTIFICATIONS API
-  - match: Host(`dogbank.local`) && PathPrefix(`/api/notifications`)
-    kind: Rule
-    services:
-    - name: notifications-service
-      port: 80
-    middlewares:
-    - name: strip-api
-    - name: cors-allow-localhost
-    priority: 100
+      targetPort: 80
+    - name: admin
+      port: 9000
+      targetPort: 8080
+
+# ---------- INGRESS (padrão) PARA FRONT + APIS ----------
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dogbank-traefik-ingress
+  namespace: production
+spec:
+  ingressClassName: traefik
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service: { name: dogbank-frontend-service, port: { number: 80 } }
+      - path: /api/auth
+        pathType: Prefix
+        backend:
+          service: { name: auth-service, port: { number: 8088 } }
+      - path: /api/accounts
+        pathType: Prefix
+        backend:
+          service: { name: account-service, port: { number: 8089 } }
+      - path: /api/transactions
+        pathType: Prefix
+        backend:
+          service: { name: transaction-service, port: { number: 8084 } }
+      - path: /api/bancocentral
+        pathType: Prefix
+        backend:
+          service: { name: bancocentral-service, port: { number: 8085 } }
+      - path: /api/integration
+        pathType: Prefix
+        backend:
+          service: { name: integration-service, port: { number: 8082 } }
+      - path: /api/notifications
+        pathType: Prefix
+        backend:
+          service: { name: notification-service, port: { number: 8083 } }

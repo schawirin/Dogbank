@@ -238,7 +238,7 @@ const ExtractPage = () => {
           <div className="text-center py-8">
             <p className="text-neutral-500">Nenhuma transação encontrada no período selecionado.</p>
             <Button 
-              onClick={() => navigate('/app/pix')}
+              onClick={() => navigate('/pix')}
               className="mt-4"
             >
               Fazer PIX
@@ -297,7 +297,7 @@ const ExtractPage = () => {
       <div className="mt-6">
         <Button 
           variant="secondary" 
-          onClick={() => navigate('/app/dashboard')}
+          onClick={() => navigate('/dashboard')}
         >
           ← Voltar ao Dashboard
         </Button>
