@@ -72,8 +72,7 @@ const LoginPage = () => {
         <div className={`relative z-10 text-white max-w-lg transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
           {/* Logo */}
           <div className="flex items-center gap-4 mb-12">
-            <img src={dogbankLogo} alt="DogBank" className="h-14 w-auto" />
-            <span className="text-2xl font-bold">DogBank</span>
+            <img src={dogbankLogo} alt="DogBank" className="h-16 w-auto" />
           </div>
 
           <h1 className="text-5xl font-bold mb-6 leading-tight">
