@@ -49,7 +49,8 @@ const PixConfirmPage = () => {
     setCounter(null);
 
     try {
-      // Executa PIX (validação + confirmação)
+      // Executa PIX (validação no Banco Central + confirmação)
+      // O timeout do Banco Central acontece AQUI!
       const receipt = await pixService.executePix({
         pixKey: state.pixKey,
         amount,
@@ -62,7 +63,24 @@ const PixConfirmPage = () => {
       navigate('/dashboard/pix/receipt', { state: receipt });
     } catch (err) {
       console.error('Erro na confirmação PIX:', err);
-      const msg = err.response?.data?.error || err.message || 'Falha na confirmação.';
+      
+      // Trata mensagens de erro específicas
+      let msg = err.message || 'Falha na confirmação.';
+      
+      // Se for erro de resposta da API, pega a mensagem
+      if (err.response?.data?.error) {
+        msg = err.response.data.error;
+      }
+      
+      // Mensagens mais amigáveis para erros comuns
+      if (msg.includes('timeout') || msg.includes('Timeout') || msg.includes('não respondeu')) {
+        msg = 'Não foi possível realizar o PIX. O Banco Central não respondeu a tempo. Tente novamente mais tarde.';
+      } else if (msg.includes('Limite')) {
+        msg = 'Limite de transação excedido. Tente um valor menor.';
+      } else if (msg.includes('Saldo')) {
+        msg = 'Saldo insuficiente para realizar esta transferência.';
+      }
+      
       setError(msg);
     } finally {
       setLoading(false);

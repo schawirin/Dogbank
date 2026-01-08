@@ -7,68 +7,52 @@ import authService from './authService';
  */
 const pixService = {
   /**
-   * Valida chave PIX junto ao Banco Central
+   * Valida chave PIX - apenas verifica se existe no sistema (auth-service)
+   * NÃO chama o Banco Central aqui - isso é feito na execução do PIX
    * @param {string} pixKey
-   * @param {number} amount
-   * @returns {Promise<{status: string, error?: string}>}
+   * @returns {Promise<{valid: boolean, user?: object, error?: string}>}
    */
-  async validatePixKey(pixKey, amount) {
+  async validatePixKey(pixKey) {
     try {
-      console.log('🔍 Validando chave PIX:', { pixKey, amount });
-      console.log('🔍 bancoCentralApi baseURL:', bancoCentralApi.defaults.baseURL);
+      console.log('🔍 Validando chave PIX no sistema local:', pixKey);
       
-      // 1) Primeiro verifica se a chave existe no auth-service (banco de dados local)
-      console.log('🔍 Verificando se chave PIX existe no sistema...');
-      try {
-        const authResponse = await authApi.get(`/validate-pix?chavePix=${encodeURIComponent(pixKey)}`);
-        console.log('🔍 Resposta do auth-service:', authResponse.data);
-        
-        if (!authResponse.data.valid) {
-          console.warn('⚠️ Chave PIX não encontrada no sistema');
-          return {
-            status: 'REJECTED',
-            error: 'Chave PIX não encontrada no sistema. Verifique se a chave está correta.',
-            valid: false
-          };
-        }
-        
-        // Guarda os dados do usuário para retornar depois
-        const userData = authResponse.data.user;
-        console.log('✅ Usuário encontrado:', userData);
-        
-        // 2) Depois valida no Banco Central
-        const { data } = await bancoCentralApi.post(
-          '/pix/validate',
-          { pixKey, amount }
-        );
-        
-        console.log('✅ Chave PIX validada no Banco Central:', data);
-        
-        // Retorna com os dados do usuário
+      // Apenas verifica se a chave existe no auth-service (banco de dados local)
+      const authResponse = await authApi.get(`/validate-pix?chavePix=${encodeURIComponent(pixKey)}`);
+      console.log('🔍 Resposta do auth-service:', authResponse.data);
+      
+      if (!authResponse.data.valid) {
+        console.warn('⚠️ Chave PIX não encontrada no sistema');
         return {
-          ...data,
-          valid: data.status === 'APPROVED',
-          user: userData
+          valid: false,
+          error: 'Chave PIX não encontrada no sistema. Verifique se a chave está correta.'
         };
-      } catch (authError) {
-        // Se o auth-service retornar 404, a chave não existe
-        if (authError.response?.status === 404) {
-          return {
-            status: 'REJECTED',
-            error: 'Chave PIX não encontrada. Verifique se a chave está correta.',
-            valid: false
-          };
-        }
-        throw authError;
       }
+      
+      // Retorna os dados do usuário
+      const userData = authResponse.data.user;
+      console.log('✅ Usuário encontrado:', userData);
+      
+      return {
+        valid: true,
+        user: userData,
+        status: 'FOUND'
+      };
     } catch (error) {
+      // Se o auth-service retornar 404, a chave não existe
+      if (error.response?.status === 404) {
+        return {
+          valid: false,
+          error: 'Chave PIX não encontrada. Verifique se a chave está correta.'
+        };
+      }
       console.error('❌ Erro ao validar chave PIX:', error.response?.data || error.message || error);
       throw error;
     }
   },
 
   /**
-   * Executa a transferência PIX: autentica senha, valida chave e dispara a transação
+   * Executa a transferência PIX: autentica senha, valida no Banco Central e dispara a transação
+   * O timeout do Banco Central acontece AQUI, não na validação da chave
    * @param {{ pixKey: string, amount: number, description?: string, password: string, sourceAccountId: number }}
    * @returns {Promise<Object>} recibo completo
    */
@@ -91,11 +75,38 @@ const pixService = {
     console.log('🔐 Autenticando usuário:', cpf);
     await authService.login(cpf, password);
 
-    // 2) Validação da chave junto ao Banco Central
-    console.log('🔍 Validando chave PIX no Banco Central...');
-    const validation = await this.validatePixKey(pixKey, amount);
-    if (validation.status !== 'APPROVED') {
-      throw new Error(validation.error || 'Chave PIX não aprovada pelo Banco Central');
+    // 2) Validação da transação junto ao Banco Central (AQUI pode dar timeout!)
+    console.log('🏦 Validando transação no Banco Central...');
+    console.log('💰 Valor da transação:', amount);
+    
+    try {
+      const bcResponse = await bancoCentralApi.post('/pix/validate', { pixKey, amount });
+      console.log('✅ Resposta do Banco Central:', bcResponse.data);
+      
+      if (bcResponse.data.status !== 'APPROVED') {
+        const errorMsg = bcResponse.data.error || 'Transação não aprovada pelo Banco Central';
+        console.error('❌ Banco Central rejeitou:', errorMsg);
+        throw new Error(errorMsg);
+      }
+    } catch (bcError) {
+      console.error('❌ Erro do Banco Central:', bcError);
+      
+      // Verifica se é timeout
+      if (bcError.code === 'ECONNABORTED' || bcError.response?.status === 408) {
+        throw new Error('Não foi possível realizar o PIX. O Banco Central não respondeu a tempo. Tente novamente mais tarde.');
+      }
+      
+      // Verifica se é erro de resposta do BC
+      if (bcError.response?.data?.error) {
+        throw new Error(bcError.response.data.error);
+      }
+      
+      // Se o erro já tem mensagem, propaga
+      if (bcError.message && !bcError.message.includes('status code')) {
+        throw bcError;
+      }
+      
+      throw new Error('Não foi possível realizar o PIX. Tente novamente mais tarde.');
     }
 
     // 3) Envio para o serviço de transações
