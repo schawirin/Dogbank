@@ -1,0 +1,161 @@
+# =============================================================================
+# DogBank - PostgreSQL Deployment with Datadog DBM
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: dogbank
+  labels:
+    app: postgres
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: dogbank
+  labels:
+    app: postgres
+    tags.datadoghq.com/env: dogbank
+    tags.datadoghq.com/service: postgres
+    tags.datadoghq.com/version: "15"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: postgres
+        tags.datadoghq.com/env: dogbank
+        tags.datadoghq.com/service: postgres
+        tags.datadoghq.com/version: "15"
+      annotations:
+        # Datadog Autodiscovery for PostgreSQL DBM
+        ad.datadoghq.com/postgres.checks: |
+          {
+            "postgres": {
+              "init_config": {},
+              "instances": [
+                {
+                  "dbm": true,
+                  "host": "%%host%%",
+                  "port": 5432,
+                  "username": "datadog",
+                  "password": "datadog_password",
+                  "dbname": "dogbank",
+                  "tags": ["env:dogbank", "service:postgres"],
+                  "query_samples": {
+                    "enabled": true,
+                    "explain_parameterized_queries": true
+                  },
+                  "query_metrics": {
+                    "enabled": true
+                  },
+                  "query_activity": {
+                    "enabled": true
+                  },
+                  "collect_activity_query_source": true,
+                  "collect_bloat_metrics": true,
+                  "collect_wal_metrics": true
+                }
+              ]
+            }
+          }
+        ad.datadoghq.com/postgres.logs: '[{"source":"postgresql","service":"postgres"}]'
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: dogbank-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: dogbank-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secrets
+                  key: POSTGRES_PASSWORD
+          args:
+            - "-c"
+            - "shared_preload_libraries=pg_stat_statements"
+            - "-c"
+            - "pg_stat_statements.track=all"
+            - "-c"
+            - "pg_stat_statements.max=10000"
+            - "-c"
+            - "track_activity_query_size=4096"
+            - "-c"
+            - "track_io_timing=on"
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - dogbank
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - dogbank
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+        - name: init-scripts
+          configMap:
+            name: postgres-init
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: dogbank
+  labels:
+    app: postgres
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
+  selector:
+    app: postgres

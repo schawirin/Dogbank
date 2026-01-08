@@ -1,0 +1,242 @@
+# =============================================================================
+# DogBank - Datadog Agent DaemonSet
+# =============================================================================
+# This manifest deploys the Datadog Agent as a DaemonSet with:
+# - APM (tracing)
+# - Logs collection
+# - Database Monitoring (DBM)
+# - Application Security Monitoring (ASM)
+# - Profiling
+# =============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: datadog-agent
+  namespace: dogbank
+  labels:
+    app: datadog-agent
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: datadog-agent
+rules:
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - nodes/proxy
+      - nodes/metrics
+      - services
+      - endpoints
+      - pods
+      - events
+      - configmaps
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - replicasets
+      - daemonsets
+      - statefulsets
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+    verbs: ["get", "list", "watch"]
+  - nonResourceURLs:
+      - "/metrics"
+      - "/healthz"
+    verbs: ["get"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: datadog-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: datadog-agent
+subjects:
+  - kind: ServiceAccount
+    name: datadog-agent
+    namespace: dogbank
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: datadog-agent
+  namespace: dogbank
+  labels:
+    app: datadog-agent
+spec:
+  selector:
+    matchLabels:
+      app: datadog-agent
+  template:
+    metadata:
+      labels:
+        app: datadog-agent
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/datadog-agent: unconfined
+    spec:
+      serviceAccountName: datadog-agent
+      containers:
+        - name: datadog-agent
+          image: gcr.io/datadoghq/agent:latest
+          ports:
+            - containerPort: 8125
+              name: dogstatsdport
+              protocol: UDP
+            - containerPort: 8126
+              name: traceport
+              protocol: TCP
+          env:
+            # API Key
+            - name: DD_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: DD_API_KEY
+            # Site configuration (adjust based on your Datadog region)
+            - name: DD_SITE
+              value: "datadoghq.com"
+            # Kubernetes integration
+            - name: DD_KUBERNETES_KUBELET_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            # APM
+            - name: DD_APM_ENABLED
+              value: "true"
+            - name: DD_APM_NON_LOCAL_TRAFFIC
+              value: "true"
+            # Logs
+            - name: DD_LOGS_ENABLED
+              value: "true"
+            - name: DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL
+              value: "true"
+            - name: DD_CONTAINER_EXCLUDE
+              value: "name:datadog-agent"
+            # Process monitoring
+            - name: DD_PROCESS_AGENT_ENABLED
+              value: "true"
+            # Database Monitoring
+            - name: DD_DBM_PROPAGATION_MODE
+              value: "full"
+            # Application Security Monitoring
+            - name: DD_APPSEC_ENABLED
+              value: "true"
+            # Environment tags
+            - name: DD_ENV
+              value: "dogbank"
+            - name: DD_TAGS
+              value: "env:dogbank team:dogbank"
+            # Cluster name
+            - name: DD_CLUSTER_NAME
+              value: "dogbank-cluster"
+            # Kubelet TLS verification
+            - name: DD_KUBELET_TLS_VERIFY
+              value: "false"
+            # Leader election for cluster checks
+            - name: DD_LEADER_ELECTION
+              value: "true"
+            # Collect Kubernetes events
+            - name: DD_COLLECT_KUBERNETES_EVENTS
+              value: "true"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: dockersocket
+              mountPath: /var/run/docker.sock
+              readOnly: true
+            - name: procdir
+              mountPath: /host/proc
+              readOnly: true
+            - name: cgroups
+              mountPath: /host/sys/fs/cgroup
+              readOnly: true
+            - name: passwd
+              mountPath: /etc/passwd
+              readOnly: true
+            - name: pointerdir
+              mountPath: /opt/datadog-agent/run
+            - name: logpodpath
+              mountPath: /var/log/pods
+              readOnly: true
+            - name: logcontainerpath
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 5555
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 5555
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 5
+      volumes:
+        - name: dockersocket
+          hostPath:
+            path: /var/run/docker.sock
+        - name: procdir
+          hostPath:
+            path: /proc
+        - name: cgroups
+          hostPath:
+            path: /sys/fs/cgroup
+        - name: passwd
+          hostPath:
+            path: /etc/passwd
+        - name: pointerdir
+          hostPath:
+            path: /opt/datadog-agent/run
+        - name: logpodpath
+          hostPath:
+            path: /var/log/pods
+        - name: logcontainerpath
+          hostPath:
+            path: /var/lib/docker/containers
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: datadog-agent
+  namespace: dogbank
+  labels:
+    app: datadog-agent
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8125
+      targetPort: 8125
+      protocol: UDP
+      name: dogstatsd
+    - port: 8126
+      targetPort: 8126
+      protocol: TCP
+      name: apm
+  selector:
+    app: datadog-agent

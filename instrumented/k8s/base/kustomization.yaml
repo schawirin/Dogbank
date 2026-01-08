@@ -1,0 +1,40 @@
+# =============================================================================
+# DogBank - Kustomization Base
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: dogbank
+
+resources:
+  # Namespace
+  - namespace.yaml
+  
+  # Configuration
+  - configmap.yaml
+  - secrets.yaml
+  
+  # Infrastructure
+  - postgres.yaml
+  - redis.yaml
+  
+  # Backend Services
+  - auth-service.yaml
+  - account-service.yaml
+  - transaction-service.yaml
+  - bancocentral-service.yaml
+  - notification-service.yaml
+  
+  # Frontend
+  - frontend.yaml
+  - nginx.yaml
+  - ingress.yaml
+  
+  # Datadog
+  - datadog-agent.yaml
+  - datadog-cluster-agent.yaml
+
+commonLabels:
+  app.kubernetes.io/name: dogbank
+  app.kubernetes.io/part-of: dogbank
+  app.kubernetes.io/managed-by: kustomize

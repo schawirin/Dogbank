@@ -1,0 +1,225 @@
+# =============================================================================
+# DogBank - Datadog Cluster Agent Deployment
+# =============================================================================
+# The Cluster Agent provides cluster-level metadata and orchestrates
+# cluster checks for better scalability
+# =============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: datadog-cluster-agent
+  namespace: dogbank
+  labels:
+    app: datadog-cluster-agent
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: datadog-cluster-agent
+rules:
+  - apiGroups: [""]
+    resources:
+      - services
+      - endpoints
+      - pods
+      - nodes
+      - namespaces
+      - componentstatuses
+      - events
+      - configmaps
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - replicasets
+      - daemonsets
+      - statefulsets
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["autoscaling"]
+    resources:
+      - horizontalpodautoscalers
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+      - networkpolicies
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["policy"]
+    resources:
+      - poddisruptionbudgets
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources:
+      - roles
+      - rolebindings
+      - clusterroles
+      - clusterrolebindings
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources:
+      - configmaps
+    resourceNames:
+      - datadog-leader-election
+      - datadog-custom-metrics
+    verbs: ["get", "update"]
+  - apiGroups: [""]
+    resources:
+      - configmaps
+    verbs: ["create"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources:
+      - leases
+    verbs: ["get", "list", "watch", "create", "update", "delete"]
+  - nonResourceURLs:
+      - "/metrics"
+      - "/healthz"
+    verbs: ["get"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: datadog-cluster-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: datadog-cluster-agent
+subjects:
+  - kind: ServiceAccount
+    name: datadog-cluster-agent
+    namespace: dogbank
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: datadog-cluster-agent-token
+  namespace: dogbank
+type: Opaque
+stringData:
+  token: "dogbank-cluster-agent-token-2024"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datadog-cluster-agent
+  namespace: dogbank
+  labels:
+    app: datadog-cluster-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: datadog-cluster-agent
+  template:
+    metadata:
+      labels:
+        app: datadog-cluster-agent
+    spec:
+      serviceAccountName: datadog-cluster-agent
+      containers:
+        - name: cluster-agent
+          image: gcr.io/datadoghq/cluster-agent:latest
+          ports:
+            - containerPort: 5005
+              name: agentport
+              protocol: TCP
+            - containerPort: 5000
+              name: metricsapi
+              protocol: TCP
+          env:
+            - name: DD_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: DD_API_KEY
+            - name: DD_APP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: DD_APP_KEY
+            - name: DD_SITE
+              value: "datadoghq.com"
+            - name: DD_CLUSTER_AGENT_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: datadog-cluster-agent-token
+                  key: token
+            - name: DD_CLUSTER_NAME
+              value: "dogbank-cluster"
+            - name: DD_ENV
+              value: "dogbank"
+            - name: DD_CLUSTER_CHECKS_ENABLED
+              value: "true"
+            - name: DD_CLUSTER_AGENT_KUBERNETES_SERVICE_NAME
+              value: "datadog-cluster-agent"
+            - name: DD_LEADER_ELECTION
+              value: "true"
+            - name: DD_COLLECT_KUBERNETES_EVENTS
+              value: "true"
+            - name: DD_ADMISSION_CONTROLLER_ENABLED
+              value: "true"
+            - name: DD_ADMISSION_CONTROLLER_MUTATE_UNLABELLED
+              value: "false"
+            - name: DD_ADMISSION_CONTROLLER_SERVICE_NAME
+              value: "datadog-cluster-agent-admission-controller"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 5555
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 5555
+            initialDelaySeconds: 15
+            periodSeconds: 15
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: datadog-cluster-agent
+  namespace: dogbank
+  labels:
+    app: datadog-cluster-agent
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5005
+      targetPort: 5005
+      name: agentport
+  selector:
+    app: datadog-cluster-agent
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: datadog-cluster-agent-admission-controller
+  namespace: dogbank
+  labels:
+    app: datadog-cluster-agent
+spec:
+  type: ClusterIP
+  ports:
+    - port: 443
+      targetPort: 8000
+      name: admission
+  selector:
+    app: datadog-cluster-agent

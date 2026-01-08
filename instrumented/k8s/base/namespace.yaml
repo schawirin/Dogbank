@@ -1,0 +1,13 @@
+# =============================================================================
+# DogBank - Kubernetes Namespace
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dogbank
+  labels:
+    name: dogbank
+    env: dogbank
+    tags.datadoghq.com/env: dogbank
+    tags.datadoghq.com/service: dogbank
+    tags.datadoghq.com/version: "1.0.0"
