@@ -6,6 +6,16 @@
 
 -- Criar extensões necessárias
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
+-- =============================================================================
+-- DATADOG DATABASE MONITORING (DBM) - Criar usuário
+-- =============================================================================
+CREATE USER datadog WITH PASSWORD 'datadog_password';
+GRANT pg_monitor TO datadog;
+GRANT SELECT ON pg_stat_database TO datadog;
+GRANT SELECT ON pg_stat_activity TO datadog;
+GRANT SELECT ON pg_stat_statements TO datadog;
 
 -- =============================================================================
 -- CONFIGURAÇÕES DE PERFORMANCE
