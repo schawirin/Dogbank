@@ -267,7 +267,7 @@ services:
       SPRING_DATASOURCE_USERNAME: dogbank
       SPRING_DATASOURCE_PASSWORD: dog1234
       SERVER_PORT: 8084
-      BANCOCENTRAL_API_URL: http://bancocentral-service:8085/api/bancocentral/pix/validate
+      BANCOCENTRAL_API_URL: http://bancocentral-service:8085/api/bancocentral
       ACCOUNT_SERVICE_URL: http://account-service:8089
       # Datadog
       DD_AGENT_HOST: datadog-agent
