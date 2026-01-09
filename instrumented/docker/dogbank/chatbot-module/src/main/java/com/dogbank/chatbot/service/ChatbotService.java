@@ -296,22 +296,55 @@ public class ChatbotService {
         }
         
         // Greeting
-        if (lowerMessage.contains("olá") || lowerMessage.contains("oi") || 
-            lowerMessage.contains("hello") || lowerMessage.contains("hi") ||
-            lowerMessage.contains("bom dia") || lowerMessage.contains("boa tarde")) {
+        if (lowerMessage.equals("ola") || lowerMessage.equals("olá") || 
+            lowerMessage.equals("oi") || lowerMessage.equals("hello") || 
+            lowerMessage.equals("hi") || lowerMessage.equals("e aí") ||
+            lowerMessage.startsWith("ola ") || lowerMessage.startsWith("olá ") ||
+            lowerMessage.startsWith("oi ") || lowerMessage.startsWith("hello ") ||
+            lowerMessage.contains("bom dia") || lowerMessage.contains("boa tarde") ||
+            lowerMessage.contains("boa noite")) {
             return "🐕 Olá! Bem-vindo ao DogBank!\n\n" +
                    "Sou o DogBot, seu assistente virtual. Como posso ajudar você hoje?\n\n" +
                    "Dica: Você pode me perguntar sobre saldo, PIX, extrato e muito mais!";
         }
         
-        // Default response
-        return "🐕 Olá! Sou o DogBot, seu assistente virtual do DogBank!\n\n" +
-               "Não entendi muito bem sua mensagem. Posso ajudar com:\n" +
-               "• Consultar saldo\n" +
-               "• Fazer transferências PIX\n" +
-               "• Ver extrato\n" +
-               "• Tirar dúvidas sobre o banco\n\n" +
-               "O que você gostaria de fazer?";
+        // Check for email patterns (could be PIX key)
+        if (lowerMessage.contains("@") && lowerMessage.contains(".")) {
+            return "📧 Entendi! Você informou uma chave PIX.\n\n" +
+                   "Para completar a transferência, me diga o valor que deseja enviar.\n\n" +
+                   "Ou clique no botão 💸 PIX para usar o formulário.";
+        }
+        
+        // Check for numbers (could be amount or CPF)
+        if (lowerMessage.matches(".*\\d{3,}.*")) {
+            if (lowerMessage.contains("reais") || lowerMessage.contains("r$") || lowerMessage.contains("valor")) {
+                return "💰 Entendi! Você quer transferir esse valor.\n\n" +
+                       "Para completar, me informe a chave PIX do destinatário.\n\n" +
+                       "Ou clique no botão 💸 PIX para usar o formulário.";
+            }
+        }
+        
+        // Thank you
+        if (lowerMessage.contains("obrigad") || lowerMessage.contains("valeu") || 
+            lowerMessage.contains("thanks") || lowerMessage.contains("thank you")) {
+            return "😊 De nada! Fico feliz em ajudar!\n\n" +
+                   "Se precisar de mais alguma coisa, é só me chamar! 🐕";
+        }
+        
+        // Bye
+        if (lowerMessage.contains("tchau") || lowerMessage.contains("até") || 
+            lowerMessage.contains("bye") || lowerMessage.contains("adeus")) {
+            return "👋 Até logo! Foi um prazer ajudar!\n\n" +
+                   "Volte sempre que precisar. O DogBot está aqui 24h! 🐕";
+        }
+        
+        // Default response - more friendly
+        return "🐕 Hmm, não entendi muito bem...\n\n" +
+               "Tente usar os botões abaixo ou me pergunte sobre:\n" +
+               "• \"Qual meu saldo?\"\n" +
+               "• \"Quero fazer um PIX\"\n" +
+               "• \"Ver meu extrato\"\n\n" +
+               "Como posso ajudar?";
     }
     
     private boolean containsCyrillic(String text) {
