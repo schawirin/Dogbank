@@ -18,9 +18,6 @@ WORKDIR /app
 # Copy the built jar
 COPY --from=builder /app/target/*.jar app.jar
 
-# Copy Datadog agent (if available)
-COPY --from=builder /app/dd-java-agent.jar /app/dd-java-agent.jar 2>/dev/null || true
-
 # Expose port
 EXPOSE 8083
 
@@ -29,4 +26,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8083/api/chatbot/health || exit 1
 
 # Run the application
+# The dd-java-agent.jar will be mounted via docker-compose volume
 ENTRYPOINT ["java", "-jar", "app.jar"]
