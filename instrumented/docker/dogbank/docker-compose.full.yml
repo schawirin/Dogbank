@@ -367,22 +367,27 @@ services:
   ollama:
     image: ollama/ollama:latest
     container_name: dogbank-ollama
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
     ports:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+      - ./ollama-entrypoint.sh:/entrypoint.sh:ro
     environment:
+      # Model to auto-pull on startup
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:1b}
       # Minimal memory usage
       OLLAMA_NUM_PARALLEL: 1
       OLLAMA_MAX_LOADED_MODELS: 1
     networks:
       - dogbank-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      # Check if model is loaded (not just server running)
+      test: ["CMD-SHELL", "curl -s http://localhost:11434/api/tags | grep -q llama || curl -s http://localhost:11434/api/tags | grep -q phi || curl -s http://localhost:11434/api/tags | grep -q qwen || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 5
-      start_period: 60s
+      retries: 10
+      start_period: 120s
     restart: unless-stopped
     labels:
       com.datadoghq.ad.logs: '[{"source": "ollama", "service": "ollama"}]'
