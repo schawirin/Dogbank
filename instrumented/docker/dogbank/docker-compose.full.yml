@@ -85,9 +85,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:
-    driver: local
-  ollama_data:/data
+      - redis_data:/data
     networks:
       - dogbank-network
     healthcheck:
