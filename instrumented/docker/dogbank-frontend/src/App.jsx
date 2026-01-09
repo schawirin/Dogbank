@@ -17,6 +17,7 @@ import PixConfirmPage from './pages/PixConfirmPage';
 import PixReceiptPage from './pages/PixReceiptPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ProfilePage from './pages/ProfilePage';
+import Chatbot from './components/Chatbot';
 
 import { datadogRum } from '@datadog/browser-rum';
 
@@ -47,6 +48,8 @@ datadogRum.startSessionReplayRecording();
 
 const App = () => (
   <AuthProvider>
+    {/* Chatbot - Assistente Virtual com vulnerabilidade de Prompt Injection */}
+    <Chatbot />
     <Routes>
       {/* Rotas públicas */}
       <Route path="/" element={<LandingPage />} />
