@@ -13,6 +13,12 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+// Datadog APM
+import datadog.trace.api.Trace;
+import datadog.trace.api.DDTags;
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
+
 import java.util.*;
 
 @Service
@@ -124,11 +130,36 @@ public class ChatbotService {
         }
     }
     
+    /**
+     * Calls the LLM API with Datadog LLM Observability tracing
+     */
+    @Trace(operationName = "llm.chat", resourceName = "chatbot.llm_call")
     private String callLLM(String systemPrompt, String userMessage, List<ChatMessage> history) {
+        // Get current span for LLM observability tagging
+        Span span = GlobalTracer.get().activeSpan();
+        long startTime = System.currentTimeMillis();
+        int inputTokens = 0;
+        int outputTokens = 0;
+        boolean usedFallback = false;
+        
         try {
+            // Tag span with LLM metadata
+            if (span != null) {
+                span.setTag("llm.request.model", openaiModel);
+                span.setTag("llm.request.provider", getModelProvider());
+                span.setTag("llm.request.type", "chat");
+                span.setTag("llm.request.temperature", 0.7);
+                span.setTag("llm.request.max_tokens", 1000);
+                // Input message (truncated for safety)
+                span.setTag("llm.request.input", truncateForTag(userMessage, 500));
+            }
+            
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(openaiApiKey);
+            // Ollama doesn't need auth, but OpenAI does
+            if (!openaiApiKey.equals("ollama") && !openaiApiKey.startsWith("sk-demo")) {
+                headers.setBearerAuth(openaiApiKey);
+            }
             
             List<Map<String, String>> messages = new ArrayList<>();
             
@@ -145,6 +176,9 @@ public class ChatbotService {
             // Current user message
             messages.add(Map.of("role", "user", "content", userMessage));
             
+            // Estimate input tokens (rough: ~4 chars per token)
+            inputTokens = estimateTokens(messages);
+            
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("model", openaiModel);
             requestBody.put("messages", messages);
@@ -154,7 +188,7 @@ public class ChatbotService {
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
             
             String url = openaiBaseUrl + "/chat/completions";
-            log.debug("🌐 Calling LLM API: {}", url);
+            log.info("🌐 [LLM] Calling {} with model {}", url, openaiModel);
             
             ResponseEntity<String> response = restTemplate.exchange(
                     url,
@@ -164,13 +198,89 @@ public class ChatbotService {
             );
             
             JsonNode jsonResponse = objectMapper.readTree(response.getBody());
-            return jsonResponse.path("choices").path(0).path("message").path("content").asText();
+            String content = jsonResponse.path("choices").path(0).path("message").path("content").asText();
+            
+            // Try to get actual token usage from response
+            JsonNode usage = jsonResponse.path("usage");
+            if (!usage.isMissingNode()) {
+                inputTokens = usage.path("prompt_tokens").asInt(inputTokens);
+                outputTokens = usage.path("completion_tokens").asInt(0);
+            } else {
+                outputTokens = estimateTokens(content);
+            }
+            
+            // Tag span with response metadata
+            if (span != null) {
+                span.setTag("llm.response.output", truncateForTag(content, 500));
+                span.setTag("llm.usage.prompt_tokens", inputTokens);
+                span.setTag("llm.usage.completion_tokens", outputTokens);
+                span.setTag("llm.usage.total_tokens", inputTokens + outputTokens);
+                span.setTag("llm.response.latency_ms", System.currentTimeMillis() - startTime);
+                span.setTag("llm.response.status", "success");
+            }
+            
+            log.info("✅ [LLM] Response received in {}ms, tokens: {}/{}", 
+                    System.currentTimeMillis() - startTime, inputTokens, outputTokens);
+            
+            return content;
             
         } catch (Exception e) {
-            log.error("❌ Erro ao chamar LLM: {}", e.getMessage());
+            log.error("❌ [LLM] Error calling {}: {}", openaiModel, e.getMessage());
+            usedFallback = true;
+            
+            // Tag span with error
+            if (span != null) {
+                span.setTag("llm.response.status", "fallback");
+                span.setTag("llm.response.error", e.getMessage());
+                span.setTag("llm.response.used_fallback", true);
+            }
+            
             // Fallback para resposta simulada baseada na MENSAGEM DO USUÁRIO
-            return generateFallbackResponse(userMessage, systemPrompt);
+            String fallbackResponse = generateFallbackResponse(userMessage, systemPrompt);
+            
+            if (span != null) {
+                span.setTag("llm.response.output", truncateForTag(fallbackResponse, 500));
+                span.setTag("llm.response.latency_ms", System.currentTimeMillis() - startTime);
+            }
+            
+            return fallbackResponse;
         }
+    }
+    
+    /**
+     * Determines the model provider for cost estimation
+     */
+    private String getModelProvider() {
+        if (openaiBaseUrl.contains("ollama")) return "ollama";
+        if (openaiBaseUrl.contains("openai.com")) return "openai";
+        if (openaiBaseUrl.contains("anthropic")) return "anthropic";
+        if (openaiModel.contains("llama")) return "ollama";
+        if (openaiModel.contains("gpt")) return "openai";
+        if (openaiModel.contains("claude")) return "anthropic";
+        return "custom";
+    }
+    
+    /**
+     * Estimates token count (rough: ~4 chars per token)
+     */
+    private int estimateTokens(List<Map<String, String>> messages) {
+        int chars = 0;
+        for (Map<String, String> msg : messages) {
+            chars += msg.getOrDefault("content", "").length();
+        }
+        return chars / 4;
+    }
+    
+    private int estimateTokens(String text) {
+        return text != null ? text.length() / 4 : 0;
+    }
+    
+    /**
+     * Truncates text for span tags (max 5000 chars in Datadog)
+     */
+    private String truncateForTag(String text, int maxLength) {
+        if (text == null) return "";
+        return text.length() > maxLength ? text.substring(0, maxLength) + "..." : text;
     }
     
     /**

@@ -85,7 +85,9 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - redis_data:
+    driver: local
+  ollama_data:/data
     networks:
       - dogbank-network
     healthcheck:
@@ -323,8 +325,8 @@ services:
     environment:
       # OpenAI API Configuration
       OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-demo-key}
-      OPENAI_API_BASE_URL: ${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      OPENAI_API_BASE_URL: ${OPENAI_API_BASE_URL:-http://ollama:11434/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-llama3.2:1b}
       # Service URLs
       ACCOUNT_SERVICE_URL: http://account-service:8089
       TRANSACTION_SERVICE_URL: http://transaction-service:8087
@@ -339,6 +341,10 @@ services:
       DD_PROFILING_ENABLED: "true"
       DD_APPSEC_ENABLED: "true"
       DD_IAST_ENABLED: "true"
+      # Datadog LLM Observability
+      DD_LLMOBS_ENABLED: "true"
+      DD_LLMOBS_ML_APP: "dogbot-assistant"
+      DD_LLMOBS_AGENTLESS_ENABLED: "false"
       JAVA_TOOL_OPTIONS: "-javaagent:/app/dd-java-agent.jar"
     volumes:
       - ./dd-java-agent.jar:/app/dd-java-agent.jar:ro
@@ -348,6 +354,8 @@ services:
       redis:
         condition: service_healthy
       account-service:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
     networks:
       - dogbank-network
@@ -360,6 +368,42 @@ services:
     restart: unless-stopped
     labels:
       com.datadoghq.ad.logs: '[{"source": "java", "service": "chatbot-service"}]'
+
+
+  # ===========================================================================
+  # 🤖 OLLAMA - Local LLM Server
+  # ===========================================================================
+  
+  ollama:
+    image: ollama/ollama:latest
+    container_name: dogbank-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      # Minimal memory usage
+      OLLAMA_NUM_PARALLEL: 1
+      OLLAMA_MAX_LOADED_MODELS: 1
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    labels:
+      com.datadoghq.ad.logs: '[{"source": "ollama", "service": "ollama"}]'
+    # Uncomment for GPU support (NVIDIA)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
 
   # ===========================================================================
   # 🌐 FRONTEND - React + Nginx
@@ -429,4 +473,6 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  ollama_data:
     driver: local

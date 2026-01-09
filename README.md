@@ -766,3 +766,96 @@ This project is for **demonstration purposes only**. Do not use in production en
 ## 📧 Support
 
 For questions or issues, please open a GitHub issue.
+
+---
+
+## 🤖 Local LLM with Ollama
+
+O DogBot agora usa **Ollama** para rodar um LLM local, sem precisar de API keys externas!
+
+### Modelos Suportados
+
+| Modelo | RAM | Descrição |
+|--------|-----|-----------|
+| `llama3.2:1b` | ~2 GB | **Padrão** - Mais leve, respostas rápidas |
+| `llama3.2:3b` | ~4 GB | Melhor qualidade de respostas |
+| `phi3:mini` | ~3 GB | Microsoft Phi-3, bom para chat |
+| `qwen2:0.5b` | ~1 GB | Menor modelo disponível |
+
+### Inicialização
+
+Após subir os containers, execute o script para baixar o modelo:
+
+```bash
+# Subir os containers
+docker-compose -f docker-compose.full.yml up -d
+
+# Baixar o modelo (primeira vez apenas)
+./ollama-init.sh
+
+# Ou manualmente:
+docker exec dogbank-ollama ollama pull llama3.2:1b
+```
+
+### Trocar de Modelo
+
+```bash
+# Usar um modelo diferente
+export OLLAMA_MODEL=phi3:mini
+./ollama-init.sh
+
+# Ou atualizar docker-compose.full.yml:
+# OPENAI_MODEL: phi3:mini
+```
+
+### Usar OpenAI em vez de Ollama
+
+```bash
+export OPENAI_API_KEY=sk-your-key
+export OPENAI_API_BASE_URL=https://api.openai.com/v1
+export OPENAI_MODEL=gpt-4o-mini
+docker-compose -f docker-compose.full.yml up -d
+```
+
+---
+
+## 📊 Datadog LLM Observability
+
+O chatbot está instrumentado com **Datadog LLM Observability** para monitorar:
+
+### Métricas Coletadas
+
+| Métrica | Tag | Descrição |
+|---------|-----|-----------|
+| Modelo | `llm.request.model` | Nome do modelo usado |
+| Provider | `llm.request.provider` | ollama, openai, anthropic |
+| Input Tokens | `llm.usage.prompt_tokens` | Tokens de entrada |
+| Output Tokens | `llm.usage.completion_tokens` | Tokens de saída |
+| Latência | `llm.response.latency_ms` | Tempo de resposta |
+| Status | `llm.response.status` | success ou fallback |
+
+### Configuração
+
+As variáveis de ambiente já estão configuradas no `docker-compose.full.yml`:
+
+```yaml
+DD_LLMOBS_ENABLED: "true"
+DD_LLMOBS_ML_APP: "dogbot-assistant"
+DD_LLMOBS_AGENTLESS_ENABLED: "false"
+```
+
+### Visualização no Datadog
+
+1. Acesse **APM > Traces**
+2. Filtre por `service:chatbot-service`
+3. Procure spans com `operation:llm.chat`
+4. Veja os tags de LLM na aba "Tags"
+
+### Dashboard Sugerido
+
+Crie um dashboard com:
+- Latência média de LLM por modelo
+- Taxa de fallback (quando LLM falha)
+- Tokens consumidos por hora
+- Erros de LLM
+
