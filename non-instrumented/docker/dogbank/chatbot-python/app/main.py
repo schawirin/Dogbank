@@ -30,12 +30,29 @@ logger = logging.getLogger(__name__)
 patch_all()
 
 # =============================================================================
-# Configuration
+# Configuration - Supports Qwen, Groq, OpenAI, Ollama
 # =============================================================================
 
-OLLAMA_BASE_URL = os.getenv("OPENAI_API_BASE_URL", "http://ollama:11434/v1")
-OLLAMA_MODEL = os.getenv("OPENAI_MODEL", "llama3.2:1b")
-OLLAMA_API_KEY = os.getenv("OPENAI_API_KEY", "ollama")  # Ollama doesn't need a real key
+# LLM API Configuration
+# Default: Qwen API (Alibaba Cloud)
+# Alternative: Groq, OpenAI, Ollama (local)
+LLM_BASE_URL = os.getenv("OPENAI_API_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+LLM_MODEL = os.getenv("OPENAI_MODEL", "qwen-turbo")  # qwen-turbo, qwen-plus, qwen-max
+LLM_API_KEY = os.getenv("OPENAI_API_KEY", "")  # Required for cloud APIs
+
+# Detect provider from URL for observability
+def get_provider():
+    if "dashscope" in LLM_BASE_URL or "aliyun" in LLM_BASE_URL:
+        return "qwen"
+    elif "groq" in LLM_BASE_URL:
+        return "groq"
+    elif "openai" in LLM_BASE_URL:
+        return "openai"
+    elif "ollama" in LLM_BASE_URL or "11434" in LLM_BASE_URL:
+        return "ollama"
+    return "custom"
+
+LLM_PROVIDER = get_provider()
 
 # Datadog LLM Observability config
 DD_LLMOBS_ML_APP = os.getenv("DD_LLMOBS_ML_APP", "dogbot-assistant")
@@ -107,14 +124,14 @@ class ChatResponse(BaseModel):
     model: Optional[str] = None
 
 # =============================================================================
-# OpenAI Client (Ollama-compatible)
+# OpenAI Client (Compatible with Qwen, Groq, OpenAI, Ollama)
 # =============================================================================
 
 def get_openai_client():
-    """Create OpenAI client configured for Ollama"""
+    """Create OpenAI client configured for the selected provider"""
     return OpenAI(
-        base_url=OLLAMA_BASE_URL,
-        api_key=OLLAMA_API_KEY,
+        base_url=LLM_BASE_URL,
+        api_key=LLM_API_KEY or "not-needed",  # Ollama doesn't need a key
     )
 
 # =============================================================================
@@ -131,7 +148,11 @@ async def lifespan(app: FastAPI):
         agentless_enabled=False,
     )
     logger.info(f"🐕 DogBot started with LLM Observability (ml_app={DD_LLMOBS_ML_APP})")
-    logger.info(f"🤖 Using model: {OLLAMA_MODEL} at {OLLAMA_BASE_URL}")
+    logger.info(f"🤖 Using model: {LLM_MODEL} at {LLM_BASE_URL}")
+    logger.info(f"📡 Provider: {LLM_PROVIDER}")
+    
+    if not LLM_API_KEY and LLM_PROVIDER != "ollama":
+        logger.warning("⚠️ No API key configured! Set OPENAI_API_KEY environment variable.")
     
     yield
     
@@ -162,7 +183,7 @@ app.add_middleware(
 # Chatbot Logic with LLM Observability
 # =============================================================================
 
-@llm(model_name=OLLAMA_MODEL, model_provider="ollama", name="dogbot_chat")
+@llm(model_name=LLM_MODEL, model_provider=LLM_PROVIDER, name="dogbot_chat")
 def call_llm(system_prompt: str, user_message: str, history: List[ChatMessage] = None) -> str:
     """
     Call the LLM with Datadog LLM Observability instrumentation.
@@ -171,6 +192,8 @@ def call_llm(system_prompt: str, user_message: str, history: List[ChatMessage] =
     - Token usage
     - Latency
     - Model info
+    
+    Supports: Qwen, Groq, OpenAI, Ollama (all OpenAI-compatible)
     """
     client = get_openai_client()
     
@@ -182,10 +205,10 @@ def call_llm(system_prompt: str, user_message: str, history: List[ChatMessage] =
     
     messages.append({"role": "user", "content": user_message})
     
-    logger.info(f"🌐 Calling LLM: {OLLAMA_MODEL}")
+    logger.info(f"🌐 Calling LLM: {LLM_MODEL} via {LLM_PROVIDER}")
     
     response = client.chat.completions.create(
-        model=OLLAMA_MODEL,
+        model=LLM_MODEL,
         messages=messages,
         temperature=0.7,
         max_tokens=1000,
@@ -230,7 +253,7 @@ def process_chat(request: ChatRequest) -> ChatResponse:
             success=True,
             message=llm_response,
             llm_used=True,
-            model=OLLAMA_MODEL,
+            model=LLM_MODEL,
         )
         
     except Exception as e:
@@ -381,8 +404,10 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "chatbot-python",
-        "model": OLLAMA_MODEL,
-        "ollama_url": OLLAMA_BASE_URL,
+        "model": LLM_MODEL,
+        "provider": LLM_PROVIDER,
+        "base_url": LLM_BASE_URL,
+        "api_key_configured": bool(LLM_API_KEY),
     }
 
 
@@ -402,8 +427,9 @@ async def debug_system_prompt():
     return {
         "warning": "This endpoint exposes sensitive information!",
         "system_prompt": SYSTEM_PROMPT,
-        "model": OLLAMA_MODEL,
-        "ollama_url": OLLAMA_BASE_URL,
+        "model": LLM_MODEL,
+        "provider": LLM_PROVIDER,
+        "base_url": LLM_BASE_URL,
     }
 
 
@@ -411,10 +437,12 @@ async def debug_system_prompt():
 async def get_config():
     """Get current configuration"""
     return {
-        "model": OLLAMA_MODEL,
-        "ollama_url": OLLAMA_BASE_URL,
+        "model": LLM_MODEL,
+        "provider": LLM_PROVIDER,
+        "base_url": LLM_BASE_URL,
         "ml_app": DD_LLMOBS_ML_APP,
         "llm_observability_enabled": True,
+        "supported_providers": ["qwen", "groq", "openai", "ollama"],
     }
 
 

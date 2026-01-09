@@ -321,10 +321,27 @@ services:
       dockerfile: Dockerfile
     container_name: chatbot-service
     environment:
-      # LLM Configuration (Ollama)
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-ollama}
-      OPENAI_API_BASE_URL: ${OPENAI_API_BASE_URL:-http://ollama:11434/v1}
-      OPENAI_MODEL: ${OPENAI_MODEL:-llama3.2:1b}
+      # =================================================================
+      # LLM Configuration - Choose your provider:
+      # =================================================================
+      # QWEN (Alibaba) - Default, free tier available
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}  # Get from https://bailian.console.aliyun.com/
+      OPENAI_API_BASE_URL: ${OPENAI_API_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-qwen-turbo}  # qwen-turbo, qwen-plus, qwen-max
+      # 
+      # Alternative providers (uncomment to use):
+      # GROQ - Fast inference, free tier
+      # OPENAI_API_BASE_URL: https://api.groq.com/openai/v1
+      # OPENAI_MODEL: llama-3.1-8b-instant
+      #
+      # OPENAI - Original
+      # OPENAI_API_BASE_URL: https://api.openai.com/v1
+      # OPENAI_MODEL: gpt-4o-mini
+      #
+      # OLLAMA - Local (requires ollama service)
+      # OPENAI_API_BASE_URL: http://ollama:11434/v1
+      # OPENAI_MODEL: llama3.2:1b
+      # =================================================================
       # Service URLs
       ACCOUNT_SERVICE_URL: http://account-service:8089
       TRANSACTION_SERVICE_URL: http://transaction-service:8087
@@ -345,8 +362,9 @@ services:
     depends_on:
       datadog-agent:
         condition: service_healthy
-      ollama:
-        condition: service_healthy
+      # Uncomment if using Ollama:
+      # ollama:
+      #   condition: service_healthy
     networks:
       - dogbank-network
     healthcheck:
@@ -354,7 +372,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 30s
     restart: unless-stopped
     labels:
       com.datadoghq.ad.logs: '[{"source": "python", "service": "chatbot-service"}]'
