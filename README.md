@@ -769,55 +769,70 @@ For questions or issues, please open a GitHub issue.
 
 ---
 
-## 🤖 Local LLM with Ollama
+---
 
-O DogBot agora usa **Ollama** para rodar um LLM local, sem precisar de API keys externas!
+## 🤖 LLM Configuration (Groq - Default)
 
-### Modelos Suportados
+O DogBot usa **Groq** como provedor de LLM padrão - super rápido e com tier gratuito!
 
-| Modelo | RAM | Descrição |
-|--------|-----|-----------|
-| `llama3.2:1b` | ~2 GB | **Padrão** - Mais leve, respostas rápidas |
-| `llama3.2:3b` | ~4 GB | Melhor qualidade de respostas |
-| `phi3:mini` | ~3 GB | Microsoft Phi-3, bom para chat |
-| `qwen2:0.5b` | ~1 GB | Menor modelo disponível |
+### ⚡ Configuração Rápida
 
-### Inicialização
+1. **Criar API Key do Groq (Grátis)**
+   - Acesse: https://console.groq.com/
+   - Crie uma conta (pode usar Google/GitHub)
+   - Vá em **API Keys** e crie uma nova chave
+   - Copie a chave (começa com `gsk_`)
 
-Após subir os containers, execute o script para baixar o modelo:
+2. **Configurar e Subir**
+   ```bash
+   # Definir a API key
+   export OPENAI_API_KEY=gsk_sua_chave_aqui
+   
+   # Subir os containers
+   docker-compose -f docker-compose.full.yml up -d
+   ```
 
-```bash
-# Subir os containers
-docker-compose -f docker-compose.full.yml up -d
+**Pronto!** Sem esperar download de modelo! 🎉
 
-# Baixar o modelo (primeira vez apenas)
-./ollama-init.sh
+### Modelos Disponíveis no Groq
 
-# Ou manualmente:
-docker exec dogbank-ollama ollama pull llama3.2:1b
-```
+| Modelo | Velocidade | Descrição |
+|--------|------------|-----------|
+| `llama-3.1-8b-instant` | ⚡ Muito rápido | **Padrão** - Ótimo para chat |
+| `llama-3.1-70b-versatile` | Rápido | Maior qualidade |
+| `mixtral-8x7b-32768` | Rápido | Bom para contexto longo |
+| `gemma2-9b-it` | ⚡ Muito rápido | Google Gemma 2 |
 
 ### Trocar de Modelo
 
 ```bash
 # Usar um modelo diferente
-export OLLAMA_MODEL=phi3:mini
-./ollama-init.sh
-
-# Ou atualizar docker-compose.full.yml:
-# OPENAI_MODEL: phi3:mini
+export OPENAI_MODEL=mixtral-8x7b-32768
+docker-compose -f docker-compose.full.yml up -d --build chatbot-service
 ```
 
-### Usar OpenAI em vez de Ollama
+### Provedores Alternativos
+
+O chatbot suporta múltiplos provedores OpenAI-compatible:
+
+| Provider | Base URL | Free Tier |
+|----------|----------|-----------|
+| **Groq** (padrão) | `api.groq.com` | ✅ Rate limited |
+| **Qwen** | `dashscope.aliyuncs.com` | ✅ 1M tokens |
+| **OpenAI** | `api.openai.com` | ❌ Pago |
+| **Ollama** | `localhost:11434` | ✅ Local |
 
 ```bash
-export OPENAI_API_KEY=sk-your-key
+# Exemplo: Usar Qwen
+export OPENAI_API_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+export OPENAI_MODEL=qwen-turbo
+export OPENAI_API_KEY=sk-sua-chave-qwen
+
+# Exemplo: Usar OpenAI
 export OPENAI_API_BASE_URL=https://api.openai.com/v1
 export OPENAI_MODEL=gpt-4o-mini
-docker-compose -f docker-compose.full.yml up -d
+export OPENAI_API_KEY=sk-sua-chave-openai
 ```
-
----
 
 ## 📊 Datadog LLM Observability
 

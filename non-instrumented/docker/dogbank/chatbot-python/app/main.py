@@ -34,10 +34,10 @@ patch_all()
 # =============================================================================
 
 # LLM API Configuration
-# Default: Qwen API (Alibaba Cloud)
-# Alternative: Groq, OpenAI, Ollama (local)
-LLM_BASE_URL = os.getenv("OPENAI_API_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
-LLM_MODEL = os.getenv("OPENAI_MODEL", "qwen-turbo")  # qwen-turbo, qwen-plus, qwen-max
+# Default: Groq API (super fast, free tier)
+# Alternative: Qwen, OpenAI, Ollama (local)
+LLM_BASE_URL = os.getenv("OPENAI_API_BASE_URL", "https://api.groq.com/openai/v1")
+LLM_MODEL = os.getenv("OPENAI_MODEL", "llama-3.1-8b-instant")  # llama-3.1-8b-instant, mixtral-8x7b-32768
 LLM_API_KEY = os.getenv("OPENAI_API_KEY", "")  # Required for cloud APIs
 
 # Detect provider from URL for observability
