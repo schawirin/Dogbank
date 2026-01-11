@@ -1045,3 +1045,57 @@ docker logs -f dogbank-fraud-detection
 | >= 0.3 | MEDIUM | APPROVED |
 | < 0.3 | LOW | APPROVED |
 
+
+## 📊 Data Streams Monitoring (DSM)
+
+O DogBank está instrumentado com **Datadog Data Streams Monitoring** para rastrear o fluxo de mensagens end-to-end através do Kafka e RabbitMQ.
+
+### O Que o DSM Mostra
+
+| Métrica | Descrição |
+|---------|-----------|
+| **End-to-End Latency** | Tempo total desde produção até consumo |
+| **Pipeline Topology** | Visualização do fluxo de dados |
+| **Consumer Lag** | Atraso dos consumers |
+| **Throughput** | Mensagens por segundo |
+| **Bottlenecks** | Gargalos no pipeline |
+
+### Serviços Instrumentados
+
+| Serviço | Tecnologia | Papel |
+|---------|------------|-------|
+| `transaction-service` | Kafka + RabbitMQ | Producer |
+| `pix-worker` | Kafka | Consumer |
+| `fraud-detection-service` | RabbitMQ | Consumer |
+
+### Variáveis de Ambiente DSM
+
+```yaml
+DD_DATA_STREAMS_ENABLED: "true"
+DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED: "true"
+```
+
+### Visualização no Datadog
+
+1. Acesse **APM > Data Streams Monitoring**
+2. Selecione o ambiente `dogbank`
+3. Visualize:
+   - **Pipeline Map** - Topologia visual
+   - **Latency** - Gráficos de latência
+   - **Throughput** - Taxa de mensagens
+   - **Consumer Lag** - Atraso por consumer group
+
+### Fluxo de Dados Rastreado
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Transaction    │────►│     Kafka       │────►│   PIX Worker    │
+│    Service      │     │ pix-transactions│     │   (Consumer)    │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+        │
+        │               ┌─────────────────┐     ┌─────────────────┐
+        └──────────────►│    RabbitMQ     │────►│ Fraud Detection │
+                        │   pix.fraud     │     │   (Consumer)    │
+                        └─────────────────┘     └─────────────────┘
+```
+
