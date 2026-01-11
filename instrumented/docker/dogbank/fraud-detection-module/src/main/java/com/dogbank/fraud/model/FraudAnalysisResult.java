@@ -20,5 +20,6 @@ public class FraudAnalysisResult {
     private List<String> riskFactors;
     private LocalDateTime analyzedAt;
     private long processingTimeMs;
-    private String decision;  // APPROVED, BLOCKED, MANUAL_REVIEW
+    private String decision;  // APPROVED, BLOCKED, MANUAL_REVIEW, MANUAL_REVIEW_COAF
+    private boolean requiresCoafNotification;  // True if transaction >= R$ 50,000.00
 }

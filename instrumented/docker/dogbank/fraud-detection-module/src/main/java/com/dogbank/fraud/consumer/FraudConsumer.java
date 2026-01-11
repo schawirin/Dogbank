@@ -16,7 +16,10 @@ import org.springframework.stereotype.Component;
  * RabbitMQ Consumer for Fraud Detection
  * 
  * Processes PIX transactions from the pix.fraud queue
- * with manual acknowledgment for guaranteed processing
+ * with manual acknowledgment for guaranteed processing.
+ * 
+ * Includes COAF (Conselho de Controle de Atividades Financeiras) notification
+ * handling for transactions >= R$ 50,000.00 as required by Brazilian regulations.
  */
 @Slf4j
 @Component
@@ -43,12 +46,18 @@ public class FraudConsumer {
             // Analyze transaction
             FraudAnalysisResult result = fraudDetectionService.analyzeTransaction(transaction);
 
-            // Log result
+            // Log result based on decision
             if (result.isFraudulent()) {
                 log.warn("🚨 FRAUD DETECTED - TX: {}, Risk Score: {}, Factors: {}",
                     result.getTransactionId(),
                     result.getRiskScore(),
                     result.getRiskFactors());
+            } else if ("MANUAL_REVIEW_COAF".equals(result.getDecision())) {
+                // COAF notification - Brazilian compliance requirement
+                log.warn("🏛️ [COAF] MANUAL REVIEW REQUIRED - TX: {}, Risk Score: {}, Reason: Transaction >= R$ 50.000,00",
+                    result.getTransactionId(),
+                    result.getRiskScore());
+                log.warn("🏛️ [COAF] Transaction sent to COAF notification queue for regulatory compliance");
             } else if ("MANUAL_REVIEW".equals(result.getDecision())) {
                 log.warn("⚠️ Manual review required - TX: {}, Risk Score: {}",
                     result.getTransactionId(),
@@ -57,6 +66,12 @@ public class FraudConsumer {
                 log.info("✅ Transaction approved - TX: {}, Risk Score: {}",
                     result.getTransactionId(),
                     result.getRiskScore());
+            }
+
+            // Log COAF notification status
+            if (result.isRequiresCoafNotification()) {
+                log.info("📤 [COAF] Notification sent to coaf.notifications queue - TX: {}",
+                    result.getTransactionId());
             }
 
             // Acknowledge message
