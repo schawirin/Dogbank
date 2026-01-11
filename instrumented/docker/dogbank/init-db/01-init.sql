@@ -2,6 +2,7 @@
 -- Script de inicialização do banco DogBank
 -- =============================================================================
 -- Este script cria as tabelas e insere dados de teste
+-- Inclui contas com saldo alto para testar regra COAF (>= R$ 50.000,00)
 -- =============================================================================
 
 -- Criar extensões necessárias
@@ -96,40 +97,52 @@ TRUNCATE TABLE usuarios CASCADE;
 -- =============================================================================
 -- INSERIR USUÁRIOS DE TESTE
 -- =============================================================================
+-- Inclui usuários com saldo alto para testar regra COAF (transações >= R$ 50.000,00)
 INSERT INTO usuarios (cpf, senha, nome, email, chave_pix) VALUES
 ('12345678915', '123456', 'Vitoria Itadori', 'vitoria.itadori@dogbank.com', 'vitoria.itadori@dogbank.com'),
 ('98765432101', '123456', 'Pedro Silva', 'pedro.silva@dogbank.com', 'pedro.silva@dogbank.com'),
 ('45678912302', '123456', 'João Santos', 'joao.santos@dogbank.com', 'joao.santos@dogbank.com'),
 ('78912345603', '123456', 'Emiliano Costa', 'emiliano.costa@dogbank.com', 'emiliano.costa@dogbank.com'),
 ('32165498704', '123456', 'Eliane Oliveira', 'eliane.oliveira@dogbank.com', 'eliane.oliveira@dogbank.com'),
-('65498732105', '123456', 'Patrícia Souza', 'patricia.souza@dogbank.com', 'patricia.souza@dogbank.com'),
+('65498732105', '123456', 'Patricia Souza', 'patricia.souza@dogbank.com', 'patricia.souza@dogbank.com'),
 ('15975385206', '123456', 'Renato Almeida', 'renato.almeida@dogbank.com', 'renato.almeida@dogbank.com'),
-('66666666666', '123456', 'Usuário Teste', 'teste@dogbank.com', 'teste@dogbank.com');
+('66666666666', '123456', 'Usuario Teste', 'teste@dogbank.com', 'teste@dogbank.com'),
+-- Usuários com saldo alto para testar COAF
+('11122233344', '123456', 'Carlos Magnata', 'carlos.magnata@dogbank.com', 'carlos.magnata@dogbank.com'),
+('55566677788', '123456', 'Maria Empresaria', 'maria.empresaria@dogbank.com', 'maria.empresaria@dogbank.com');
 
 -- =============================================================================
 -- CRIAR CONTAS COM SALDO INICIAL
 -- =============================================================================
+-- Contas com saldo alto (>= R$ 100.000,00) para testar regra COAF
+-- COAF: Transações >= R$ 50.000,00 devem ser reportadas
 INSERT INTO contas (usuario_id, numero_conta, saldo, banco, user_name) VALUES
 ((SELECT id FROM usuarios WHERE cpf='12345678915'), '0001-9', 10000.00, 'DOG BANK', 'Vitoria Itadori'),
 ((SELECT id FROM usuarios WHERE cpf='98765432101'), '0002-1', 15000.00, 'Banco do Brasil', 'Pedro Silva'),
-((SELECT id FROM usuarios WHERE cpf='45678912302'), '0003-2', 8500.00, 'Itaú', 'João Santos'),
+((SELECT id FROM usuarios WHERE cpf='45678912302'), '0003-2', 8500.00, 'Itau', 'Joao Santos'),
 ((SELECT id FROM usuarios WHERE cpf='78912345603'), '0004-3', 12000.00, 'Santander', 'Emiliano Costa'),
 ((SELECT id FROM usuarios WHERE cpf='32165498704'), '0005-4', 9500.00, 'Bradesco', 'Eliane Oliveira'),
-((SELECT id FROM usuarios WHERE cpf='65498732105'), '0006-5', 20000.00, 'Nubank', 'Patrícia Souza'),
+((SELECT id FROM usuarios WHERE cpf='65498732105'), '0006-5', 20000.00, 'Nubank', 'Patricia Souza'),
 ((SELECT id FROM usuarios WHERE cpf='15975385206'), '0007-6', 7500.00, 'DOG BANK', 'Renato Almeida'),
-((SELECT id FROM usuarios WHERE cpf='66666666666'), '0008-7', 50000.00, 'DOG BANK', 'Usuário Teste');
+((SELECT id FROM usuarios WHERE cpf='66666666666'), '0008-7', 50000.00, 'DOG BANK', 'Usuario Teste'),
+-- Contas com saldo alto para testar COAF (>= R$ 100.000,00)
+((SELECT id FROM usuarios WHERE cpf='11122233344'), '0009-8', 250000.00, 'DOG BANK', 'Carlos Magnata'),
+((SELECT id FROM usuarios WHERE cpf='55566677788'), '0010-9', 500000.00, 'DOG BANK', 'Maria Empresaria');
 
 -- =============================================================================
 -- VERIFICAR E ATUALIZAR SALDOS (garantia extra)
 -- =============================================================================
 UPDATE contas SET saldo = 10000.00, banco = 'DOG BANK', user_name = 'Vitoria Itadori' WHERE numero_conta = '0001-9';
 UPDATE contas SET saldo = 15000.00, banco = 'Banco do Brasil', user_name = 'Pedro Silva' WHERE numero_conta = '0002-1';
-UPDATE contas SET saldo = 8500.00, banco = 'Itaú', user_name = 'João Santos' WHERE numero_conta = '0003-2';
+UPDATE contas SET saldo = 8500.00, banco = 'Itau', user_name = 'Joao Santos' WHERE numero_conta = '0003-2';
 UPDATE contas SET saldo = 12000.00, banco = 'Santander', user_name = 'Emiliano Costa' WHERE numero_conta = '0004-3';
 UPDATE contas SET saldo = 9500.00, banco = 'Bradesco', user_name = 'Eliane Oliveira' WHERE numero_conta = '0005-4';
-UPDATE contas SET saldo = 20000.00, banco = 'Nubank', user_name = 'Patrícia Souza' WHERE numero_conta = '0006-5';
+UPDATE contas SET saldo = 20000.00, banco = 'Nubank', user_name = 'Patricia Souza' WHERE numero_conta = '0006-5';
 UPDATE contas SET saldo = 7500.00, banco = 'DOG BANK', user_name = 'Renato Almeida' WHERE numero_conta = '0007-6';
-UPDATE contas SET saldo = 50000.00, banco = 'DOG BANK', user_name = 'Usuário Teste' WHERE numero_conta = '0008-7';
+UPDATE contas SET saldo = 50000.00, banco = 'DOG BANK', user_name = 'Usuario Teste' WHERE numero_conta = '0008-7';
+-- Contas com saldo alto para testar COAF
+UPDATE contas SET saldo = 250000.00, banco = 'DOG BANK', user_name = 'Carlos Magnata' WHERE numero_conta = '0009-8';
+UPDATE contas SET saldo = 500000.00, banco = 'DOG BANK', user_name = 'Maria Empresaria' WHERE numero_conta = '0010-9';
 
 -- =============================================================================
 -- INSERIR TRANSAÇÕES DE EXEMPLO
@@ -161,11 +174,13 @@ DECLARE
     v_contas INT;
     v_transacoes INT;
     v_saldo_total NUMERIC;
+    v_contas_coaf INT;
 BEGIN
     SELECT COUNT(*) INTO v_usuarios FROM usuarios;
     SELECT COUNT(*) INTO v_contas FROM contas;
     SELECT COUNT(*) INTO v_transacoes FROM transacoes_pix;
     SELECT COALESCE(SUM(saldo), 0) INTO v_saldo_total FROM contas;
+    SELECT COUNT(*) INTO v_contas_coaf FROM contas WHERE saldo >= 50000;
     
     RAISE NOTICE '';
     RAISE NOTICE '╔═══════════════════════════════════════════════════════════════╗';
@@ -175,7 +190,12 @@ BEGIN
     RAISE NOTICE '║   💳 Contas criadas: %                                        ', v_contas;
     RAISE NOTICE '║   💸 Transações de exemplo: %                                 ', v_transacoes;
     RAISE NOTICE '║   💰 Saldo total no sistema: R$ %                         ', v_saldo_total;
+    RAISE NOTICE '║   🏛️ Contas com saldo >= R$ 50k (COAF): %                     ', v_contas_coaf;
     RAISE NOTICE '╚═══════════════════════════════════════════════════════════════╝';
+    RAISE NOTICE '';
+    RAISE NOTICE '📋 CONTAS PARA TESTAR REGRA COAF (transações >= R$ 50.000,00):';
+    RAISE NOTICE '   - Carlos Magnata: R$ 250.000,00 (CPF: 11122233344)';
+    RAISE NOTICE '   - Maria Empresaria: R$ 500.000,00 (CPF: 55566677788)';
     RAISE NOTICE '';
 END $$;
 
@@ -185,7 +205,8 @@ SELECT
     u.cpf,
     c.numero_conta,
     c.banco,
-    c.saldo
+    c.saldo,
+    CASE WHEN c.saldo >= 50000 THEN '🏛️ COAF' ELSE '' END as coaf_eligible
 FROM usuarios u
 JOIN contas c ON u.id = c.usuario_id
-ORDER BY u.nome;
+ORDER BY c.saldo DESC;

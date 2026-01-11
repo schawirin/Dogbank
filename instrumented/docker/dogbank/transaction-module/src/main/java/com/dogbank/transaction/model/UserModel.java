@@ -5,6 +5,7 @@ public class UserModel {
     private String nome;
     private String chavePix;
     private String cpf;
+    private String email;
     
     public Long getId() {
         return id;
@@ -36,5 +37,13 @@ public class UserModel {
     
     public void setCpf(String cpf) {
         this.cpf = cpf;
+    }
+    
+    public String getEmail() {
+        return email;
+    }
+    
+    public void setEmail(String email) {
+        this.email = email;
     }
 }

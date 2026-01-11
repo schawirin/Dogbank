@@ -49,6 +49,15 @@
       "auto_delete": false,
       "internal": false,
       "arguments": {}
+    },
+    {
+      "name": "coaf.exchange",
+      "vhost": "dogbank",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
     }
   ],
   "queues": [
@@ -102,6 +111,17 @@
       "arguments": {
         "x-queue-type": "quorum"
       }
+    },
+    {
+      "name": "coaf.notifications",
+      "vhost": "dogbank",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-message-ttl": 604800000,
+        "x-max-length": 10000
+      }
     }
   ],
   "bindings": [
@@ -143,6 +163,14 @@
       "destination": "pix.dlq",
       "destination_type": "queue",
       "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "coaf.exchange",
+      "vhost": "dogbank",
+      "destination": "coaf.notifications",
+      "destination_type": "queue",
+      "routing_key": "coaf.notification",
       "arguments": {}
     }
   ]

@@ -101,52 +101,46 @@ services:
       com.datadoghq.ad.logs: '[{"source": "redis", "service": "dogbank-redis"}]'
 
   # ===========================================================================
-  # 📨 KAFKA - Message Queue for PIX Transactions
+  # 📨 KAFKA - Message Queue for PIX Transactions (KRaft Mode - No Zookeeper!)
   # ===========================================================================
+  # Using Apache Kafka in KRaft mode - much lighter and faster startup!
+  # No Zookeeper dependency = less memory, faster boot, simpler architecture
   
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
-    container_name: dogbank-zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "2181:2181"
-    networks:
-      - dogbank-network
-    healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "2181"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
   kafka:
-    image: confluentinc/cp-kafka:7.5.0
+    image: bitnami/kafka:3.6
     container_name: dogbank-kafka
-    depends_on:
-      zookeeper:
-        condition: service_healthy
     ports:
       - "9092:9092"
       - "29092:29092"
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # KRaft mode (no Zookeeper!)
+      KAFKA_CFG_NODE_ID: 1
+      KAFKA_CFG_PROCESS_ROLES: broker,controller
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # Listeners
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:29092,CONTROLLER://:9093,EXTERNAL://:9092
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Topic settings
+      KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # Performance tuning for demo
+      KAFKA_CFG_NUM_PARTITIONS: 3
+      KAFKA_CFG_LOG_RETENTION_HOURS: 24
+      # Allow plaintext
+      ALLOW_PLAINTEXT_LISTENER: "yes"
       # JMX for Datadog monitoring
-      KAFKA_JMX_PORT: 9999
-      KAFKA_JMX_HOSTNAME: kafka
+      JMX_PORT: 9999
+    volumes:
+      - kafka_data:/bitnami/kafka
     networks:
       - dogbank-network
     healthcheck:
-      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:29092"]
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:29092 --list || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -160,7 +154,7 @@ services:
 
   # Kafka topic initialization
   kafka-init:
-    image: confluentinc/cp-kafka:7.5.0
+    image: bitnami/kafka:3.6
     container_name: dogbank-kafka-init
     depends_on:
       kafka:
@@ -169,12 +163,12 @@ services:
     command: |
       "
       echo 'Creating Kafka topics...'
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-transactions --partitions 3 --replication-factor 1
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-results --partitions 3 --replication-factor 1
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-notifications --partitions 3 --replication-factor 1
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-dlq --partitions 1 --replication-factor 1
+      kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-transactions --partitions 3 --replication-factor 1
+      kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-results --partitions 3 --replication-factor 1
+      kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-notifications --partitions 3 --replication-factor 1
+      kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-dlq --partitions 1 --replication-factor 1
       echo 'Topics created:'
-      kafka-topics --bootstrap-server kafka:29092 --list
+      kafka-topics.sh --bootstrap-server kafka:29092 --list
       "
     networks:
       - dogbank-network
@@ -726,4 +720,6 @@ volumes:
   ollama_data:
     driver: local
   rabbitmq_data:
+    driver: local
+  kafka_data:
     driver: local

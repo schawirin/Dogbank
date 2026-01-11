@@ -24,6 +24,7 @@ public class PixTransaction {
     private String correlationId;
     private String sourceUserName;
     private String sourceUserEmail;
+    private String sourceCpf;
     private String destinationUserName;
     private String destinationUserEmail;
 }

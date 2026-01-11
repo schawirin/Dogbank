@@ -254,6 +254,29 @@ public class TransactionService {
                         log.warn("⚠️ Failed to send PIX event to RabbitMQ (non-blocking): {}", rabbitEx.getMessage());
                     }
                 }
+            } else if (rabbitmqEnabled && rabbitMQProducerService != null) {
+                // Send only to RabbitMQ if Kafka is disabled
+                try {
+                    PixTransactionEvent event = PixTransactionEvent.builder()
+                        .transactionId(saved.getId().toString())
+                        .sourceAccountId(accountOriginId.toString())
+                        .destinationPixKey(pixKeyDestination)
+                        .amount(amount)
+                        .description("PIX para " + userDest.getNome())
+                        .createdAt(java.time.LocalDateTime.now())
+                        .status("COMPLETED")
+                        .retryCount(0)
+                        .correlationId(UUID.randomUUID().toString())
+                        .sourceUserName("Remetente")
+                        .sourceUserEmail("")
+                        .destinationUserName(userDest.getNome())
+                        .destinationUserEmail(userDest.getEmail() != null ? userDest.getEmail() : "")
+                        .build();
+                    rabbitMQProducerService.publishPixTransaction(event);
+                    log.info("🐰 PIX event sent to RabbitMQ for transaction {}", saved.getId());
+                } catch (Exception rabbitEx) {
+                    log.warn("⚠️ Failed to send PIX event to RabbitMQ (non-blocking): {}", rabbitEx.getMessage());
+                }
             }
             
             return saved;

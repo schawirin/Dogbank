@@ -7,9 +7,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
+import org.springframework.util.concurrent.ListenableFuture;
+import org.springframework.util.concurrent.ListenableFutureCallback;
 
-import java.util.concurrent.CompletableFuture;
-
+/**
+ * Kafka Producer Service for PIX transactions
+ * 
+ * Uses ListenableFuture for Spring Boot 2.7 compatibility
+ * (CompletableFuture is only available in Spring Boot 3.x)
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -27,12 +33,12 @@ public class KafkaProducerService {
      * Sends a PIX transaction event to Kafka for async processing
      * 
      * @param event The transaction event to send
-     * @return CompletableFuture with the send result
+     * @return ListenableFuture with the send result
      */
-    public CompletableFuture<SendResult<String, Object>> sendPixTransaction(PixTransactionEvent event) {
+    public ListenableFuture<SendResult<String, Object>> sendPixTransaction(PixTransactionEvent event) {
         if (!kafkaEnabled) {
             log.warn("⚠️ Kafka is disabled, skipping event: {}", event.getTransactionId());
-            return CompletableFuture.completedFuture(null);
+            return null;
         }
 
         log.info("📤 Sending PIX transaction to Kafka: {} | Amount: R$ {} | Key: {}",
@@ -40,18 +46,26 @@ public class KafkaProducerService {
                 event.getAmount(),
                 event.getDestinationPixKey());
 
-        return kafkaTemplate.send(transactionsTopic, event.getTransactionId(), event)
-                .whenComplete((result, ex) -> {
-                    if (ex == null) {
-                        log.info("✅ PIX transaction sent to Kafka successfully: {} | Partition: {} | Offset: {}",
-                                event.getTransactionId(),
-                                result.getRecordMetadata().partition(),
-                                result.getRecordMetadata().offset());
-                    } else {
-                        log.error("❌ Failed to send PIX transaction to Kafka: {} | Error: {}",
-                                event.getTransactionId(),
-                                ex.getMessage());
-                    }
-                });
+        ListenableFuture<SendResult<String, Object>> future = 
+            kafkaTemplate.send(transactionsTopic, event.getTransactionId(), event);
+        
+        future.addCallback(new ListenableFutureCallback<SendResult<String, Object>>() {
+            @Override
+            public void onSuccess(SendResult<String, Object> result) {
+                log.info("✅ PIX transaction sent to Kafka successfully: {} | Partition: {} | Offset: {}",
+                        event.getTransactionId(),
+                        result.getRecordMetadata().partition(),
+                        result.getRecordMetadata().offset());
+            }
+
+            @Override
+            public void onFailure(Throwable ex) {
+                log.error("❌ Failed to send PIX transaction to Kafka: {} | Error: {}",
+                        event.getTransactionId(),
+                        ex.getMessage());
+            }
+        });
+        
+        return future;
     }
 }
