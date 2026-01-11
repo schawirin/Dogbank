@@ -24,6 +24,7 @@ resources:
   - transaction-service.yaml
   - bancocentral-service.yaml
   - notification-service.yaml
+  - chatbot-service.yaml
   
   # Frontend
   - frontend.yaml
