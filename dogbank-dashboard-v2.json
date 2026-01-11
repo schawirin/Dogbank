@@ -1,0 +1,1049 @@
+{
+  "title": "🐕 DogBank PIX - Dashboard Completo v2",
+  "description": "Dashboard de observabilidade para transações PIX do DogBank - Métricas, Logs, APM e Segurança",
+  "widgets": [
+    {
+      "id": 1,
+      "definition": {
+        "title": "📊 Visão Geral PIX",
+        "type": "group",
+        "background_color": "vivid_purple",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "id": 2,
+            "definition": {
+              "title": "✅ PIX Com Sucesso",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [],
+                      "search": {
+                        "query": "service:transaction-service @status_transacao:CONCLUIDO"
+                      }
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "query1"
+                    }
+                  ],
+                  "conditional_formats": [
+                    {"comparator": ">", "palette": "white_on_green", "value": 0}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            },
+            "layout": {"x": 0, "y": 0, "width": 3, "height": 2}
+          },
+          {
+            "id": 3,
+            "definition": {
+              "title": "❌ PIX Com Falha",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [],
+                      "search": {
+                        "query": "service:transaction-service @evento:PIX_ERRO"
+                      }
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "query1"
+                    }
+                  ],
+                  "conditional_formats": [
+                    {"comparator": ">", "palette": "white_on_red", "value": 0}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            },
+            "layout": {"x": 3, "y": 0, "width": 3, "height": 2}
+          },
+          {
+            "id": 4,
+            "definition": {
+              "title": "💰 Valor Total Transferido (R$)",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {
+                        "aggregation": "sum",
+                        "metric": "@valor_numerico"
+                      },
+                      "group_by": [],
+                      "search": {
+                        "query": "service:transaction-service @status_transacao:CONCLUIDO @valor_numerico:*"
+                      }
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "query1"
+                    }
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 2,
+              "custom_unit": "R$"
+            },
+            "layout": {"x": 6, "y": 0, "width": 3, "height": 2}
+          },
+          {
+            "id": 5,
+            "definition": {
+              "title": "📈 Taxa de Sucesso",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "sucesso",
+                      "indexes": ["*"],
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [],
+                      "search": {
+                        "query": "service:transaction-service @status_transacao:CONCLUIDO"
+                      }
+                    },
+                    {
+                      "data_source": "logs",
+                      "name": "total",
+                      "indexes": ["*"],
+                      "compute": {
+                        "aggregation": "count"
+                      },
+                      "group_by": [],
+                      "search": {
+                        "query": "service:transaction-service (@status_transacao:CONCLUIDO OR @evento:PIX_ERRO)"
+                      }
+                    }
+                  ],
+                  "formulas": [
+                    {
+                      "formula": "(sucesso / total) * 100"
+                    }
+                  ]
+                }
+              ],
+              "autoscale": false,
+              "precision": 1,
+              "custom_unit": "%"
+            },
+            "layout": {"x": 9, "y": 0, "width": 3, "height": 2}
+          }
+        ]
+      },
+      "layout": {"x": 0, "y": 0, "width": 12, "height": 3}
+    },
+    {
+      "id": 10,
+      "definition": {
+        "title": "📈 Transações PIX ao Longo do Tempo",
+        "title_size": "16",
+        "title_align": "left",
+        "show_legend": true,
+        "legend_layout": "auto",
+        "legend_columns": ["avg", "min", "max", "value", "sum"],
+        "type": "timeseries",
+        "requests": [
+          {
+            "formulas": [
+              {"alias": "Sucesso", "formula": "query1"},
+              {"alias": "Falha", "formula": "query2"}
+            ],
+            "queries": [
+              {
+                "data_source": "logs",
+                "name": "query1",
+                "indexes": ["*"],
+                "compute": {"aggregation": "count"},
+                "group_by": [],
+                "search": {"query": "service:transaction-service @status_transacao:CONCLUIDO"}
+              },
+              {
+                "data_source": "logs",
+                "name": "query2",
+                "indexes": ["*"],
+                "compute": {"aggregation": "count"},
+                "group_by": [],
+                "search": {"query": "service:transaction-service @evento:PIX_ERRO"}
+              }
+            ],
+            "response_format": "timeseries",
+            "style": {"palette": "semantic", "line_type": "solid", "line_width": "normal"},
+            "display_type": "bars"
+          }
+        ]
+      },
+      "layout": {"x": 0, "y": 3, "width": 6, "height": 3}
+    },
+    {
+      "id": 11,
+      "definition": {
+        "title": "💵 Valor Monetário das Transações",
+        "title_size": "16",
+        "title_align": "left",
+        "show_legend": true,
+        "legend_layout": "auto",
+        "type": "timeseries",
+        "requests": [
+          {
+            "formulas": [{"alias": "Valor Sucesso (R$)", "formula": "query1"}],
+            "queries": [
+              {
+                "data_source": "logs",
+                "name": "query1",
+                "indexes": ["*"],
+                "compute": {"aggregation": "sum", "metric": "@valor_numerico"},
+                "group_by": [],
+                "search": {"query": "service:transaction-service @status_transacao:CONCLUIDO @valor_numerico:*"}
+              }
+            ],
+            "response_format": "timeseries",
+            "style": {"palette": "green", "line_type": "solid", "line_width": "normal"},
+            "display_type": "area"
+          }
+        ]
+      },
+      "layout": {"x": 6, "y": 3, "width": 6, "height": 3}
+    },
+    {
+      "id": 20,
+      "definition": {
+        "title": "⏱️ Performance & Latência",
+        "type": "group",
+        "background_color": "vivid_blue",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "id": 21,
+            "definition": {
+              "title": "Tempo Médio de Transação (ms)",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "avg", "metric": "@duracao_ms"},
+                      "group_by": [],
+                      "search": {"query": "service:transaction-service @status_transacao:CONCLUIDO @duracao_ms:*"}
+                    }
+                  ],
+                  "formulas": [{"formula": "query1"}],
+                  "conditional_formats": [
+                    {"comparator": "<", "palette": "white_on_green", "value": 1000},
+                    {"comparator": ">=", "palette": "white_on_yellow", "value": 1000},
+                    {"comparator": ">=", "palette": "white_on_red", "value": 3000}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0,
+              "custom_unit": "ms"
+            },
+            "layout": {"x": 0, "y": 0, "width": 3, "height": 2}
+          },
+          {
+            "id": 22,
+            "definition": {
+              "title": "Tempo Médio Banco Central (ms)",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "avg", "metric": "@tempo_banco_central_ms"},
+                      "group_by": [],
+                      "search": {"query": "service:transaction-service @tempo_banco_central_ms:*"}
+                    }
+                  ],
+                  "formulas": [{"formula": "query1"}],
+                  "conditional_formats": [
+                    {"comparator": "<", "palette": "white_on_green", "value": 500},
+                    {"comparator": ">=", "palette": "white_on_yellow", "value": 500},
+                    {"comparator": ">=", "palette": "white_on_red", "value": 2000}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0,
+              "custom_unit": "ms"
+            },
+            "layout": {"x": 3, "y": 0, "width": 3, "height": 2}
+          },
+          {
+            "id": 23,
+            "definition": {
+              "title": "Latência P95 (ms)",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "pc95", "metric": "@duracao_ms"},
+                      "group_by": [],
+                      "search": {"query": "service:transaction-service @status_transacao:CONCLUIDO @duracao_ms:*"}
+                    }
+                  ],
+                  "formulas": [{"formula": "query1"}]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0,
+              "custom_unit": "ms"
+            },
+            "layout": {"x": 6, "y": 0, "width": 3, "height": 2}
+          },
+          {
+            "id": 24,
+            "definition": {
+              "title": "Latência P99 (ms)",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "pc99", "metric": "@duracao_ms"},
+                      "group_by": [],
+                      "search": {"query": "service:transaction-service @status_transacao:CONCLUIDO @duracao_ms:*"}
+                    }
+                  ],
+                  "formulas": [{"formula": "query1"}]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0,
+              "custom_unit": "ms"
+            },
+            "layout": {"x": 9, "y": 0, "width": 3, "height": 2}
+          }
+        ]
+      },
+      "layout": {"x": 0, "y": 6, "width": 12, "height": 3}
+    },
+    {
+      "id": 25,
+      "definition": {
+        "title": "📉 Latência ao Longo do Tempo",
+        "title_size": "16",
+        "title_align": "left",
+        "show_legend": true,
+        "legend_layout": "auto",
+        "type": "timeseries",
+        "requests": [
+          {
+            "formulas": [
+              {"alias": "Duração Média (ms)", "formula": "query1"},
+              {"alias": "P95 (ms)", "formula": "query2"}
+            ],
+            "queries": [
+              {
+                "data_source": "logs",
+                "name": "query1",
+                "indexes": ["*"],
+                "compute": {"aggregation": "avg", "metric": "@duracao_ms"},
+                "group_by": [],
+                "search": {"query": "service:transaction-service @duracao_ms:*"}
+              },
+              {
+                "data_source": "logs",
+                "name": "query2",
+                "indexes": ["*"],
+                "compute": {"aggregation": "pc95", "metric": "@duracao_ms"},
+                "group_by": [],
+                "search": {"query": "service:transaction-service @duracao_ms:*"}
+              }
+            ],
+            "response_format": "timeseries",
+            "style": {"palette": "cool", "line_type": "solid", "line_width": "normal"},
+            "display_type": "line"
+          }
+        ],
+        "markers": [
+          {"value": "y = 500", "display_type": "warning dashed", "label": "Warning 500ms"},
+          {"value": "y = 1000", "display_type": "error dashed", "label": "Critical 1000ms"}
+        ]
+      },
+      "layout": {"x": 0, "y": 9, "width": 12, "height": 3}
+    },
+    {
+      "id": 30,
+      "definition": {
+        "title": "❌ Análise de Erros",
+        "type": "group",
+        "background_color": "vivid_orange",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "id": 31,
+            "definition": {
+              "title": "Top Motivos de Falha",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "toplist",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "count"},
+                      "group_by": [
+                        {"facet": "@status_transacao", "limit": 10, "sort": {"aggregation": "count", "order": "desc"}}
+                      ],
+                      "search": {"query": "service:transaction-service @evento:PIX_ERRO"}
+                    }
+                  ],
+                  "formulas": [{"formula": "query1"}]
+                }
+              ]
+            },
+            "layout": {"x": 0, "y": 0, "width": 6, "height": 3}
+          },
+          {
+            "id": 32,
+            "definition": {
+              "title": "Taxa de Erro ao Longo do Tempo",
+              "title_size": "16",
+              "title_align": "left",
+              "show_legend": true,
+              "type": "timeseries",
+              "requests": [
+                {
+                  "formulas": [{"alias": "Taxa de Erro (%)", "formula": "(query2 / (query1 + query2)) * 100"}],
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "count"},
+                      "group_by": [],
+                      "search": {"query": "service:transaction-service @status_transacao:CONCLUIDO"}
+                    },
+                    {
+                      "data_source": "logs",
+                      "name": "query2",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "count"},
+                      "group_by": [],
+                      "search": {"query": "service:transaction-service @evento:PIX_ERRO"}
+                    }
+                  ],
+                  "response_format": "timeseries",
+                  "style": {"palette": "warm", "line_type": "solid", "line_width": "normal"},
+                  "display_type": "line"
+                }
+              ],
+              "markers": [
+                {"value": "y = 5", "display_type": "warning dashed", "label": "Warning 5%"},
+                {"value": "y = 10", "display_type": "error dashed", "label": "Critical 10%"}
+              ]
+            },
+            "layout": {"x": 6, "y": 0, "width": 6, "height": 3}
+          }
+        ]
+      },
+      "layout": {"x": 0, "y": 12, "width": 12, "height": 4}
+    },
+    {
+      "id": 40,
+      "definition": {
+        "title": "🏛️ COAF - Compliance",
+        "type": "group",
+        "background_color": "vivid_green",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "id": 41,
+            "definition": {
+              "title": "Transações COAF (>= R$ 50k)",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "count"},
+                      "group_by": [],
+                      "search": {"query": "service:fraud-detection-service COAF"}
+                    }
+                  ],
+                  "formulas": [{"formula": "query1"}]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            },
+            "layout": {"x": 0, "y": 0, "width": 4, "height": 2}
+          },
+          {
+            "id": 42,
+            "definition": {
+              "title": "Valor Total COAF (R$)",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "sum", "metric": "@valor_numerico"},
+                      "group_by": [],
+                      "search": {"query": "service:transaction-service @valor_numerico:>=50000 @status_transacao:CONCLUIDO"}
+                    }
+                  ],
+                  "formulas": [{"formula": "query1"}]
+                }
+              ],
+              "autoscale": true,
+              "precision": 2,
+              "custom_unit": "R$"
+            },
+            "layout": {"x": 4, "y": 0, "width": 4, "height": 2}
+          },
+          {
+            "id": 43,
+            "definition": {
+              "title": "Timeline COAF",
+              "title_size": "16",
+              "title_align": "left",
+              "show_legend": true,
+              "type": "timeseries",
+              "requests": [
+                {
+                  "formulas": [{"alias": "Notificações COAF", "formula": "query1"}],
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "count"},
+                      "group_by": [],
+                      "search": {"query": "service:fraud-detection-service COAF"}
+                    }
+                  ],
+                  "response_format": "timeseries",
+                  "style": {"palette": "purple", "line_type": "solid", "line_width": "normal"},
+                  "display_type": "bars"
+                }
+              ]
+            },
+            "layout": {"x": 8, "y": 0, "width": 4, "height": 2}
+          }
+        ]
+      },
+      "layout": {"x": 0, "y": 16, "width": 12, "height": 3}
+    },
+    {
+      "id": 50,
+      "definition": {
+        "title": "🔐 Fraud Detection",
+        "type": "group",
+        "background_color": "vivid_yellow",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "id": 51,
+            "definition": {
+              "title": "🚨 Fraudes Detectadas",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "count"},
+                      "group_by": [],
+                      "search": {"query": "service:fraud-detection-service (BLOCKED OR REJECTED OR FRAUD)"}
+                    }
+                  ],
+                  "formulas": [{"formula": "query1"}]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            },
+            "layout": {"x": 0, "y": 0, "width": 3, "height": 2}
+          },
+          {
+            "id": 52,
+            "definition": {
+              "title": "⚠️ Revisão Manual",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "count"},
+                      "group_by": [],
+                      "search": {"query": "service:fraud-detection-service MANUAL_REVIEW"}
+                    }
+                  ],
+                  "formulas": [{"formula": "query1"}]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            },
+            "layout": {"x": 3, "y": 0, "width": 3, "height": 2}
+          },
+          {
+            "id": 53,
+            "definition": {
+              "title": "✅ Aprovadas",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "count"},
+                      "group_by": [],
+                      "search": {"query": "service:fraud-detection-service (APPROVED OR ALLOW)"}
+                    }
+                  ],
+                  "formulas": [{"formula": "query1"}]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            },
+            "layout": {"x": 6, "y": 0, "width": 3, "height": 2}
+          },
+          {
+            "id": 54,
+            "definition": {
+              "title": "Timeline Fraud Detection",
+              "title_size": "16",
+              "title_align": "left",
+              "show_legend": true,
+              "type": "timeseries",
+              "requests": [
+                {
+                  "formulas": [{"alias": "Análises", "formula": "query1"}],
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "count"},
+                      "group_by": [],
+                      "search": {"query": "service:fraud-detection-service"}
+                    }
+                  ],
+                  "response_format": "timeseries",
+                  "style": {"palette": "orange", "line_type": "solid", "line_width": "normal"},
+                  "display_type": "bars"
+                }
+              ]
+            },
+            "layout": {"x": 9, "y": 0, "width": 3, "height": 2}
+          }
+        ]
+      },
+      "layout": {"x": 0, "y": 19, "width": 12, "height": 3}
+    },
+    {
+      "id": 60,
+      "definition": {
+        "title": "📊 Distribuição de Transações",
+        "type": "group",
+        "background_color": "gray",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "id": 61,
+            "definition": {
+              "title": "Por Tipo de Chave PIX",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "sunburst",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "count"},
+                      "group_by": [
+                        {"facet": "@tipo_chave", "limit": 10, "sort": {"aggregation": "count", "order": "desc"}}
+                      ],
+                      "search": {"query": "service:transaction-service @tipo_chave:*"}
+                    }
+                  ],
+                  "formulas": [{"formula": "query1"}]
+                }
+              ]
+            },
+            "layout": {"x": 0, "y": 0, "width": 6, "height": 3}
+          },
+          {
+            "id": 62,
+            "definition": {
+              "title": "Por Banco Destinatário",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "toplist",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "count"},
+                      "group_by": [
+                        {"facet": "@destinatario_banco", "limit": 10, "sort": {"aggregation": "count", "order": "desc"}}
+                      ],
+                      "search": {"query": "service:transaction-service @destinatario_banco:* @status_transacao:CONCLUIDO"}
+                    }
+                  ],
+                  "formulas": [{"formula": "query1"}]
+                }
+              ]
+            },
+            "layout": {"x": 6, "y": 0, "width": 6, "height": 3}
+          }
+        ]
+      },
+      "layout": {"x": 0, "y": 22, "width": 12, "height": 4}
+    },
+    {
+      "id": 70,
+      "definition": {
+        "title": "🏦 Banco Central",
+        "type": "group",
+        "background_color": "vivid_blue",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "id": 71,
+            "definition": {
+              "title": "Aprovações BC",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "count"},
+                      "group_by": [],
+                      "search": {"query": "service:transaction-service \"Banco Central\" aprovada"}
+                    }
+                  ],
+                  "formulas": [{"formula": "query1"}]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            },
+            "layout": {"x": 0, "y": 0, "width": 3, "height": 2}
+          },
+          {
+            "id": 72,
+            "definition": {
+              "title": "Rejeições BC",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "count"},
+                      "group_by": [],
+                      "search": {"query": "service:transaction-service @status_transacao:REJEITADO_BANCO_CENTRAL"}
+                    }
+                  ],
+                  "formulas": [{"formula": "query1"}]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            },
+            "layout": {"x": 3, "y": 0, "width": 3, "height": 2}
+          },
+          {
+            "id": 73,
+            "definition": {
+              "title": "Tempo Resposta BC (ms)",
+              "title_size": "16",
+              "title_align": "left",
+              "show_legend": true,
+              "type": "timeseries",
+              "requests": [
+                {
+                  "formulas": [{"alias": "Tempo BC (ms)", "formula": "query1"}],
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "avg", "metric": "@tempo_banco_central_ms"},
+                      "group_by": [],
+                      "search": {"query": "service:transaction-service @tempo_banco_central_ms:*"}
+                    }
+                  ],
+                  "response_format": "timeseries",
+                  "style": {"palette": "blue", "line_type": "solid", "line_width": "normal"},
+                  "display_type": "line"
+                }
+              ],
+              "markers": [
+                {"value": "y = 200", "display_type": "warning dashed", "label": "Warning 200ms"},
+                {"value": "y = 500", "display_type": "error dashed", "label": "Critical 500ms"}
+              ]
+            },
+            "layout": {"x": 6, "y": 0, "width": 6, "height": 2}
+          }
+        ]
+      },
+      "layout": {"x": 0, "y": 26, "width": 12, "height": 3}
+    },
+    {
+      "id": 80,
+      "definition": {
+        "title": "🛡️ Segurança & ASM",
+        "type": "group",
+        "background_color": "vivid_pink",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "id": 81,
+            "definition": {
+              "title": "🚨 SQL Injection Detectados",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "count"},
+                      "group_by": [],
+                      "search": {"query": "@security_event:SQL_INJECTION* OR \"SQL Injection\""}
+                    }
+                  ],
+                  "formulas": [{"formula": "query1"}]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            },
+            "layout": {"x": 0, "y": 0, "width": 4, "height": 2}
+          },
+          {
+            "id": 82,
+            "definition": {
+              "title": "Eventos de Segurança",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "count"},
+                      "group_by": [],
+                      "search": {"query": "@security_event:*"}
+                    }
+                  ],
+                  "formulas": [{"formula": "query1"}]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            },
+            "layout": {"x": 4, "y": 0, "width": 4, "height": 2}
+          },
+          {
+            "id": 83,
+            "definition": {
+              "title": "Timeline de Ataques",
+              "title_size": "16",
+              "title_align": "left",
+              "show_legend": true,
+              "type": "timeseries",
+              "requests": [
+                {
+                  "formulas": [{"alias": "Eventos de Segurança", "formula": "query1"}],
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "query1",
+                      "indexes": ["*"],
+                      "compute": {"aggregation": "count"},
+                      "group_by": [],
+                      "search": {"query": "@security_event:* OR \"SQL Injection\""}
+                    }
+                  ],
+                  "response_format": "timeseries",
+                  "style": {"palette": "warm", "line_type": "solid", "line_width": "normal"},
+                  "display_type": "bars"
+                }
+              ]
+            },
+            "layout": {"x": 8, "y": 0, "width": 4, "height": 2}
+          }
+        ]
+      },
+      "layout": {"x": 0, "y": 29, "width": 12, "height": 3}
+    },
+    {
+      "id": 90,
+      "definition": {
+        "title": "📝 Logs de Transações PIX",
+        "title_size": "16",
+        "title_align": "left",
+        "type": "log_stream",
+        "indexes": [],
+        "query": "service:transaction-service (@status_transacao:CONCLUIDO OR @evento:PIX_ERRO)",
+        "sort": {"column": "time", "order": "desc"},
+        "columns": ["host", "service", "@status_transacao", "@valor", "@chave_pix", "@destinatario_nome", "@duracao_ms"],
+        "show_date_column": true,
+        "show_message_column": true,
+        "message_display": "inline"
+      },
+      "layout": {"x": 0, "y": 32, "width": 12, "height": 4}
+    },
+    {
+      "id": 91,
+      "definition": {
+        "title": "🚨 Logs de Erros",
+        "title_size": "16",
+        "title_align": "left",
+        "type": "log_stream",
+        "indexes": [],
+        "query": "service:transaction-service status:error",
+        "sort": {"column": "time", "order": "desc"},
+        "columns": ["host", "service", "@status_transacao", "@erro_codigo", "@erro_mensagem"],
+        "show_date_column": true,
+        "show_message_column": true,
+        "message_display": "inline"
+      },
+      "layout": {"x": 0, "y": 36, "width": 12, "height": 4}
+    }
+  ],
+  "template_variables": [
+    {"name": "env", "prefix": "env", "available_values": [], "default": "dogbank"},
+    {"name": "service", "prefix": "service", "available_values": [], "default": "*"}
+  ],
+  "layout_type": "ordered",
+  "notify_list": [],
+  "reflow_type": "fixed"
+}
