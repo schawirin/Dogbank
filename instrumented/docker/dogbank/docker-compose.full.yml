@@ -478,7 +478,10 @@ services:
       start_period: 90s
     restart: unless-stopped
     labels:
-      com.datadoghq.ad.logs: '[{"source": "java", "service": "transaction-service"}]'
+      com.datadoghq.ad.logs: '[{"type": "json", "source": "java", "service": "transaction-service"}]'
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.service: "transaction-service"
+      com.datadoghq.tags.version: "1.0.0"
 
 
   # ===========================================================================
