@@ -1,5 +1,5 @@
 # --- STAGE 1: build all modules ---
-FROM maven:3.9.7-eclipse-temurin-17 AS builder
+FROM maven:3.9.7-eclipse-temurin-21 AS builder
 WORKDIR /app
 
 # 1) copia todo o código
@@ -12,7 +12,7 @@ RUN mvn -f bancocentral-module/pom.xml clean install -DskipTests
 RUN mvn clean package -DskipTests
 
 # --- STAGE 2: runtime com JRE Debian-slim multi-arch ---
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 
 # copia os jars prontos
