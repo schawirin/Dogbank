@@ -69,7 +69,7 @@ export default function LandingPage() {
         <div className="container mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <img src={dogbankLogo} alt="DogBank" className="h-12 w-auto" />
+              <img src={dogbankLogo} alt="DogBank" className="h-10 w-auto object-contain" />
             </div>
             <div className="hidden md:flex items-center gap-8">
               <a href="#features" className="text-white/70 hover:text-white transition-colors">Recursos</a>

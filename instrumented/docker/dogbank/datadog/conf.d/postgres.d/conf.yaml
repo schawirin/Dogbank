@@ -18,6 +18,12 @@ instances:
     collect_database_size_metrics: true
     collect_default_database: true
     
+    ## Schema collection (requires Datadog Agent 7.54+)
+    collect_schemas:
+      enabled: true
+      max_tables: 1000
+      max_columns: 50
+    
     ## Query samples and explain plans
     query_samples:
       enabled: true
