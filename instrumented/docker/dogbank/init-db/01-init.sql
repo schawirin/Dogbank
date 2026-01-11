@@ -12,11 +12,25 @@ CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 -- =============================================================================
 -- DATADOG DATABASE MONITORING (DBM) - Criar usuário
 -- =============================================================================
+-- Drop and recreate to ensure correct password
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'datadog') THEN
+        DROP ROLE datadog;
+    END IF;
+END
+$$;
+
 CREATE USER datadog WITH PASSWORD 'datadog_password';
 GRANT pg_monitor TO datadog;
 GRANT SELECT ON pg_stat_database TO datadog;
 GRANT SELECT ON pg_stat_activity TO datadog;
-GRANT SELECT ON pg_stat_statements TO datadog;
+
+-- Grant access to dogbank database
+GRANT CONNECT ON DATABASE dogbank TO datadog;
+GRANT USAGE ON SCHEMA public TO datadog;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO datadog;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO datadog;
 
 -- =============================================================================
 -- CONFIGURAÇÕES DE PERFORMANCE
