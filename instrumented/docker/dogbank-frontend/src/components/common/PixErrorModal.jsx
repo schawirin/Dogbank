@@ -2,36 +2,52 @@
 import React from 'react';
 
 /**
- * Cachorrinho triste minimalista SVG
+ * Cachorrinho estilo Datadog (Bits) - Versão triste
+ * Minimalista, branco com contornos roxos
  */
 const SadDogIcon = () => (
-  <svg viewBox="0 0 120 120" className="w-24 h-24 mx-auto">
-    {/* Corpo/Cabeça do cachorro */}
-    <ellipse cx="60" cy="65" rx="35" ry="30" fill="#E8D5B7" />
-    
-    {/* Orelhas caídas (tristes) */}
-    <ellipse cx="30" cy="50" rx="12" ry="20" fill="#D4B896" transform="rotate(-15 30 50)" />
-    <ellipse cx="90" cy="50" rx="12" ry="20" fill="#D4B896" transform="rotate(15 90 50)" />
-    
-    {/* Focinho */}
-    <ellipse cx="60" cy="75" rx="15" ry="12" fill="#F5E6D3" />
-    
-    {/* Nariz */}
-    <ellipse cx="60" cy="72" rx="6" ry="4" fill="#4A4A4A" />
-    
-    {/* Olhos tristes (olhando para baixo) */}
-    <circle cx="45" cy="58" r="5" fill="#4A4A4A" />
-    <circle cx="75" cy="58" r="5" fill="#4A4A4A" />
-    
-    {/* Sobrancelhas tristes (inclinadas para baixo) */}
-    <line x1="38" y1="48" x2="50" y2="52" stroke="#4A4A4A" strokeWidth="2" strokeLinecap="round" />
-    <line x1="82" y1="48" x2="70" y2="52" stroke="#4A4A4A" strokeWidth="2" strokeLinecap="round" />
-    
-    {/* Boca triste */}
-    <path d="M 50 82 Q 60 78 70 82" stroke="#4A4A4A" strokeWidth="2" fill="none" strokeLinecap="round" />
-    
-    {/* Lágrima */}
-    <ellipse cx="48" cy="66" rx="2" ry="3" fill="#87CEEB" opacity="0.7" />
+  <svg viewBox="0 0 100 100" className="w-20 h-20 mx-auto">
+    {/* Corpo principal */}
+    <g fill="none" stroke="#7C3AED" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      {/* Cabeça */}
+      <ellipse cx="50" cy="45" rx="28" ry="25" fill="white" />
+      
+      {/* Orelha esquerda (caída - triste) */}
+      <path d="M 25 35 Q 15 45 20 55" fill="white" />
+      <ellipse cx="20" cy="45" rx="8" ry="12" fill="white" transform="rotate(20 20 45)" />
+      
+      {/* Orelha direita (caída - triste) */}
+      <path d="M 75 35 Q 85 45 80 55" fill="white" />
+      <ellipse cx="80" cy="45" rx="8" ry="12" fill="white" transform="rotate(-20 80 45)" />
+      
+      {/* Focinho */}
+      <ellipse cx="50" cy="55" rx="12" ry="8" fill="white" />
+      
+      {/* Nariz */}
+      <ellipse cx="50" cy="52" rx="5" ry="3.5" fill="#7C3AED" />
+      
+      {/* Olhos tristes (olhando para baixo) */}
+      <circle cx="38" cy="40" r="4" fill="#7C3AED" />
+      <circle cx="62" cy="40" r="4" fill="#7C3AED" />
+      
+      {/* Sobrancelhas tristes */}
+      <path d="M 30 32 L 42 36" strokeWidth="2" />
+      <path d="M 70 32 L 58 36" strokeWidth="2" />
+      
+      {/* Boca triste */}
+      <path d="M 42 60 Q 50 56 58 60" strokeWidth="2" />
+      
+      {/* Lágrima */}
+      <path d="M 40 48 Q 42 54 40 58" stroke="#60A5FA" strokeWidth="1.5" fill="none" />
+      <circle cx="40" cy="58" r="2" fill="#60A5FA" />
+      
+      {/* Patinhas na frente (segurando algo) */}
+      <ellipse cx="35" cy="75" rx="8" ry="6" fill="white" />
+      <ellipse cx="65" cy="75" rx="8" ry="6" fill="white" />
+      
+      {/* Corpo */}
+      <path d="M 30 65 Q 30 85 50 85 Q 70 85 70 65" fill="white" />
+    </g>
   </svg>
 );
 
@@ -93,9 +109,11 @@ const PixErrorModal = ({ isOpen, onClose, onRetry, errorType = 'generic' }) => {
 
         {/* Content */}
         <div className="text-center pt-4">
-          {/* Sad Dog Icon */}
+          {/* Sad Dog Icon - Datadog Style */}
           <div className="mb-6 animate-bounce-slow">
-            <SadDogIcon />
+            <div className="w-24 h-24 mx-auto bg-gradient-to-br from-purple-100 to-violet-100 rounded-full flex items-center justify-center">
+              <SadDogIcon />
+            </div>
           </div>
 
           {/* Title */}
