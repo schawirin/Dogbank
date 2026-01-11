@@ -45,5 +45,13 @@
         <!-- Tomcat -->
         <Logger name="org.apache.catalina" level="warn"/>
         <Logger name="org.apache.tomcat" level="warn"/>
+        
+        <!-- Silence noisy libraries -->
+        <Logger name="io.micrometer" level="error"/>
+        <Logger name="io.netty" level="error"/>
+        <Logger name="reactor.netty" level="error"/>
+        <Logger name="io.lettuce" level="error"/>
+        <Logger name="com.zaxxer.hikari" level="warn"/>
+        <Logger name="org.apache.kafka" level="warn"/>
     </Loggers>
 </Configuration>
