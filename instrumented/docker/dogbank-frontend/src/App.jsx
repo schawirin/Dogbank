@@ -27,7 +27,7 @@ datadogRum.init({
     // `site` refers to the Datadog site parameter of your organization
     // see https://docs.datadoghq.com/getting_started/site/
     site: 'datadoghq.com',
-    service: 'dogbank',
+    service: 'dogbank-frontend',
     env: 'dogbank',
     // Specify a version number to identify the deployed version of your application in Datadog
     version: '1.0.0',
@@ -41,6 +41,14 @@ datadogRum.init({
     trackUserInteractions: true,
     trackResources: true,
     trackLongTasks: true,
+    // Connect RUM with APM traces
+    allowedTracingUrls: [
+        { match: /localhost/, propagatorTypes: ['tracecontext', 'datadog'] },
+        { match: /127\.0\.0\.1/, propagatorTypes: ['tracecontext', 'datadog'] },
+        { match: /\/api\//, propagatorTypes: ['tracecontext', 'datadog'] },
+    ],
+    // Enable tracing
+    traceSampleRate: 100,
 });
 
 // Start session replay recording

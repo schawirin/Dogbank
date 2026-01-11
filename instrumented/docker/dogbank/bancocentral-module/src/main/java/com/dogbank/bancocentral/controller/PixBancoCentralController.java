@@ -1,7 +1,10 @@
 package com.dogbank.bancocentral.controller;
 
+import com.dogbank.bancocentral.service.SpiExternalService;
+import com.dogbank.bancocentral.service.SpiExternalService.SpiValidationResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +18,9 @@ import java.util.Map;
 public class PixBancoCentralController {
 
     private static final Logger log = LoggerFactory.getLogger(PixBancoCentralController.class);
+    
+    @Autowired
+    private SpiExternalService spiExternalService;
 
     @PostMapping("/validate")
     public ResponseEntity<Map<String, Object>> validarPix(@RequestBody Map<String, Object> request) {
@@ -72,13 +78,24 @@ public class PixBancoCentralController {
             return erroResponse("PIX-ERRO-INTERNO", "Erro interno do Banco Central", HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
+        // Chama o SPI (Sistema de Pagamentos Instantâneos) do Banco Central
+        log.info("📡 [BANCO CENTRAL] Consultando SPI para validação final...");
+        String senderCpf = (String) request.getOrDefault("senderCpf", "00000000000");
+        SpiValidationResult spiResult = spiExternalService.validatePixTransaction(pixKey, valor, senderCpf);
+        
+        if (!spiResult.isApproved()) {
+            log.error("❌ [SPI] Transação rejeitada pelo SPI: {}", spiResult.getMessage());
+            return erroResponse(spiResult.getErrorCode(), spiResult.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+        
         // Transação aprovada
         Map<String, Object> response = new HashMap<>();
         response.put("pixKey", pixKey);
         response.put("amount", valor);
         response.put("status", "APPROVED");
+        response.put("spiTransactionId", spiResult.getSpiTransactionId());
         
-        log.info("✅ [SUCESSO] PIX aprovado - Chave: {}, Valor: R$ {}", pixKey, valor);
+        log.info("✅ [SUCESSO] PIX aprovado - Chave: {}, Valor: R$ {}, SPI ID: {}", pixKey, valor, spiResult.getSpiTransactionId());
         
         return ResponseEntity.ok(response);
     }

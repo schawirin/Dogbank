@@ -20,6 +20,11 @@ const PixReceiptPage = () => {
   const [error, setError] = useState('');
   const [showConfetti, setShowConfetti] = useState(true);
 
+  // Scroll to top when page loads
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
   useEffect(() => {
     if (!details && transactionId) {
       setLoading(true);
@@ -149,7 +154,7 @@ const PixReceiptPage = () => {
         </div>
       )}
 
-      {/* Success Header - PIX Concluído com Cachorrinho Feliz */}
+      {/* Success Header - PIX Concluído com Cachorrinho Estilo Datadog */}
       <div className="mb-6 print:hidden">
         <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg shadow-green-500/30 relative overflow-hidden">
           {/* Background decoration */}
@@ -159,28 +164,45 @@ const PixReceiptPage = () => {
           </div>
           
           <div className="relative flex items-center gap-4">
-            {/* Happy Dog Icon */}
+            {/* Happy Dog Icon - Datadog Bits Style */}
             <div className="relative">
               <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
                 <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center animate-scale-in p-1">
-                  {/* Happy Dog SVG */}
+                  {/* Happy Dog SVG - Datadog Bits Style */}
                   <svg viewBox="0 0 100 100" className="w-10 h-10">
-                    {/* Cabeça */}
-                    <ellipse cx="50" cy="55" rx="30" ry="25" fill="#E8D5B7" />
-                    {/* Orelhas levantadas (feliz) */}
-                    <ellipse cx="25" cy="35" rx="10" ry="15" fill="#D4B896" transform="rotate(-20 25 35)" />
-                    <ellipse cx="75" cy="35" rx="10" ry="15" fill="#D4B896" transform="rotate(20 75 35)" />
-                    {/* Focinho */}
-                    <ellipse cx="50" cy="65" rx="12" ry="10" fill="#F5E6D3" />
-                    {/* Nariz */}
-                    <ellipse cx="50" cy="62" rx="5" ry="3" fill="#4A4A4A" />
-                    {/* Olhos felizes (arqueados) */}
-                    <path d="M 35 50 Q 40 45 45 50" stroke="#4A4A4A" strokeWidth="3" fill="none" strokeLinecap="round" />
-                    <path d="M 55 50 Q 60 45 65 50" stroke="#4A4A4A" strokeWidth="3" fill="none" strokeLinecap="round" />
-                    {/* Sorriso grande */}
-                    <path d="M 38 72 Q 50 82 62 72" stroke="#4A4A4A" strokeWidth="2" fill="none" strokeLinecap="round" />
-                    {/* Língua */}
-                    <ellipse cx="50" cy="78" rx="5" ry="6" fill="#FF9999" />
+                    <g fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      {/* Cabeça */}
+                      <ellipse cx="50" cy="45" rx="28" ry="25" fill="white" />
+                      
+                      {/* Orelha esquerda (levantada - feliz) */}
+                      <ellipse cx="25" cy="28" rx="8" ry="14" fill="white" transform="rotate(-15 25 28)" />
+                      
+                      {/* Orelha direita (levantada - feliz) */}
+                      <ellipse cx="75" cy="28" rx="8" ry="14" fill="white" transform="rotate(15 75 28)" />
+                      
+                      {/* Focinho */}
+                      <ellipse cx="50" cy="55" rx="12" ry="8" fill="white" />
+                      
+                      {/* Nariz */}
+                      <ellipse cx="50" cy="52" rx="5" ry="3.5" fill="#16a34a" />
+                      
+                      {/* Olhos felizes (arqueados) */}
+                      <path d="M 35 42 Q 40 36 45 42" strokeWidth="3" />
+                      <path d="M 55 42 Q 60 36 65 42" strokeWidth="3" />
+                      
+                      {/* Sorriso grande */}
+                      <path d="M 40 60 Q 50 70 60 60" strokeWidth="2" />
+                      
+                      {/* Língua */}
+                      <ellipse cx="50" cy="66" rx="4" ry="5" fill="#f87171" stroke="#f87171" />
+                      
+                      {/* Patinhas */}
+                      <ellipse cx="35" cy="78" rx="8" ry="5" fill="white" />
+                      <ellipse cx="65" cy="78" rx="8" ry="5" fill="white" />
+                      
+                      {/* Corpo */}
+                      <path d="M 32 65 Q 32 82 50 82 Q 68 82 68 65" fill="white" />
+                    </g>
                   </svg>
                 </div>
               </div>
