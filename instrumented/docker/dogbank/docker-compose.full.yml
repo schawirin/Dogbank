@@ -101,6 +101,86 @@ services:
       com.datadoghq.ad.logs: '[{"source": "redis", "service": "dogbank-redis"}]'
 
   # ===========================================================================
+  # 📨 KAFKA - Message Queue for PIX Transactions
+  # ===========================================================================
+  
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: dogbank-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: dogbank-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # JMX for Datadog monitoring
+      KAFKA_JMX_PORT: 9999
+      KAFKA_JMX_HOSTNAME: kafka
+    networks:
+      - dogbank-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:29092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    labels:
+      com.datadoghq.ad.check_names: '["kafka"]'
+      com.datadoghq.ad.init_configs: '[{"is_jmx": true, "collect_default_metrics": true}]'
+      com.datadoghq.ad.instances: '[{"host": "%%host%%", "port": "9999"}]'
+      com.datadoghq.ad.logs: '[{"source": "kafka", "service": "dogbank-kafka"}]'
+
+  # Kafka topic initialization
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: dogbank-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      "
+      echo 'Creating Kafka topics...'
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-transactions --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-results --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-notifications --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-dlq --partitions 1 --replication-factor 1
+      echo 'Topics created:'
+      kafka-topics --bootstrap-server kafka:29092 --list
+      "
+    networks:
+      - dogbank-network
+
+
+  # ===========================================================================
   # 🐕 DATADOG AGENT
   # ===========================================================================
   
@@ -136,6 +216,7 @@ services:
       - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - ./datadog/conf.d/postgres.d/conf.yaml:/etc/datadog-agent/conf.d/postgres.d/conf.yaml:ro
+      - ./datadog/conf.d/kafka.d/conf.yaml:/etc/datadog-agent/conf.d/kafka.d/conf.yaml:ro
     ports:
       - "8126:8126"  # APM traces
       - "8125:8125/udp"  # DogStatsD
@@ -282,6 +363,9 @@ services:
       SERVER_PORT: 8084
       BANCOCENTRAL_API_URL: http://bancocentral-service:8085/api/bancocentral
       ACCOUNT_SERVICE_URL: http://account-service:8089
+      # Kafka
+      KAFKA_ENABLED: "true"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       # Datadog
       DD_AGENT_HOST: datadog-agent
       DD_SERVICE: transaction-service
@@ -293,6 +377,8 @@ services:
       bancocentral-service:
         condition: service_healthy
       account-service:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
       datadog-agent:
         condition: service_started
@@ -417,6 +503,54 @@ services:
     #         - driver: nvidia
     #           count: 1
     #           capabilities: [gpu]
+
+
+  # ===========================================================================
+  # 🔄 PIX WORKER - Kafka Consumer
+  # ===========================================================================
+  
+  pix-worker:
+    build:
+      context: ./pix-worker-module
+      dockerfile: Dockerfile
+    container_name: dogbank-pix-worker
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      bancocentral-service:
+        condition: service_healthy
+    environment:
+      # Kafka
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/dogbank
+      SPRING_DATASOURCE_USERNAME: dogbank
+      SPRING_DATASOURCE_PASSWORD: dog1234
+      # External services
+      BANCOCENTRAL_SERVICE_URL: http://bancocentral-service:8085
+      # Datadog
+      DD_AGENT_HOST: datadog-agent
+      DD_TRACE_AGENT_PORT: 8126
+      DD_SERVICE: pix-worker
+      DD_ENV: dogbank
+      DD_VERSION: "1.0.0"
+      DD_LOGS_INJECTION: "true"
+      DD_PROFILING_ENABLED: "true"
+      DD_TRACE_KAFKA_ENABLED: "true"
+      DD_API_KEY: ${DD_API_KEY:-}
+      DD_METRICS_ENABLED: "true"
+    volumes:
+      - ./dd-java-agent.jar:/app/dd-java-agent.jar:ro
+    networks:
+      - dogbank-network
+    restart: unless-stopped
+    labels:
+      com.datadoghq.ad.logs: '[{"source": "java", "service": "pix-worker"}]'
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.service: "pix-worker"
+      com.datadoghq.tags.version: "1.0.0"
 
   # ===========================================================================
   # 🌐 FRONTEND - React + Nginx
