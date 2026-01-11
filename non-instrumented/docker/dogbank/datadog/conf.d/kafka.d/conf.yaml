@@ -1,0 +1,19 @@
+## Datadog Kafka Integration Configuration
+## https://docs.datadoghq.com/integrations/kafka/
+
+init_config:
+
+instances:
+  - host: kafka
+    port: 9101  # JMX port
+    
+    # Consumer lag monitoring
+    consumer_groups:
+      pix-worker-group:
+        pix-transactions: []
+        
+    # Custom tags
+    tags:
+      - env:dogbank
+      - service:kafka
+      - project:dogbank

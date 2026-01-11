@@ -874,3 +874,95 @@ Crie um dashboard com:
 - Tokens consumidos por hora
 - Erros de LLM
 
+
+---
+
+## 📬 Kafka Message Queue
+
+O DogBank utiliza **Apache Kafka** para processamento assíncrono de transações PIX, proporcionando maior resiliência e escalabilidade.
+
+### Arquitetura
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Frontend  │────▶│ Transaction │────▶│    Kafka    │────▶│ PIX Worker  │
+│             │     │   Service   │     │             │     │             │
+└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+                           │                   │                   │
+                           │                   │                   ▼
+                           │                   │           ┌─────────────┐
+                           │                   │           │Banco Central│
+                           │                   │           └─────────────┘
+                           │                   │                   │
+                           │                   ▼                   ▼
+                           │           ┌─────────────┐     ┌─────────────┐
+                           │           │ pix-results │     │Notification │
+                           │           │   topic     │────▶│   Service   │
+                           │           └─────────────┘     └─────────────┘
+                           │
+                           ▼
+                    ┌─────────────┐
+                    │  PostgreSQL │
+                    └─────────────┘
+```
+
+### Topics Kafka
+
+| Topic | Descrição | Partições |
+|-------|-----------|-----------|
+| `pix-transactions` | Transações PIX para processamento | 3 |
+| `pix-results` | Resultados do processamento | 3 |
+| `pix-notifications` | Notificações para usuários | 3 |
+| `pix-dlq` | Dead Letter Queue (falhas) | 1 |
+
+### Fluxo de Processamento
+
+1. **Usuário inicia PIX** → Transaction Service valida e salva
+2. **Evento enviado** → Kafka topic `pix-transactions`
+3. **PIX Worker consome** → Processa com Banco Central
+4. **Resultado publicado** → Topics `pix-results` e `pix-notifications`
+5. **Notificação enviada** → Push/Email para usuário
+
+### Monitoramento no Datadog
+
+O Kafka está integrado com o Datadog para monitoramento de:
+
+- **Consumer Lag** - Atraso no processamento
+- **Throughput** - Mensagens por segundo
+- **Partition Distribution** - Balanceamento de carga
+- **Error Rate** - Taxa de erros
+
+### Métricas Customizadas
+
+| Métrica | Descrição |
+|---------|-----------|
+| `pix.transactions.processed` | Total de transações processadas |
+| `pix.transactions.success` | Transações bem-sucedidas |
+| `pix.transactions.failed` | Transações com falha |
+| `pix.transactions.dlq` | Transações na DLQ |
+| `pix.transactions.processing.time` | Tempo de processamento |
+
+### Comandos Úteis
+
+```bash
+# Ver topics
+docker exec dogbank-kafka kafka-topics --bootstrap-server localhost:29092 --list
+
+# Ver mensagens em um topic
+docker exec dogbank-kafka kafka-console-consumer \
+  --bootstrap-server localhost:29092 \
+  --topic pix-transactions \
+  --from-beginning
+
+# Ver consumer groups
+docker exec dogbank-kafka kafka-consumer-groups \
+  --bootstrap-server localhost:29092 \
+  --list
+
+# Ver lag do consumer
+docker exec dogbank-kafka kafka-consumer-groups \
+  --bootstrap-server localhost:29092 \
+  --group pix-worker-group \
+  --describe
+```
+

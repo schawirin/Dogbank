@@ -5,6 +5,7 @@ import com.dogbank.transaction.repository.TransactionRepository;
 import com.dogbank.transaction.model.AccountModel;
 import com.dogbank.transaction.model.UserModel;
 import com.dogbank.transaction.metrics.PixBusinessMetrics;
+import com.dogbank.transaction.event.PixTransactionEvent;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +41,12 @@ public class TransactionService {
     
     @Autowired
     private PixBusinessMetrics pixMetrics;
+    
+    @Autowired(required = false)
+    private KafkaProducerService kafkaProducerService;
+    
+    @Value("${kafka.enabled:false}")
+    private boolean kafkaEnabled;
     
     @PersistenceContext
     private EntityManager entityManager;
@@ -206,6 +213,32 @@ public class TransactionService {
             
             log.info("PIX concluído com sucesso - ID: {}, Valor: R$ {}, Destino: {}, Banco: {}, Duração: {}ms", 
                 saved.getId(), amount, userDest.getNome(), bancoDestino, durationMs);
+            
+            // Send event to Kafka for async processing (notifications, audit, etc.)
+            if (kafkaEnabled && kafkaProducerService != null) {
+                try {
+                    PixTransactionEvent event = PixTransactionEvent.builder()
+                        .transactionId(saved.getId().toString())
+                        .sourceAccountId(accountOriginId.toString())
+                        .destinationPixKey(pixKeyDestination)
+                        .amount(amount)
+                        .description("PIX para " + userDest.getNome())
+                        .createdAt(java.time.LocalDateTime.now())
+                        .status("COMPLETED")
+                        .retryCount(0)
+                        .correlationId(UUID.randomUUID().toString())
+                        .sourceUserName("Remetente")
+                        .sourceUserEmail("")
+                        .destinationUserName(userDest.getNome())
+                        .destinationUserEmail(userDest.getEmail() != null ? userDest.getEmail() : "")
+                        .build();
+                    
+                    kafkaProducerService.sendPixTransaction(event);
+                    log.info("📤 PIX event sent to Kafka for transaction {}", saved.getId());
+                } catch (Exception kafkaEx) {
+                    log.warn("⚠️ Failed to send PIX event to Kafka (non-blocking): {}", kafkaEx.getMessage());
+                }
+            }
             
             return saved;
             
