@@ -1,0 +1,1138 @@
+{
+  "title": "🐕 DogBank PIX - Dashboard Completo",
+  "description": "Observabilidade completa de transações PIX com APM, Logs, Fraud Detection e COAF",
+  "widgets": [
+    {
+      "id": 1,
+      "definition": {
+        "type": "group",
+        "title": "📊 Visão Geral PIX",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "id": 101,
+            "definition": {
+              "title": "✅ PIX Com Sucesso",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank service:transaction-service @status_transacao:CONCLUIDO"},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "count"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    {"comparator": ">", "palette": "white_on_green", "value": 0}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "id": 102,
+            "definition": {
+              "title": "❌ PIX Com Falha",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank service:transaction-service @status_transacao:ERRO* OR @status_transacao:FALHA OR @status_transacao:REJEITADO*"},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "count"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    {"comparator": ">", "palette": "white_on_red", "value": 0}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "id": 103,
+            "definition": {
+              "title": "💰 Valor Total Transferido (R$)",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank service:transaction-service @status_transacao:CONCLUIDO @valor_numerico:*"},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "sum", "metric": "@valor_numerico"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar"
+                }
+              ],
+              "autoscale": true,
+              "precision": 2,
+              "custom_unit": "R$"
+            }
+          },
+          {
+            "id": 104,
+            "definition": {
+              "title": "💸 Valor Perdido em Falhas (R$)",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank service:transaction-service (@status_transacao:ERRO* OR @status_transacao:FALHA) @valor_numerico:*"},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "sum", "metric": "@valor_numerico"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    {"comparator": ">", "palette": "white_on_red", "value": 0}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 2,
+              "custom_unit": "R$"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "definition": {
+        "title": "📈 Transações PIX - Sucesso vs Falha",
+        "title_size": "16",
+        "title_align": "left",
+        "show_legend": true,
+        "legend_layout": "auto",
+        "legend_columns": ["avg", "min", "max", "value", "sum"],
+        "type": "timeseries",
+        "requests": [
+          {
+            "formulas": [
+              {"formula": "query1", "alias": "✅ Sucesso"},
+              {"formula": "query2", "alias": "❌ Falha"}
+            ],
+            "queries": [
+              {
+                "name": "query1",
+                "data_source": "logs",
+                "search": {"query": "env:dogbank service:transaction-service @status_transacao:CONCLUIDO"},
+                "indexes": ["*"],
+                "group_by": [],
+                "compute": {"aggregation": "count"},
+                "storage": "hot"
+              },
+              {
+                "name": "query2",
+                "data_source": "logs",
+                "search": {"query": "env:dogbank service:transaction-service (@status_transacao:ERRO* OR @status_transacao:FALHA OR @status_transacao:REJEITADO*)"},
+                "indexes": ["*"],
+                "group_by": [],
+                "compute": {"aggregation": "count"},
+                "storage": "hot"
+              }
+            ],
+            "response_format": "timeseries",
+            "style": {"palette": "dog_classic", "line_type": "solid", "line_width": "normal"},
+            "display_type": "bars"
+          }
+        ],
+        "yaxis": {"include_zero": true, "scale": "linear"}
+      }
+    },
+    {
+      "id": 3,
+      "definition": {
+        "title": "💵 Valor Monetário - Sucesso vs Perdas (R$)",
+        "title_size": "16",
+        "title_align": "left",
+        "show_legend": true,
+        "legend_layout": "auto",
+        "type": "timeseries",
+        "requests": [
+          {
+            "formulas": [
+              {"formula": "query1", "alias": "💰 Transferido"},
+              {"formula": "query2", "alias": "💸 Perdido"}
+            ],
+            "queries": [
+              {
+                "name": "query1",
+                "data_source": "logs",
+                "search": {"query": "env:dogbank service:transaction-service @status_transacao:CONCLUIDO @valor_numerico:*"},
+                "indexes": ["*"],
+                "group_by": [],
+                "compute": {"aggregation": "sum", "metric": "@valor_numerico"},
+                "storage": "hot"
+              },
+              {
+                "name": "query2",
+                "data_source": "logs",
+                "search": {"query": "env:dogbank service:transaction-service (@status_transacao:ERRO* OR @status_transacao:FALHA) @valor_numerico:*"},
+                "indexes": ["*"],
+                "group_by": [],
+                "compute": {"aggregation": "sum", "metric": "@valor_numerico"},
+                "storage": "hot"
+              }
+            ],
+            "response_format": "timeseries",
+            "display_type": "area"
+          }
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "definition": {
+        "type": "group",
+        "title": "⏱️ Performance & Latência",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "id": 401,
+            "definition": {
+              "title": "⏱️ Tempo Médio de Transação (ms)",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank service:transaction-service @duracao_ms:*"},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "avg", "metric": "@duracao_ms"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    {"comparator": "<", "palette": "white_on_green", "value": 1000},
+                    {"comparator": ">=", "palette": "white_on_yellow", "value": 1000},
+                    {"comparator": ">=", "palette": "white_on_red", "value": 3000}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0,
+              "custom_unit": "ms"
+            }
+          },
+          {
+            "id": 402,
+            "definition": {
+              "title": "🏦 Tempo Médio Banco Central (ms)",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank service:transaction-service @tempo_banco_central_ms:*"},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "avg", "metric": "@tempo_banco_central_ms"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    {"comparator": "<", "palette": "white_on_green", "value": 500},
+                    {"comparator": ">=", "palette": "white_on_yellow", "value": 500},
+                    {"comparator": ">=", "palette": "white_on_red", "value": 2000}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0,
+              "custom_unit": "ms"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "definition": {
+        "title": "📊 Latência - P50, P95, P99 (ms)",
+        "title_size": "16",
+        "title_align": "left",
+        "show_legend": true,
+        "legend_layout": "auto",
+        "type": "timeseries",
+        "requests": [
+          {
+            "formulas": [
+              {"formula": "query1", "alias": "P50"},
+              {"formula": "query2", "alias": "P95"},
+              {"formula": "query3", "alias": "P99"}
+            ],
+            "queries": [
+              {
+                "name": "query1",
+                "data_source": "logs",
+                "search": {"query": "env:dogbank service:transaction-service @duracao_ms:*"},
+                "indexes": ["*"],
+                "group_by": [],
+                "compute": {"aggregation": "pc50", "metric": "@duracao_ms"},
+                "storage": "hot"
+              },
+              {
+                "name": "query2",
+                "data_source": "logs",
+                "search": {"query": "env:dogbank service:transaction-service @duracao_ms:*"},
+                "indexes": ["*"],
+                "group_by": [],
+                "compute": {"aggregation": "pc95", "metric": "@duracao_ms"},
+                "storage": "hot"
+              },
+              {
+                "name": "query3",
+                "data_source": "logs",
+                "search": {"query": "env:dogbank service:transaction-service @duracao_ms:*"},
+                "indexes": ["*"],
+                "group_by": [],
+                "compute": {"aggregation": "pc99", "metric": "@duracao_ms"},
+                "storage": "hot"
+              }
+            ],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "definition": {
+        "title": "📉 Taxa de Erro (%)",
+        "title_size": "16",
+        "title_align": "left",
+        "show_legend": true,
+        "legend_layout": "auto",
+        "type": "timeseries",
+        "requests": [
+          {
+            "formulas": [{"formula": "(query2 / query1) * 100", "alias": "Taxa de Erro %"}],
+            "queries": [
+              {
+                "name": "query1",
+                "data_source": "logs",
+                "search": {"query": "env:dogbank service:transaction-service @status_transacao:*"},
+                "indexes": ["*"],
+                "group_by": [],
+                "compute": {"aggregation": "count"},
+                "storage": "hot"
+              },
+              {
+                "name": "query2",
+                "data_source": "logs",
+                "search": {"query": "env:dogbank service:transaction-service (@status_transacao:ERRO* OR @status_transacao:FALHA OR @status_transacao:REJEITADO*)"},
+                "indexes": ["*"],
+                "group_by": [],
+                "compute": {"aggregation": "count"},
+                "storage": "hot"
+              }
+            ],
+            "response_format": "timeseries",
+            "style": {"palette": "warm", "line_type": "solid", "line_width": "normal"},
+            "display_type": "line"
+          }
+        ],
+        "yaxis": {"min": "0", "max": "100"},
+        "markers": [
+          {"label": " ⚠️ Warning ", "value": "y = 5", "display_type": "warning dashed"},
+          {"label": " 🚨 Critical ", "value": "y = 10", "display_type": "error dashed"}
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "definition": {
+        "title": "🔝 Top Motivos de Falha",
+        "title_size": "16",
+        "title_align": "left",
+        "type": "toplist",
+        "requests": [
+          {
+            "queries": [
+              {
+                "name": "query1",
+                "data_source": "logs",
+                "search": {"query": "env:dogbank service:transaction-service (@status_transacao:ERRO* OR @status_transacao:FALHA OR @status_transacao:REJEITADO*)"},
+                "indexes": ["*"],
+                "group_by": [
+                  {"facet": "@status_transacao", "limit": 10, "sort": {"aggregation": "count", "order": "desc"}}
+                ],
+                "compute": {"aggregation": "count"},
+                "storage": "hot"
+              }
+            ],
+            "response_format": "scalar",
+            "formulas": [{"formula": "query1"}],
+            "sort": {"count": 10, "order_by": [{"type": "formula", "index": 0, "order": "desc"}]}
+          }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "definition": {
+        "type": "group",
+        "title": "🔒 Segurança & ASM",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "id": 801,
+            "definition": {
+              "title": "🚨 SQL Injection Detectados",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank service:transaction-service @security_event:sql_injection_vulnerable_endpoint"},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "count"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    {"comparator": ">", "palette": "white_on_red", "value": 0},
+                    {"comparator": "<=", "palette": "white_on_green", "value": 0}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "id": 802,
+            "definition": {
+              "title": "🛡️ Eventos de Segurança",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank @security_event:*"},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "count"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    {"comparator": ">", "palette": "white_on_yellow", "value": 0}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "definition": {
+        "title": "🔐 Ataques de Segurança - Timeline",
+        "title_size": "16",
+        "title_align": "left",
+        "show_legend": true,
+        "legend_layout": "auto",
+        "type": "timeseries",
+        "requests": [
+          {
+            "formulas": [{"formula": "query1"}],
+            "queries": [
+              {
+                "name": "query1",
+                "data_source": "logs",
+                "search": {"query": "env:dogbank @security_event:*"},
+                "indexes": ["*"],
+                "group_by": [
+                  {"facet": "@security_event", "limit": 10, "sort": {"aggregation": "count", "order": "desc"}}
+                ],
+                "compute": {"aggregation": "count"},
+                "storage": "hot"
+              }
+            ],
+            "response_format": "timeseries",
+            "style": {"palette": "warm"},
+            "display_type": "bars"
+          }
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "definition": {
+        "type": "group",
+        "title": "🏛️ COAF - Compliance Regulatório",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "id": 1001,
+            "definition": {
+              "title": "🏛️ Transações COAF (≥R$50k)",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank service:fraud-detection-service \"COAF\""},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "count"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    {"comparator": ">", "palette": "white_on_yellow", "value": 0}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "id": 1002,
+            "definition": {
+              "title": "💰 Valor Total COAF (R$)",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank service:transaction-service @status_transacao:CONCLUIDO @valor_numerico:>=50000"},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "sum", "metric": "@valor_numerico"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar"
+                }
+              ],
+              "autoscale": true,
+              "precision": 2,
+              "custom_unit": "R$"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "definition": {
+        "type": "group",
+        "title": "🕵️ Fraud Detection",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "id": 1101,
+            "definition": {
+              "title": "🚨 Fraudes Detectadas",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank service:fraud-detection-service \"FRAUD DETECTED\""},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "count"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    {"comparator": ">", "palette": "white_on_red", "value": 0},
+                    {"comparator": "<=", "palette": "white_on_green", "value": 0}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "id": 1102,
+            "definition": {
+              "title": "⚠️ Revisão Manual",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank service:fraud-detection-service \"Manual review required\""},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "count"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    {"comparator": ">", "palette": "white_on_yellow", "value": 0}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "id": 1103,
+            "definition": {
+              "title": "✅ Transações Aprovadas",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank service:fraud-detection-service \"Transaction approved\""},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "count"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    {"comparator": ">", "palette": "white_on_green", "value": 0}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "definition": {
+        "title": "🔄 Fraud Detection - Timeline",
+        "title_size": "16",
+        "title_align": "left",
+        "show_legend": true,
+        "legend_layout": "auto",
+        "type": "timeseries",
+        "requests": [
+          {
+            "formulas": [
+              {"formula": "query1", "alias": "✅ Aprovadas"},
+              {"formula": "query2", "alias": "⚠️ Revisão Manual"},
+              {"formula": "query3", "alias": "🚨 Fraude"}
+            ],
+            "queries": [
+              {
+                "name": "query1",
+                "data_source": "logs",
+                "search": {"query": "env:dogbank service:fraud-detection-service \"Transaction approved\""},
+                "indexes": ["*"],
+                "group_by": [],
+                "compute": {"aggregation": "count"},
+                "storage": "hot"
+              },
+              {
+                "name": "query2",
+                "data_source": "logs",
+                "search": {"query": "env:dogbank service:fraud-detection-service \"Manual review required\" OR \"COAF\""},
+                "indexes": ["*"],
+                "group_by": [],
+                "compute": {"aggregation": "count"},
+                "storage": "hot"
+              },
+              {
+                "name": "query3",
+                "data_source": "logs",
+                "search": {"query": "env:dogbank service:fraud-detection-service \"FRAUD DETECTED\""},
+                "indexes": ["*"],
+                "group_by": [],
+                "compute": {"aggregation": "count"},
+                "storage": "hot"
+              }
+            ],
+            "response_format": "timeseries",
+            "style": {"palette": "semantic"},
+            "display_type": "bars"
+          }
+        ]
+      }
+    },
+    {
+      "id": 13,
+      "definition": {
+        "type": "group",
+        "title": "📊 Distribuição de Transações",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "id": 1301,
+            "definition": {
+              "title": "💳 Por Tipo de Chave PIX",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "toplist",
+              "requests": [
+                {
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank service:transaction-service @tipo_chave:*"},
+                      "indexes": ["*"],
+                      "group_by": [
+                        {"facet": "@tipo_chave", "limit": 10, "sort": {"aggregation": "count", "order": "desc"}}
+                      ],
+                      "compute": {"aggregation": "count"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "formulas": [{"formula": "query1"}],
+                  "sort": {"count": 10, "order_by": [{"type": "formula", "index": 0, "order": "desc"}]}
+                }
+              ]
+            }
+          },
+          {
+            "id": 1302,
+            "definition": {
+              "title": "💰 Por Faixa de Valor",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "toplist",
+              "requests": [
+                {
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank service:transaction-service @faixa_valor:*"},
+                      "indexes": ["*"],
+                      "group_by": [
+                        {"facet": "@faixa_valor", "limit": 10, "sort": {"aggregation": "count", "order": "desc"}}
+                      ],
+                      "compute": {"aggregation": "count"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "formulas": [{"formula": "query1"}],
+                  "sort": {"count": 10, "order_by": [{"type": "formula", "index": 0, "order": "desc"}]}
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": 14,
+      "definition": {
+        "type": "group",
+        "title": "🏦 Banco Central",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "id": 1401,
+            "definition": {
+              "title": "✅ BC Aprovado",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank service:transaction-service @status_transacao:BANCO_CENTRAL_APROVADO"},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "count"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    {"comparator": ">", "palette": "white_on_green", "value": 0}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "id": 1402,
+            "definition": {
+              "title": "❌ BC Rejeitado",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank service:transaction-service @status_transacao:REJEITADO_BANCO_CENTRAL"},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "count"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    {"comparator": ">", "palette": "white_on_red", "value": 0}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": 15,
+      "definition": {
+        "title": "⏱️ Tempo de Resposta Banco Central (ms)",
+        "title_size": "16",
+        "title_align": "left",
+        "show_legend": true,
+        "legend_layout": "auto",
+        "type": "timeseries",
+        "requests": [
+          {
+            "formulas": [
+              {"formula": "query1", "alias": "Avg"},
+              {"formula": "query2", "alias": "P95"},
+              {"formula": "query3", "alias": "P99"}
+            ],
+            "queries": [
+              {
+                "name": "query1",
+                "data_source": "logs",
+                "search": {"query": "env:dogbank service:transaction-service @tempo_banco_central_ms:*"},
+                "indexes": ["*"],
+                "group_by": [],
+                "compute": {"aggregation": "avg", "metric": "@tempo_banco_central_ms"},
+                "storage": "hot"
+              },
+              {
+                "name": "query2",
+                "data_source": "logs",
+                "search": {"query": "env:dogbank service:transaction-service @tempo_banco_central_ms:*"},
+                "indexes": ["*"],
+                "group_by": [],
+                "compute": {"aggregation": "pc95", "metric": "@tempo_banco_central_ms"},
+                "storage": "hot"
+              },
+              {
+                "name": "query3",
+                "data_source": "logs",
+                "search": {"query": "env:dogbank service:transaction-service @tempo_banco_central_ms:*"},
+                "indexes": ["*"],
+                "group_by": [],
+                "compute": {"aggregation": "pc99", "metric": "@tempo_banco_central_ms"},
+                "storage": "hot"
+              }
+            ],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ],
+        "markers": [
+          {"label": " ⚠️ Lento ", "value": "y = 1000", "display_type": "warning dashed"},
+          {"label": " 🚨 Timeout ", "value": "y = 3000", "display_type": "error dashed"}
+        ]
+      }
+    },
+    {
+      "id": 16,
+      "definition": {
+        "type": "group",
+        "title": "📨 Messaging (Kafka & RabbitMQ)",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "id": 1601,
+            "definition": {
+              "title": "📤 Kafka Events Sent",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank \"PIX event sent to Kafka\""},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "count"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    {"comparator": ">", "palette": "white_on_green", "value": 0}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "id": 1602,
+            "definition": {
+              "title": "🐰 RabbitMQ Events Sent",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank \"PIX event sent to RabbitMQ\""},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "count"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    {"comparator": ">", "palette": "white_on_green", "value": 0}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "id": 1603,
+            "definition": {
+              "title": "❌ Kafka Failures",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank \"Failed to send PIX event to Kafka\""},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "count"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    {"comparator": ">", "palette": "white_on_red", "value": 0},
+                    {"comparator": "<=", "palette": "white_on_green", "value": 0}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          },
+          {
+            "id": 1604,
+            "definition": {
+              "title": "❌ RabbitMQ Failures",
+              "title_size": "16",
+              "title_align": "left",
+              "type": "query_value",
+              "requests": [
+                {
+                  "formulas": [{"formula": "query1"}],
+                  "queries": [
+                    {
+                      "name": "query1",
+                      "data_source": "logs",
+                      "search": {"query": "env:dogbank \"Failed to send PIX event to RabbitMQ\""},
+                      "indexes": ["*"],
+                      "group_by": [],
+                      "compute": {"aggregation": "count"},
+                      "storage": "hot"
+                    }
+                  ],
+                  "response_format": "scalar",
+                  "conditional_formats": [
+                    {"comparator": ">", "palette": "white_on_red", "value": 0},
+                    {"comparator": "<=", "palette": "white_on_green", "value": 0}
+                  ]
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": 17,
+      "definition": {
+        "title": "📝 Logs Recentes - Transações PIX",
+        "title_size": "16",
+        "title_align": "left",
+        "type": "log_stream",
+        "indexes": [],
+        "query": "env:dogbank service:transaction-service @status_transacao:*",
+        "sort": {"column": "time", "order": "desc"},
+        "columns": ["host", "service", "@status_transacao", "@valor", "@chave_pix", "@duracao_ms"],
+        "show_date_column": true,
+        "show_message_column": true,
+        "message_display": "expanded-md"
+      }
+    },
+    {
+      "id": 18,
+      "definition": {
+        "title": "🚨 Logs de Erro",
+        "title_size": "16",
+        "title_align": "left",
+        "type": "log_stream",
+        "indexes": [],
+        "query": "env:dogbank status:error",
+        "sort": {"column": "time", "order": "desc"},
+        "columns": ["host", "service", "@status_transacao", "@erro_mensagem"],
+        "show_date_column": true,
+        "show_message_column": true,
+        "message_display": "expanded-md"
+      }
+    }
+  ],
+  "template_variables": [
+    {
+      "name": "service",
+      "prefix": "service",
+      "available_values": [],
+      "default": "*"
+    },
+    {
+      "name": "status",
+      "prefix": "@status_transacao",
+      "available_values": [],
+      "default": "*"
+    }
+  ],
+  "layout_type": "ordered",
+  "notify_list": [],
+  "pause_auto_refresh": false,
+  "reflow_type": "auto"
+}

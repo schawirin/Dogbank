@@ -55,14 +55,19 @@ class Account:
     initial_balance: float
 
 
-# Contas disponíveis para transações
+# Contas disponíveis para transações (conforme init-db/01-init.sql)
 ACCOUNTS = [
-    Account("joao.silva@dogbank.com", "123456", "João Silva", "joao.silva@dogbank.com", 5000.00),
-    Account("maria.santos@dogbank.com", "123456", "Maria Santos", "maria.santos@dogbank.com", 7500.00),
-    Account("pedro.oliveira@dogbank.com", "123456", "Pedro Oliveira", "pedro.oliveira@dogbank.com", 3000.00),
-    Account("ana.costa@dogbank.com", "123456", "Ana Costa", "ana.costa@dogbank.com", 10000.00),
+    Account("vitoria.itadori@dogbank.com", "123456", "Vitoria Itadori", "vitoria.itadori@dogbank.com", 10000.00),
+    Account("pedro.silva@dogbank.com", "123456", "Pedro Silva", "pedro.silva@dogbank.com", 15000.00),
+    Account("joao.santos@dogbank.com", "123456", "João Santos", "joao.santos@dogbank.com", 8500.00),
+    Account("emiliano.costa@dogbank.com", "123456", "Emiliano Costa", "emiliano.costa@dogbank.com", 12000.00),
+    Account("eliane.oliveira@dogbank.com", "123456", "Eliane Oliveira", "eliane.oliveira@dogbank.com", 9500.00),
+    Account("patricia.souza@dogbank.com", "123456", "Patricia Souza", "patricia.souza@dogbank.com", 20000.00),
+    Account("renato.almeida@dogbank.com", "123456", "Renato Almeida", "renato.almeida@dogbank.com", 7500.00),
+    Account("teste@dogbank.com", "123456", "Usuario Teste", "teste@dogbank.com", 50000.00),
+    # Contas com saldo alto para testar COAF
     Account("carlos.magnata@dogbank.com", "123456", "Carlos Magnata", "carlos.magnata@dogbank.com", 250000.00),
-    Account("maria.empresaria@dogbank.com", "123456", "Maria Empresária", "maria.empresaria@dogbank.com", 500000.00),
+    Account("maria.empresaria@dogbank.com", "123456", "Maria Empresaria", "maria.empresaria@dogbank.com", 500000.00),
 ]
 
 
@@ -194,8 +199,8 @@ class LoadGenerator:
             ])
             amount = round(amount, 2)
             
-            from_account = random.choice(ACCOUNTS[:4])  # Contas normais
-            to_account = random.choice([a for a in ACCOUNTS[:4] if a != from_account])
+            from_account = random.choice(ACCOUNTS[:8])  # Contas normais
+            to_account = random.choice([a for a in ACCOUNTS[:8] if a != from_account])
             
             logger.info(f"💰 [{scenario.upper()}] {from_account.name} -> {to_account.name}: R$ {amount:.2f}")
             result = self.make_pix(from_account, to_account, amount)
@@ -211,8 +216,8 @@ class LoadGenerator:
             # Cenário de erro: exatamente R$ 100,00
             amount = 100.00
             
-            from_account = random.choice(ACCOUNTS[:4])
-            to_account = random.choice([a for a in ACCOUNTS[:4] if a != from_account])
+            from_account = random.choice(ACCOUNTS[:8])
+            to_account = random.choice([a for a in ACCOUNTS[:8] if a != from_account])
             
             logger.info(f"🚨 [{scenario.upper()}] {from_account.name} -> {to_account.name}: R$ {amount:.2f} (ERRO ESPERADO)")
             result = self.make_pix(from_account, to_account, amount)
@@ -229,7 +234,7 @@ class LoadGenerator:
             amount = round(amount, 2)
             
             # Usa contas com saldo alto
-            high_balance_accounts = ACCOUNTS[4:]  # Carlos Magnata e Maria Empresária
+            high_balance_accounts = ACCOUNTS[8:]  # Carlos Magnata e Maria Empresaria
             from_account = random.choice(high_balance_accounts)
             to_account = random.choice([a for a in ACCOUNTS if a != from_account])
             
@@ -246,7 +251,7 @@ class LoadGenerator:
             # Transação com saldo insuficiente
             amount = 999999.99  # Valor muito alto
             
-            from_account = random.choice(ACCOUNTS[:4])  # Contas com saldo baixo
+            from_account = random.choice(ACCOUNTS[:8])  # Contas com saldo normal
             to_account = random.choice([a for a in ACCOUNTS if a != from_account])
             
             logger.info(f"💸 [{scenario.upper()}] {from_account.name} -> {to_account.name}: R$ {amount:.2f} (SALDO INSUFICIENTE)")

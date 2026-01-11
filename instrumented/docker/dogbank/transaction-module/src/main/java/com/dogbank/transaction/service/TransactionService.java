@@ -88,6 +88,7 @@ public class TransactionService {
                 long durationMs = calcularDuracao(startedAt);
                 pixMetrics.registrarPixFalha(accountOriginId, pixKeyDestination, amount, 
                     "CONTA_ORIGEM_NAO_ENCONTRADA", "Conta de origem não encontrada", "VALIDACAO", durationMs);
+                MDC.put("evento", "PIX_ERRO");
                 MDC.put("status_transacao", "ERRO_CONTA_ORIGEM_NAO_ENCONTRADA");
                 log.error("Conta de origem não encontrada");
                 throw new RuntimeException("Conta de origem não encontrada");
@@ -104,6 +105,7 @@ public class TransactionService {
                 long durationMs = calcularDuracao(startedAt);
                 pixMetrics.registrarPixFalha(accountOriginId, pixKeyDestination, amount, 
                     "CHAVE_PIX_NAO_ENCONTRADA", "Chave Pix de destino não encontrada", "VALIDACAO", durationMs);
+                MDC.put("evento", "PIX_ERRO");
                 MDC.put("status_transacao", "ERRO_CHAVE_PIX_NAO_ENCONTRADA");
                 log.error("Chave Pix de destino não encontrada");
                 throw new RuntimeException("Chave Pix de destino não encontrada");
@@ -119,6 +121,7 @@ public class TransactionService {
                 long durationMs = calcularDuracao(startedAt);
                 pixMetrics.registrarPixFalha(accountOriginId, pixKeyDestination, amount, 
                     "CONTA_DESTINO_NAO_ENCONTRADA", "Conta de destino não encontrada", "VALIDACAO", durationMs);
+                MDC.put("evento", "PIX_ERRO");
                 MDC.put("status_transacao", "ERRO_CONTA_DESTINO_NAO_ENCONTRADA");
                 log.error("Conta de destino não encontrada");
                 throw new RuntimeException("Conta de destino não encontrada");
@@ -147,6 +150,7 @@ public class TransactionService {
                 pixMetrics.registrarPixFalha(accountOriginId, pixKeyDestination, amount, 
                     errorCode != null ? errorCode : "BC_REJEITADO", 
                     error != null ? error : "Erro desconhecido", "BANCO_CENTRAL", durationMs);
+                MDC.put("evento", "PIX_ERRO");
                 MDC.put("status_transacao", "REJEITADO_BANCO_CENTRAL");
                 MDC.put("erro_codigo", errorCode != null ? errorCode : "DESCONHECIDO");
                 MDC.put("erro_mensagem", error != null ? error : "Erro desconhecido");
@@ -164,6 +168,7 @@ public class TransactionService {
                 pixMetrics.registrarSaldoInsuficiente(accountOriginId, origin.getBalance(), amount);
                 pixMetrics.registrarPixFalha(accountOriginId, pixKeyDestination, amount, 
                     "SALDO_INSUFICIENTE", "Saldo insuficiente para realizar a transferência", "SALDO", durationMs);
+                MDC.put("evento", "PIX_ERRO");
                 MDC.put("status_transacao", "ERRO_SALDO_INSUFICIENTE");
                 MDC.put("saldo_disponivel", origin.getBalance().toString());
                 log.error("Saldo insuficiente - Disponível: R$ {}, Necessário: R$ {}", origin.getBalance(), amount);
@@ -212,6 +217,7 @@ public class TransactionService {
                 durationMs
             );
             
+            MDC.put("evento", "PIX_CONCLUIDO");
             MDC.put("status_transacao", "CONCLUIDO");
             MDC.put("transaction_id", saved.getId().toString());
             MDC.put("duracao_ms", String.valueOf(durationMs));
@@ -264,6 +270,7 @@ public class TransactionService {
             
         } catch (RuntimeException e) {
             if (MDC.getCopyOfContextMap() == null || !MDC.getCopyOfContextMap().containsKey("status_transacao")) {
+                MDC.put("evento", "PIX_ERRO");
                 MDC.put("status_transacao", "ERRO_GENERICO");
             }
             MDC.put("erro_mensagem", e.getMessage());
