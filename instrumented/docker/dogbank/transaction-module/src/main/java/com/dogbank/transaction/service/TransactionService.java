@@ -220,32 +220,36 @@ public class TransactionService {
             log.info("PIX concluído com sucesso - ID: {}, Valor: R$ {}, Destino: {}, Banco: {}, Duração: {}ms", 
                 saved.getId(), amount, userDest.getNome(), bancoDestino, durationMs);
             
-            // Send event to Kafka for async processing (notifications, audit, etc.)
-            if (kafkaEnabled && kafkaProducerService != null) {
-                try {
-                    PixTransactionEvent event = PixTransactionEvent.builder()
-                        .transactionId(saved.getId().toString())
-                        .sourceAccountId(accountOriginId.toString())
-                        .destinationPixKey(pixKeyDestination)
-                        .amount(amount)
-                        .description("PIX para " + userDest.getNome())
-                        .createdAt(java.time.LocalDateTime.now())
-                        .status("COMPLETED")
-                        .retryCount(0)
-                        .correlationId(UUID.randomUUID().toString())
-                        .sourceUserName("Remetente")
-                        .sourceUserEmail("")
-                        .destinationUserName(userDest.getNome())
-                        .destinationUserEmail(userDest.getEmail() != null ? userDest.getEmail() : "")
-                        .build();
-                    
-                    kafkaProducerService.sendPixTransaction(event);
-                    log.info("📤 PIX event sent to Kafka for transaction {}", saved.getId());
-                } catch (Exception kafkaEx) {
-                    log.warn("⚠️ Failed to send PIX event to Kafka (non-blocking): {}", kafkaEx.getMessage());
+            // Send event to message queues for async processing (notifications, audit, fraud detection, etc.)
+            if ((kafkaEnabled && kafkaProducerService != null) || (rabbitmqEnabled && rabbitMQProducerService != null)) {
+                // Create event once, reuse for both Kafka and RabbitMQ
+                PixTransactionEvent event = PixTransactionEvent.builder()
+                    .transactionId(saved.getId().toString())
+                    .sourceAccountId(accountOriginId.toString())
+                    .destinationPixKey(pixKeyDestination)
+                    .amount(amount)
+                    .description("PIX para " + userDest.getNome())
+                    .createdAt(java.time.LocalDateTime.now())
+                    .status("COMPLETED")
+                    .retryCount(0)
+                    .correlationId(UUID.randomUUID().toString())
+                    .sourceUserName("Remetente")
+                    .sourceUserEmail("")
+                    .destinationUserName(userDest.getNome())
+                    .destinationUserEmail(userDest.getEmail() != null ? userDest.getEmail() : "")
+                    .build();
+                
+                // Send to Kafka for event sourcing and analytics
+                if (kafkaEnabled && kafkaProducerService != null) {
+                    try {
+                        kafkaProducerService.sendPixTransaction(event);
+                        log.info("📤 PIX event sent to Kafka for transaction {}", saved.getId());
+                    } catch (Exception kafkaEx) {
+                        log.warn("⚠️ Failed to send PIX event to Kafka (non-blocking): {}", kafkaEx.getMessage());
+                    }
                 }
                 
-                // Also send to RabbitMQ for FIFO processing (fraud detection, etc.)
+                // Send to RabbitMQ for FIFO processing (fraud detection, etc.)
                 if (rabbitmqEnabled && rabbitMQProducerService != null) {
                     try {
                         rabbitMQProducerService.publishPixTransaction(event);
@@ -253,29 +257,6 @@ public class TransactionService {
                     } catch (Exception rabbitEx) {
                         log.warn("⚠️ Failed to send PIX event to RabbitMQ (non-blocking): {}", rabbitEx.getMessage());
                     }
-                }
-            } else if (rabbitmqEnabled && rabbitMQProducerService != null) {
-                // Send only to RabbitMQ if Kafka is disabled
-                try {
-                    PixTransactionEvent event = PixTransactionEvent.builder()
-                        .transactionId(saved.getId().toString())
-                        .sourceAccountId(accountOriginId.toString())
-                        .destinationPixKey(pixKeyDestination)
-                        .amount(amount)
-                        .description("PIX para " + userDest.getNome())
-                        .createdAt(java.time.LocalDateTime.now())
-                        .status("COMPLETED")
-                        .retryCount(0)
-                        .correlationId(UUID.randomUUID().toString())
-                        .sourceUserName("Remetente")
-                        .sourceUserEmail("")
-                        .destinationUserName(userDest.getNome())
-                        .destinationUserEmail(userDest.getEmail() != null ? userDest.getEmail() : "")
-                        .build();
-                    rabbitMQProducerService.publishPixTransaction(event);
-                    log.info("🐰 PIX event sent to RabbitMQ for transaction {}", saved.getId());
-                } catch (Exception rabbitEx) {
-                    log.warn("⚠️ Failed to send PIX event to RabbitMQ (non-blocking): {}", rabbitEx.getMessage());
                 }
             }
             
