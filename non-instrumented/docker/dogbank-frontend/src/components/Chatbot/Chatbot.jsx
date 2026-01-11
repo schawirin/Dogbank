@@ -41,7 +41,7 @@ const Chatbot = ({ userId, accountId }) => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/chatbot/message', {
+      const response = await fetch('/api/chatbot/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
