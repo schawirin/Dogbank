@@ -45,8 +45,14 @@ public class TransactionService {
     @Autowired(required = false)
     private KafkaProducerService kafkaProducerService;
     
+    @Autowired(required = false)
+    private RabbitMQProducerService rabbitMQProducerService;
+    
     @Value("${kafka.enabled:false}")
     private boolean kafkaEnabled;
+    
+    @Value("${rabbitmq.enabled:false}")
+    private boolean rabbitmqEnabled;
     
     @PersistenceContext
     private EntityManager entityManager;
@@ -237,6 +243,16 @@ public class TransactionService {
                     log.info("📤 PIX event sent to Kafka for transaction {}", saved.getId());
                 } catch (Exception kafkaEx) {
                     log.warn("⚠️ Failed to send PIX event to Kafka (non-blocking): {}", kafkaEx.getMessage());
+                }
+                
+                // Also send to RabbitMQ for FIFO processing (fraud detection, etc.)
+                if (rabbitmqEnabled && rabbitMQProducerService != null) {
+                    try {
+                        rabbitMQProducerService.publishPixTransaction(event);
+                        log.info("🐰 PIX event sent to RabbitMQ for transaction {}", saved.getId());
+                    } catch (Exception rabbitEx) {
+                        log.warn("⚠️ Failed to send PIX event to RabbitMQ (non-blocking): {}", rabbitEx.getMessage());
+                    }
                 }
             }
             

@@ -966,3 +966,82 @@ docker exec dogbank-kafka kafka-consumer-groups \
   --describe
 ```
 
+
+---
+
+## 🐰 RabbitMQ - FIFO Message Processing
+
+O DogBank usa uma arquitetura híbrida com **Kafka + RabbitMQ**:
+
+| Sistema | Responsabilidade | Garantia |
+|---------|------------------|----------|
+| **Kafka** | Event sourcing, analytics, audit | At-least-once, replay |
+| **RabbitMQ** | Processamento transacional FIFO | Exactly-once com ACK |
+
+### Arquitetura de Filas
+
+```
+PIX Transaction → Exchange (fanout) → Múltiplas Filas:
+├── pix.fraud      → Fraud Detection Service (ML)
+├── pix.balance    → Balance Update Worker
+├── pix.notification → Notification Service
+├── pix.audit      → Audit Logger
+└── pix.dlq        → Dead Letter Queue (falhas)
+```
+
+### Acessar RabbitMQ Management UI
+
+```bash
+# Abrir no navegador
+open http://localhost:15672
+
+# Credenciais
+# User: dogbank
+# Pass: dog1234
+```
+
+### Métricas no Datadog
+
+| Métrica | Descrição |
+|---------|-----------|
+| `rabbitmq.queue.messages` | Mensagens na fila |
+| `rabbitmq.queue.consumers` | Consumers ativos |
+| `rabbitmq.queue.messages_ready` | Mensagens prontas |
+| `rabbitmq.queue.messages_unacknowledged` | Aguardando ACK |
+| `rabbitmq.overview.messages_published` | Total publicado |
+
+### Fraud Detection Service
+
+O serviço de detecção de fraude simula análise ML:
+
+```bash
+# Ver logs do fraud detection
+docker logs -f dogbank-fraud-detection
+
+# Métricas customizadas
+# fraud.detected - Fraudes detectadas
+# fraud.transactions.analyzed - Total analisado
+# fraud.analysis.time - Tempo de análise
+```
+
+### Regras de Fraude (Simuladas)
+
+| Regra | Fator de Risco | Descrição |
+|-------|----------------|-----------|
+| Blacklist | +0.9 | Chave PIX na lista negra |
+| Valor crítico | +0.4 | Acima de R$ 10.000 |
+| Valor alto | +0.2 | Acima de R$ 5.000 |
+| Horário suspeito | +0.15 | Entre 2h e 5h |
+| Novo destinatário | +0.1 | Primeira transação |
+| Alta velocidade | +0.25 | Muitas transações |
+| Anomalia de device | +0.3 | Device diferente |
+
+### Decisões
+
+| Risk Score | Nível | Decisão |
+|------------|-------|---------|
+| >= 0.8 | CRITICAL | BLOCKED |
+| >= 0.5 | HIGH | MANUAL_REVIEW |
+| >= 0.3 | MEDIUM | APPROVED |
+| < 0.3 | LOW | APPROVED |
+
