@@ -1,0 +1,143 @@
+# =============================================================================
+# Chatbot Service - DogBot AI Assistant
+# =============================================================================
+# Python FastAPI service with LLM integration (Groq by default)
+# Includes Datadog LLM Observability instrumentation
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chatbot-service
+  namespace: dogbank
+  labels:
+    app: chatbot-service
+    tags.datadoghq.com/env: dogbank
+    tags.datadoghq.com/service: chatbot-service
+    tags.datadoghq.com/version: "2.0.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chatbot-service
+  template:
+    metadata:
+      labels:
+        app: chatbot-service
+        tags.datadoghq.com/env: dogbank
+        tags.datadoghq.com/service: chatbot-service
+        tags.datadoghq.com/version: "2.0.0"
+      annotations:
+        # Datadog APM - Python auto-instrumentation
+        admission.datadoghq.com/python-lib.version: "latest"
+        # Datadog Logs
+        ad.datadoghq.com/chatbot-service.logs: '[{"source": "python", "service": "chatbot-service"}]'
+    spec:
+      containers:
+        - name: chatbot-service
+          image: dogbank/chatbot-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8083
+              name: http
+          env:
+            # =================================================================
+            # LLM Configuration - Groq (Default)
+            # =================================================================
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: groq-api-key
+            - name: OPENAI_API_BASE_URL
+              value: "https://api.groq.com/openai/v1"
+            - name: OPENAI_MODEL
+              value: "llama-3.1-8b-instant"
+            # =================================================================
+            # Service URLs
+            # =================================================================
+            - name: ACCOUNT_SERVICE_URL
+              value: "http://account-service:8089"
+            - name: TRANSACTION_SERVICE_URL
+              value: "http://transaction-service:8087"
+            - name: AUTH_SERVICE_URL
+              value: "http://auth-service:8088"
+            # =================================================================
+            # Datadog APM Configuration
+            # =================================================================
+            - name: DD_AGENT_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: DD_TRACE_AGENT_PORT
+              value: "8126"
+            - name: DD_ENV
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/env']
+            - name: DD_SERVICE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/service']
+            - name: DD_VERSION
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/version']
+            - name: DD_LOGS_INJECTION
+              value: "true"
+            - name: DD_PROFILING_ENABLED
+              value: "true"
+            # =================================================================
+            # Datadog LLM Observability
+            # =================================================================
+            - name: DD_LLMOBS_ENABLED
+              value: "1"
+            - name: DD_LLMOBS_ML_APP
+              value: "dogbot-assistant"
+            - name: DD_LLMOBS_AGENTLESS_ENABLED
+              value: "false"
+            - name: DD_SITE
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: dd-site
+                  optional: true
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /api/chatbot/health
+              port: 8083
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/chatbot/health
+              port: 8083
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chatbot-service
+  namespace: dogbank
+  labels:
+    app: chatbot-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8083
+      targetPort: 8083
+      protocol: TCP
+      name: http
+  selector:
+    app: chatbot-service
