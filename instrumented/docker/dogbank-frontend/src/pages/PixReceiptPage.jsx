@@ -149,7 +149,7 @@ const PixReceiptPage = () => {
         </div>
       )}
 
-      {/* Success Header - PIX Concluído */}
+      {/* Success Header - PIX Concluído com Cachorrinho Feliz */}
       <div className="mb-6 print:hidden">
         <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg shadow-green-500/30 relative overflow-hidden">
           {/* Background decoration */}
@@ -159,18 +159,28 @@ const PixReceiptPage = () => {
           </div>
           
           <div className="relative flex items-center gap-4">
-            {/* Animated checkmark */}
+            {/* Happy Dog Icon */}
             <div className="relative">
               <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center animate-scale-in">
-                  <svg className="w-7 h-7 text-green-600 animate-check-draw" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                      strokeWidth={3} 
-                      d="M5 13l4 4L19 7"
-                      className="animate-check-path"
-                    />
+                <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center animate-scale-in p-1">
+                  {/* Happy Dog SVG */}
+                  <svg viewBox="0 0 100 100" className="w-10 h-10">
+                    {/* Cabeça */}
+                    <ellipse cx="50" cy="55" rx="30" ry="25" fill="#E8D5B7" />
+                    {/* Orelhas levantadas (feliz) */}
+                    <ellipse cx="25" cy="35" rx="10" ry="15" fill="#D4B896" transform="rotate(-20 25 35)" />
+                    <ellipse cx="75" cy="35" rx="10" ry="15" fill="#D4B896" transform="rotate(20 75 35)" />
+                    {/* Focinho */}
+                    <ellipse cx="50" cy="65" rx="12" ry="10" fill="#F5E6D3" />
+                    {/* Nariz */}
+                    <ellipse cx="50" cy="62" rx="5" ry="3" fill="#4A4A4A" />
+                    {/* Olhos felizes (arqueados) */}
+                    <path d="M 35 50 Q 40 45 45 50" stroke="#4A4A4A" strokeWidth="3" fill="none" strokeLinecap="round" />
+                    <path d="M 55 50 Q 60 45 65 50" stroke="#4A4A4A" strokeWidth="3" fill="none" strokeLinecap="round" />
+                    {/* Sorriso grande */}
+                    <path d="M 38 72 Q 50 82 62 72" stroke="#4A4A4A" strokeWidth="2" fill="none" strokeLinecap="round" />
+                    {/* Língua */}
+                    <ellipse cx="50" cy="78" rx="5" ry="6" fill="#FF9999" />
                   </svg>
                 </div>
               </div>

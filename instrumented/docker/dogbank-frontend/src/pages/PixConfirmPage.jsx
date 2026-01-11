@@ -237,7 +237,7 @@ const PixConfirmPage = () => {
                 Processando seu PIX
               </h3>
               <p className="text-neutral-600">
-                Conectando ao Banco Central...
+                Aguarde enquanto processamos sua transferência...
               </p>
               {counter !== null && (
                 <div className="flex items-center justify-center gap-2 mt-4">
