@@ -3,7 +3,7 @@
   "users": [
     {
       "name": "dogbank",
-      "password_hash": "dog1234",
+      "password_hash": "UvzFnuIF/i5ZsMBnO4JpIImeo1RtfgGOhBSBzfL5G35tq+z6",
       "hashing_algorithm": "rabbit_password_hashing_sha256",
       "tags": ["administrator"]
     }
