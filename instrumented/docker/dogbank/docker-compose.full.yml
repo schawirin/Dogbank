@@ -32,8 +32,6 @@
 #
 # =============================================================================
 
-version: '3.8'
-
 services:
   # ===========================================================================
   # 💾 BANCO DE DADOS - PostgreSQL
@@ -107,7 +105,7 @@ services:
   # No Zookeeper dependency = less memory, faster boot, simpler architecture
   
   kafka:
-    image: bitnami/kafka:3.6
+    image: bitnami/kafka:latest
     container_name: dogbank-kafka
     ports:
       - "9092:9092"
@@ -154,7 +152,7 @@ services:
 
   # Kafka topic initialization
   kafka-init:
-    image: bitnami/kafka:3.6
+    image: bitnami/kafka:latest
     container_name: dogbank-kafka-init
     depends_on:
       kafka:
