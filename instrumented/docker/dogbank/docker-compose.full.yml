@@ -675,8 +675,8 @@ services:
       DD_LOGS_INJECTION: "true"
       DD_PROFILING_ENABLED: "true"
       DD_TRACE_KAFKA_ENABLED: "true"
-      DD_API_KEY: ${DD_API_KEY:-}
-      DD_METRICS_ENABLED: "true"
+      DD_API_KEY: ${DD_API_KEY:-dummy-key-for-local-dev}
+      DD_METRICS_ENABLED: ${DD_METRICS_ENABLED:-false}
       # Data Streams Monitoring
       DD_DATA_STREAMS_ENABLED: "true"
       DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED: "true"
