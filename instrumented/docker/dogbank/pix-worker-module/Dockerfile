@@ -23,11 +23,11 @@ FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-# Install wget and curl for health checks and agent download
-RUN apk add --no-cache wget curl
+# Install wget for health checks
+RUN apk add --no-cache wget
 
-# Download Datadog Java Agent
-RUN curl -Lo dd-java-agent.jar https://dtdg.co/latest-java-tracer
+# Download Datadog Java Agent (using ADD is more reliable than curl)
+ADD https://dtdg.co/latest-java-tracer dd-java-agent.jar
 
 # Copy JAR from builder
 COPY --from=builder /app/target/*.jar app.jar
