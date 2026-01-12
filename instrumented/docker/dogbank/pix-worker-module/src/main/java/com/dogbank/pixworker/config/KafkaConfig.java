@@ -47,7 +47,12 @@ public class KafkaConfig {
         props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 10);
         props.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
         props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, PixTransactionMessage.class.getName());
-        
+        props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
+
+        // Map PixTransactionEvent from transaction-service to PixTransactionMessage
+        props.put(JsonDeserializer.TYPE_MAPPINGS,
+            "com.dogbank.transaction.event.PixTransactionEvent:com.dogbank.pixworker.model.PixTransactionMessage");
+
         return new DefaultKafkaConsumerFactory<>(props);
     }
 
