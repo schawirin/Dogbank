@@ -48,7 +48,7 @@ PROB_INSUFFICIENT = float(os.getenv('PROB_INSUFFICIENT', '0.15'))  # 15% saldo i
 @dataclass
 class Account:
     """Representa uma conta do DogBank"""
-    email: str
+    cpf: str
     password: str
     name: str
     pix_key: str
@@ -57,17 +57,17 @@ class Account:
 
 # Contas disponíveis para transações (conforme init-db/01-init.sql)
 ACCOUNTS = [
-    Account("vitoria.itadori@dogbank.com", "123456", "Vitoria Itadori", "vitoria.itadori@dogbank.com", 10000.00),
-    Account("pedro.silva@dogbank.com", "123456", "Pedro Silva", "pedro.silva@dogbank.com", 15000.00),
-    Account("joao.santos@dogbank.com", "123456", "João Santos", "joao.santos@dogbank.com", 8500.00),
-    Account("emiliano.costa@dogbank.com", "123456", "Emiliano Costa", "emiliano.costa@dogbank.com", 12000.00),
-    Account("eliane.oliveira@dogbank.com", "123456", "Eliane Oliveira", "eliane.oliveira@dogbank.com", 9500.00),
-    Account("patricia.souza@dogbank.com", "123456", "Patricia Souza", "patricia.souza@dogbank.com", 20000.00),
-    Account("renato.almeida@dogbank.com", "123456", "Renato Almeida", "renato.almeida@dogbank.com", 7500.00),
-    Account("teste@dogbank.com", "123456", "Usuario Teste", "teste@dogbank.com", 50000.00),
+    Account("12345678915", "123456", "Vitoria Itadori", "vitoria.itadori@dogbank.com", 10000.00),
+    Account("98765432101", "123456", "Pedro Silva", "pedro.silva@dogbank.com", 15000.00),
+    Account("45678912302", "123456", "João Santos", "joao.santos@dogbank.com", 8500.00),
+    Account("78912345603", "123456", "Emiliano Costa", "emiliano.costa@dogbank.com", 12000.00),
+    Account("32165498704", "123456", "Eliane Oliveira", "eliane.oliveira@dogbank.com", 9500.00),
+    Account("65498732105", "123456", "Patricia Souza", "patricia.souza@dogbank.com", 20000.00),
+    Account("15975385206", "123456", "Renato Almeida", "renato.almeida@dogbank.com", 7500.00),
+    Account("66666666666", "123456", "Usuario Teste", "teste@dogbank.com", 50000.00),
     # Contas com saldo alto para testar COAF
-    Account("carlos.magnata@dogbank.com", "123456", "Carlos Magnata", "carlos.magnata@dogbank.com", 250000.00),
-    Account("maria.empresaria@dogbank.com", "123456", "Maria Empresaria", "maria.empresaria@dogbank.com", 500000.00),
+    Account("11122233344", "123456", "Carlos Magnata", "carlos.magnata@dogbank.com", 250000.00),
+    Account("55566677788", "123456", "Maria Empresaria", "maria.empresaria@dogbank.com", 500000.00),
 ]
 
 
@@ -76,7 +76,7 @@ class LoadGenerator:
     
     def __init__(self):
         self.session = requests.Session()
-        self.tokens = {}  # Cache de tokens por email
+        self.tokens = {}  # Cache de tokens por CPF
         self.stats = {
             'total': 0,
             'success': 0,
@@ -85,30 +85,30 @@ class LoadGenerator:
             'insufficient': 0,
             'other_errors': 0
         }
-    
-    def login(self, account: Account) -> Optional[str]:
-        """Faz login e retorna o token JWT"""
-        if account.email in self.tokens:
-            return self.tokens[account.email]
-        
+
+    def login(self, account: Account) -> Optional[dict]:
+        """Faz login e retorna os dados do usuário incluindo accountId"""
+        if account.cpf in self.tokens:
+            return self.tokens[account.cpf]
+
         try:
             response = self.session.post(
                 f"{AUTH_SERVICE_URL}/api/auth/login",
-                json={"email": account.email, "password": account.password},
+                json={"cpf": account.cpf, "senha": account.password},
                 timeout=10
             )
-            
+
             if response.status_code == 200:
                 data = response.json()
-                token = data.get('token') or data.get('accessToken')
-                if token:
-                    self.tokens[account.email] = token
-                    logger.info(f"✅ Login OK: {account.name}")
-                    return token
-            
+                # O backend retorna: {nome, chavePix, accountId}
+                if 'accountId' in data:
+                    self.tokens[account.cpf] = data
+                    logger.info(f"✅ Login OK: {account.name} (AccountID: {data['accountId']})")
+                    return data
+
             logger.warning(f"⚠️ Login falhou para {account.name}: {response.status_code}")
             return None
-            
+
         except Exception as e:
             logger.error(f"❌ Erro no login de {account.name}: {e}")
             return None
@@ -135,40 +135,34 @@ class LoadGenerator:
     
     def make_pix(self, from_account: Account, to_account: Account, amount: float) -> dict:
         """Realiza uma transação PIX"""
-        token = self.login(from_account)
-        if not token:
+        user_data = self.login(from_account)
+        if not user_data:
             return {'success': False, 'error': 'Login failed'}
-        
+
         try:
-            headers = {
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json"
-            }
-            
-            # Obtém o ID da conta de origem
-            account_id = self.get_account_id(token, from_account.email)
+            # O login já retorna o accountId
+            account_id = user_data.get('accountId')
             if not account_id:
                 return {'success': False, 'error': 'Account not found'}
-            
+
             payload = {
                 "accountOriginId": account_id,
                 "pixKeyDestination": to_account.pix_key,
                 "amount": amount
             }
-            
+
             response = self.session.post(
                 f"{TRANSACTION_SERVICE_URL}/api/transactions/pix",
                 json=payload,
-                headers=headers,
                 timeout=30
             )
-            
+
             return {
                 'success': response.status_code in [200, 201],
                 'status_code': response.status_code,
                 'response': response.text[:500] if response.text else None
             }
-            
+
         except Exception as e:
             return {'success': False, 'error': str(e)}
     
