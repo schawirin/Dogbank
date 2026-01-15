@@ -22,13 +22,26 @@ git clone https://github.com/schawirin/Dogbank.git
 # 2. Entre no diretorio
 cd Dogbank/instrumented/docker/dogbank
 
-# 3. Suba tudo com Docker
-docker-compose -f docker-compose.full.yml up -d
+# 3. Execute o setup interativo (configura .env e sobe tudo)
+./setup.sh
 ```
 
 **Pronto!** Acesse: http://localhost
 
 **Login:** CPF `12345678915` | Senha `123456`
+
+> O script `setup.sh` vai pedir suas API keys do Datadog e Groq, criar o `.env` automaticamente e subir todos os containers.
+
+### Alternativa Manual (sem setup.sh)
+
+```bash
+# Copie o .env de exemplo e edite com suas chaves
+cp .env.example .env
+nano .env  # ou use seu editor preferido
+
+# Suba os containers
+docker-compose -f docker-compose.full.yml up -d
+```
 
 > **Nota:** Aguarde ~2-3 minutos para todos os servicos subirem. Use `docker-compose -f docker-compose.full.yml ps` para verificar.
 
