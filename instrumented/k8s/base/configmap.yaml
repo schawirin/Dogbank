@@ -21,10 +21,19 @@ data:
   BANCOCENTRAL_API_URL: "http://bancocentral-service:8085/api/bancocentral"
   NOTIFICATION_SERVICE_URL: "http://notification-service:8086"
   INTEGRATION_SERVICE_URL: "http://integration-service:8090"
-  
+  SPI_API_URL: "http://spi-mock-service:8090"
+
   # Redis
   REDIS_HOST: "redis"
   REDIS_PORT: "6379"
+
+  # RabbitMQ
+  RABBITMQ_HOST: "rabbitmq"
+  RABBITMQ_PORT: "5672"
+
+  # Kafka
+  KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+  db-url: "jdbc:postgresql://postgres:5432/dogbank"
   
   # Spring profiles
   SPRING_PROFILES_ACTIVE: "docker"

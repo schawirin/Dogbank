@@ -1,0 +1,169 @@
+# =============================================================================
+# Kafka - Message Queue for PIX Transactions (KRaft Mode)
+# =============================================================================
+# Apache Kafka in KRaft mode - no Zookeeper dependency
+# Handles event sourcing and analytics for PIX transactions
+# =============================================================================
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  namespace: dogbank
+  labels:
+    app: kafka
+    tags.datadoghq.com/env: dogbank
+    tags.datadoghq.com/service: kafka
+spec:
+  serviceName: kafka
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+        tags.datadoghq.com/env: dogbank
+        tags.datadoghq.com/service: kafka
+      annotations:
+        # Datadog Kafka integration
+        ad.datadoghq.com/kafka.logs: '[{"source": "kafka", "service": "kafka"}]'
+    spec:
+      containers:
+        - name: kafka
+          image: apache/kafka:latest
+          ports:
+            - containerPort: 9092
+              name: external
+            - containerPort: 29092
+              name: internal
+            - containerPort: 9093
+              name: controller
+          env:
+            # KRaft mode configuration
+            - name: KAFKA_NODE_ID
+              value: "1"
+            - name: KAFKA_PROCESS_ROLES
+              value: "broker,controller"
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: "1@kafka:9093"
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: "CONTROLLER"
+            # Listeners
+            - name: KAFKA_LISTENERS
+              value: "PLAINTEXT://:29092,CONTROLLER://:9093,EXTERNAL://:9092"
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: "PLAINTEXT://kafka:29092,EXTERNAL://kafka:9092"
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT"
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: "PLAINTEXT"
+            # Topic settings
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+              value: "1"
+            - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+              value: "true"
+            # Performance tuning
+            - name: KAFKA_NUM_PARTITIONS
+              value: "3"
+            - name: KAFKA_LOG_RETENTION_HOURS
+              value: "24"
+            # Cluster ID
+            - name: CLUSTER_ID
+              value: "dogbank-kafka-cluster-001"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          volumeMounts:
+            - name: kafka-data
+              mountPath: /var/lib/kafka/data
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list || exit 1
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            timeoutSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list || exit 1
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: kafka-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: dogbank
+  labels:
+    app: kafka
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9092
+      targetPort: 9092
+      protocol: TCP
+      name: external
+    - port: 29092
+      targetPort: 29092
+      protocol: TCP
+      name: internal
+  selector:
+    app: kafka
+
+---
+# Kafka Topic Initialization Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-init
+  namespace: dogbank
+  labels:
+    app: kafka-init
+spec:
+  template:
+    metadata:
+      labels:
+        app: kafka-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: kafka-init
+          image: apache/kafka:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo 'Waiting for Kafka to be ready...'
+              sleep 30
+              echo 'Creating Kafka topics...'
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-transactions --partitions 3 --replication-factor 1
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-results --partitions 3 --replication-factor 1
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-notifications --partitions 3 --replication-factor 1
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-dlq --partitions 1 --replication-factor 1
+              echo 'Topics created:'
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list
