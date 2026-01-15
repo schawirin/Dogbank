@@ -1,0 +1,120 @@
+# =============================================================================
+# PIX Worker - Kafka Consumer for PIX Transaction Processing
+# =============================================================================
+# Java Spring Boot service consuming from Kafka
+# Includes Datadog APM and Data Streams Monitoring
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pix-worker
+  namespace: dogbank
+  labels:
+    app: pix-worker
+    tags.datadoghq.com/env: dogbank
+    tags.datadoghq.com/service: pix-worker
+    tags.datadoghq.com/version: "1.0.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pix-worker
+  template:
+    metadata:
+      labels:
+        app: pix-worker
+        tags.datadoghq.com/env: dogbank
+        tags.datadoghq.com/service: pix-worker
+        tags.datadoghq.com/version: "1.0.0"
+      annotations:
+        # Datadog APM - Java auto-instrumentation
+        admission.datadoghq.com/java-lib.version: "latest"
+        # Datadog Logs
+        ad.datadoghq.com/pix-worker.logs: '[{"source": "java", "service": "pix-worker"}]'
+    spec:
+      containers:
+        - name: pix-worker
+          image: dogbank/pix-worker:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            # =================================================================
+            # Kafka Configuration
+            # =================================================================
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:9092"
+            # =================================================================
+            # Database
+            # =================================================================
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: dogbank-config
+                  key: db-url
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: db-user
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: db-password
+            # =================================================================
+            # External Services
+            # =================================================================
+            - name: BANCOCENTRAL_SERVICE_URL
+              value: "http://bancocentral-service:8085"
+            # =================================================================
+            # Datadog APM Configuration
+            # =================================================================
+            - name: DD_AGENT_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: DD_TRACE_AGENT_PORT
+              value: "8126"
+            - name: DD_ENV
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/env']
+            - name: DD_SERVICE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/service']
+            - name: DD_VERSION
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/version']
+            - name: DD_LOGS_INJECTION
+              value: "true"
+            - name: DD_PROFILING_ENABLED
+              value: "true"
+            - name: DD_TRACE_SAMPLE_RATE
+              value: "1"
+            - name: DD_RUNTIME_METRICS_ENABLED
+              value: "true"
+            # =================================================================
+            # Datadog Data Streams Monitoring - Kafka visibility
+            # =================================================================
+            - name: DD_DATA_STREAMS_ENABLED
+              value: "true"
+            - name: DD_TRACE_KAFKA_ENABLED
+              value: "true"
+            - name: DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED
+              value: "true"
+            - name: DD_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: dd-api-key
+            - name: DD_METRICS_ENABLED
+              value: "true"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"

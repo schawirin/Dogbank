@@ -1,0 +1,105 @@
+# =============================================================================
+# Fraud Detection Service - RabbitMQ Consumer
+# =============================================================================
+# Java Spring Boot service analyzing PIX transactions for fraud
+# Consumes from RabbitMQ with FIFO guarantee
+# Includes Datadog APM and Data Streams Monitoring
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fraud-detection-service
+  namespace: dogbank
+  labels:
+    app: fraud-detection-service
+    tags.datadoghq.com/env: dogbank
+    tags.datadoghq.com/service: fraud-detection-service
+    tags.datadoghq.com/version: "1.0.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fraud-detection-service
+  template:
+    metadata:
+      labels:
+        app: fraud-detection-service
+        tags.datadoghq.com/env: dogbank
+        tags.datadoghq.com/service: fraud-detection-service
+        tags.datadoghq.com/version: "1.0.0"
+      annotations:
+        # Datadog APM - Java auto-instrumentation
+        admission.datadoghq.com/java-lib.version: "latest"
+        # Datadog Logs
+        ad.datadoghq.com/fraud-detection-service.logs: '[{"source": "java", "service": "fraud-detection-service"}]'
+    spec:
+      containers:
+        - name: fraud-detection-service
+          image: dogbank/fraud-detection-service:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            # =================================================================
+            # RabbitMQ Configuration
+            # =================================================================
+            - name: RABBITMQ_HOST
+              value: "rabbitmq"
+            - name: RABBITMQ_PORT
+              value: "5672"
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: rabbitmq-user
+            - name: RABBITMQ_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: rabbitmq-password
+            - name: RABBITMQ_VHOST
+              value: "dogbank"
+            # =================================================================
+            # Datadog APM Configuration
+            # =================================================================
+            - name: DD_AGENT_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: DD_TRACE_AGENT_PORT
+              value: "8126"
+            - name: DD_ENV
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/env']
+            - name: DD_SERVICE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/service']
+            - name: DD_VERSION
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/version']
+            - name: DD_LOGS_INJECTION
+              value: "true"
+            - name: DD_PROFILING_ENABLED
+              value: "true"
+            - name: DD_TRACE_SAMPLE_RATE
+              value: "1"
+            - name: DD_RUNTIME_METRICS_ENABLED
+              value: "true"
+            # =================================================================
+            # Datadog Data Streams Monitoring - RabbitMQ visibility
+            # =================================================================
+            - name: DD_DATA_STREAMS_ENABLED
+              value: "true"
+            - name: DD_TRACE_RABBITMQ_ENABLED
+              value: "true"
+            - name: DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED
+              value: "true"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"

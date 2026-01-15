@@ -13,6 +13,27 @@ DogBank is a **demo banking application** designed for demonstrating observabili
 
 ---
 
+## ⚡ TL;DR - Rodar em 3 Comandos
+
+```bash
+# 1. Clone o repositorio
+git clone https://github.com/schawirin/Dogbank.git
+
+# 2. Entre no diretorio
+cd Dogbank/instrumented/docker/dogbank
+
+# 3. Suba tudo com Docker
+docker-compose -f docker-compose.full.yml up -d
+```
+
+**Pronto!** Acesse: http://localhost
+
+**Login:** CPF `12345678915` | Senha `123456`
+
+> **Nota:** Aguarde ~2-3 minutos para todos os servicos subirem. Use `docker-compose -f docker-compose.full.yml ps` para verificar.
+
+---
+
 ## 📁 Repository Structure
 
 ```

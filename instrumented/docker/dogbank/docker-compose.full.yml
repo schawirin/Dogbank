@@ -393,11 +393,19 @@ services:
       SERVER_PORT: 8088
       JWT_SECRET: dogbank-secret-key-change-in-production
       JWT_EXPIRATION: 86400000
-      # Datadog
+      # Datadog APM
       DD_AGENT_HOST: datadog-agent
+      DD_TRACE_AGENT_PORT: 8126
       DD_SERVICE: auth-service
       DD_ENV: dogbank
       DD_VERSION: "1.0.0"
+      DD_LOGS_INJECTION: "true"
+      DD_PROFILING_ENABLED: "true"
+      DD_TRACE_SAMPLE_RATE: "1"
+      # Datadog ASM (Application Security) - Detecta ataques
+      DD_APPSEC_ENABLED: "true"
+      DD_IAST_ENABLED: "true"
+      DD_APPSEC_RULES: "https://raw.githubusercontent.com/DataDog/appsec-event-rules/main/build/recommended.json"
     depends_on:
       postgres:
         condition: service_healthy
@@ -416,6 +424,9 @@ services:
     restart: unless-stopped
     labels:
       com.datadoghq.ad.logs: '[{"source": "java", "service": "auth-service"}]'
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.service: "auth-service"
+      com.datadoghq.tags.version: "1.0.0"
 
   # ===========================================================================
   # 💳 ACCOUNT SERVICE
@@ -432,11 +443,18 @@ services:
       SPRING_DATASOURCE_USERNAME: dogbank
       SPRING_DATASOURCE_PASSWORD: dog1234
       SERVER_PORT: 8089
-      # Datadog
+      # Datadog APM
       DD_AGENT_HOST: datadog-agent
+      DD_TRACE_AGENT_PORT: 8126
       DD_SERVICE: account-service
       DD_ENV: dogbank
       DD_VERSION: "1.0.0"
+      DD_LOGS_INJECTION: "true"
+      DD_PROFILING_ENABLED: "true"
+      DD_TRACE_SAMPLE_RATE: "1"
+      # Datadog ASM (Application Security) - Detecta ataques
+      DD_APPSEC_ENABLED: "true"
+      DD_IAST_ENABLED: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -455,6 +473,9 @@ services:
     restart: unless-stopped
     labels:
       com.datadoghq.ad.logs: '[{"source": "java", "service": "account-service"}]'
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.service: "account-service"
+      com.datadoghq.tags.version: "1.0.0"
 
   # ===========================================================================
   # 💸 TRANSACTION SERVICE
@@ -498,6 +519,9 @@ services:
       DD_TRACE_KAFKA_ENABLED: "true"
       DD_TRACE_RABBITMQ_ENABLED: "true"
       DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED: "true"
+      # Datadog ASM (Application Security) - Detecta ataques
+      DD_APPSEC_ENABLED: "true"
+      DD_IAST_ENABLED: "true"
     volumes:
       - ./dd-java-agent.jar:/app/dd-java-agent.jar:ro
     depends_on:
@@ -793,11 +817,24 @@ services:
       com.datadoghq.ad.logs: '[{"source": "nginx", "service": "dogbank-nginx"}]'
 
   # ===========================================================================
-  # 🤖 LOAD GENERATOR - Gerador de Carga Automático
+  # 🤖 LOAD GENERATOR + SECURITY ATTACKER
   # ===========================================================================
-  # Simula transações PIX automáticas para gerar dados de observabilidade
-  # Cenários: normal, erro R$ 100, COAF (>= R$ 50k), saldo insuficiente
-  
+  # Simula transacoes PIX automaticas + ataques de seguranca para demonstracao
+  #
+  # Cenarios de Carga:
+  #   - Transacoes normais, erro R$ 100, COAF (>= R$ 50k), saldo insuficiente
+  #
+  # Cenarios de Ataque (para demonstrar Datadog ASM/IAST):
+  #   - SQL Injection (extracao de dados)
+  #   - RCE/Command Injection
+  #   - Path Traversal
+  #   - XSS (Cross-Site Scripting)
+  #   - Authentication Bypass
+  #   - IDOR (Insecure Direct Object Reference)
+  #
+  # RUN_MODE: "load" (apenas transacoes), "security" (apenas ataques), "both"
+  # ===========================================================================
+
   load-generator:
     build:
       context: ./load-generator
@@ -811,17 +848,36 @@ services:
       account-service:
         condition: service_healthy
     environment:
+      # Service URLs
       AUTH_SERVICE_URL: http://auth-service:8088
       TRANSACTION_SERVICE_URL: http://transaction-service:8084
       ACCOUNT_SERVICE_URL: http://account-service:8089
-      # Intervalo entre transações (segundos)
+      CHATBOT_SERVICE_URL: http://chatbot-service:8083
+      NGINX_URL: http://nginx:80
+      # =================================================================
+      # Load Generator Config
+      # =================================================================
       MIN_INTERVAL: "3"
       MAX_INTERVAL: "8"
-      # Probabilidades de cenários
-      PROB_NORMAL: "0.55"       # 55% transações normais
-      PROB_ERROR_100: "0.20"    # 20% erro R$ 100 (cenário específico)
-      PROB_COAF: "0.10"         # 10% COAF (>= R$ 50k)
-      PROB_INSUFFICIENT: "0.15" # 15% saldo insuficiente
+      PROB_NORMAL: "0.55"
+      PROB_ERROR_100: "0.20"
+      PROB_COAF: "0.10"
+      PROB_INSUFFICIENT: "0.15"
+      # =================================================================
+      # Security Attacker Config - Para demonstrar Datadog ASM/IAST
+      # =================================================================
+      ATTACK_MIN_INTERVAL: "8"
+      ATTACK_MAX_INTERVAL: "20"
+      PROB_SQL_INJECTION: "0.30"    # 30% SQL Injection
+      PROB_RCE: "0.15"              # 15% RCE/Command Injection
+      PROB_PATH_TRAVERSAL: "0.15"   # 15% Path Traversal
+      PROB_XSS: "0.15"              # 15% XSS
+      PROB_AUTH_BYPASS: "0.15"      # 15% Auth Bypass
+      PROB_IDOR: "0.10"             # 10% IDOR
+      # =================================================================
+      # Run Mode: "load", "security", or "both"
+      # =================================================================
+      RUN_MODE: "both"
     networks:
       - dogbank-network
     restart: unless-stopped
