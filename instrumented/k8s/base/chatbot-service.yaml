@@ -15,6 +15,7 @@ metadata:
     tags.datadoghq.com/env: dogbank
     tags.datadoghq.com/service: chatbot-service
     tags.datadoghq.com/version: "2.0.0"
+    tags.datadoghq.com/team: dogbank-ai
 spec:
   replicas: 1
   selector:
@@ -29,7 +30,7 @@ spec:
         tags.datadoghq.com/version: "2.0.0"
       annotations:
         # Datadog APM - Python auto-instrumentation
-        admission.datadoghq.com/python-lib.version: "latest"
+        #admission.datadoghq.com/python-lib.version: "latest"
         # Datadog Logs
         ad.datadoghq.com/chatbot-service.logs: '[{"source": "python", "service": "chatbot-service"}]'
     spec:
