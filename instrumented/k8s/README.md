@@ -74,30 +74,78 @@ instrumented/k8s/
 
 ## Quick Start
 
-### 1. Update Secrets
+### 1. Criar Secrets no EKS
 
-Edit `base/secrets.yaml` with your actual values:
+**IMPORTANTE:** Os secrets devem ser criados diretamente no cluster EKS. Nunca commite secrets no Git.
 
-```yaml
-stringData:
-  # Datadog
-  DD_API_KEY: "your-datadog-api-key"
-  DD_APP_KEY: "your-datadog-app-key"
-  VITE_DD_CLIENT_TOKEN: "your-rum-client-token"
-  VITE_DD_APPLICATION_ID: "your-rum-application-id"
-  
-  # Groq API Key (for DogBot chatbot)
-  groq-api-key: "your-groq-api-key"
+#### 1.1 Criar Namespace primeiro
+
+```bash
+kubectl apply -f base/namespace.yaml
 ```
 
-#### Getting a Groq API Key (Free)
+#### 1.2 Secret Principal (dogbank-secrets)
 
-1. Go to https://console.groq.com/
-2. Create an account (Google/GitHub login available)
-3. Navigate to **API Keys**
-4. Click **Create API Key**
-5. Copy the key (starts with `gsk_`)
-6. Paste it in `secrets.yaml` under `groq-api-key`
+```bash
+kubectl create secret generic dogbank-secrets \
+  --namespace=dogbank \
+  --from-literal=SPRING_DATASOURCE_PASSWORD='<POSTGRES_PASSWORD>' \
+  --from-literal=JWT_SECRET='<JWT_SECRET_MIN_32_CHARS>' \
+  --from-literal=groq-api-key='<GROQ_API_KEY>' \
+  --from-literal=dd-api-key='<DATADOG_API_KEY>' \
+  --from-literal=dd-app-key='<DATADOG_APP_KEY>' \
+  --from-literal=dd-client-token='<DATADOG_RUM_CLIENT_TOKEN>' \
+  --from-literal=dd-site='datadoghq.com' \
+  --from-literal=rabbitmq-user='dogbank' \
+  --from-literal=rabbitmq-password='<RABBITMQ_PASSWORD>'
+```
+
+#### 1.3 Secret do PostgreSQL
+
+```bash
+kubectl create secret generic postgres-secrets \
+  --namespace=dogbank \
+  --from-literal=POSTGRES_PASSWORD='<POSTGRES_PASSWORD>'
+```
+
+#### 1.4 Secret do Datadog Cluster Agent
+
+```bash
+# Gerar token aleatorio de 32 caracteres
+TOKEN=$(openssl rand -hex 16)
+echo "Token gerado: $TOKEN"
+
+kubectl create secret generic datadog-cluster-agent-token \
+  --namespace=dogbank \
+  --from-literal=token="$TOKEN"
+```
+
+#### 1.5 Verificar Secrets
+
+```bash
+kubectl get secrets -n dogbank
+# Esperado: dogbank-secrets, postgres-secrets, datadog-cluster-agent-token
+```
+
+#### Como obter as chaves
+
+| Secret | Como Obter |
+|--------|------------|
+| POSTGRES_PASSWORD | Defina uma senha forte (min 16 chars) |
+| JWT_SECRET | `openssl rand -base64 32` |
+| GROQ_API_KEY | https://console.groq.com/ → API Keys |
+| DATADOG_API_KEY | Datadog → Organization Settings → API Keys |
+| DATADOG_APP_KEY | Datadog → Organization Settings → Application Keys |
+| DD_CLIENT_TOKEN | Datadog → UX Monitoring → RUM → Client Token |
+| RABBITMQ_PASSWORD | Defina uma senha forte |
+
+#### Groq API Key (Gratis)
+
+1. Acesse https://console.groq.com/
+2. Crie uma conta (login Google/GitHub disponivel)
+3. Navegue ate **API Keys**
+4. Clique em **Create API Key**
+5. Copie a chave (comeca com `gsk_`)
 
 ### 2. Build Docker Images
 
