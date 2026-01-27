@@ -16,6 +16,7 @@ metadata:
     tags.datadoghq.com/env: dogbank
     tags.datadoghq.com/service: fraud-detection-service
     tags.datadoghq.com/version: "1.0.0"
+    tags.datadoghq.com/team: dogbank-backend
 spec:
   replicas: 1
   selector:
