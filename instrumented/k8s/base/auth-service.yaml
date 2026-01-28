@@ -33,7 +33,7 @@ spec:
     spec:
       containers:
         - name: auth-service
-          image: dogbank/auth-service:latest
+          image: schawirin/dogbank-auth-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8088

@@ -33,7 +33,7 @@ spec:
     spec:
       containers:
         - name: account-service
-          image: dogbank/account-service:latest
+          image: schawirin/dogbank-account-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8089

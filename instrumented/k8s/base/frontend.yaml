@@ -11,6 +11,7 @@ metadata:
     tags.datadoghq.com/env: dogbank
     tags.datadoghq.com/service: dogbank-frontend
     tags.datadoghq.com/version: "1.0.0"
+    tags.datadoghq.com/team: frontend
 spec:
   replicas: 1
   selector:
@@ -29,7 +30,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: dogbank/frontend:latest
+          image: schawirin/dogbank-frontend:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
