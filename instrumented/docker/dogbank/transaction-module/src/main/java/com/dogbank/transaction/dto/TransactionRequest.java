@@ -7,6 +7,7 @@ public class TransactionRequest {
     private Long accountDestinationId; // Opcional, se o ID da conta destino for informado diretamente
     private BigDecimal amount;
     private String pixKeyDestination;  // Para transferências via PIX
+    private String description;  // Descrição opcional da transferência
 
     // Getters e Setters
     public Long getAccountOriginId() {
@@ -35,5 +36,12 @@ public class TransactionRequest {
     }
     public void setPixKeyDestination(String pixKeyDestination) {
         this.pixKeyDestination = pixKeyDestination;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+    public void setDescription(String description) {
+        this.description = description;
     }
 }

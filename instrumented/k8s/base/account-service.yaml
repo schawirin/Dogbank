@@ -25,8 +25,7 @@ spec:
         tags.datadoghq.com/service: account-service
         tags.datadoghq.com/version: "1.0.0"
       annotations:
-        # Datadog Admission Controller
-        admission.datadoghq.com/enabled: "true"
+        # Datadog Admission Controller - automatically injects DD Java agent
         admission.datadoghq.com/java-lib.version: "latest"
         # Datadog Logs
         ad.datadoghq.com/account-service.logs: '[{"source":"java","service":"account-service"}]'
@@ -111,9 +110,6 @@ spec:
                 configMapKeyRef:
                   name: dogbank-config
                   key: DD_IAST_ENABLED
-            # Java options for Datadog
-            - name: JAVA_TOOL_OPTIONS
-              value: "-javaagent:/datadog/dd-java-agent.jar"
           resources:
             requests:
               memory: "256Mi"

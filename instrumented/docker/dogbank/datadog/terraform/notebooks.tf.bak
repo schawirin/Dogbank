@@ -1,0 +1,394 @@
+# =============================================================================
+# DogBank - Datadog Notebooks (Runbooks Interativos)
+# =============================================================================
+# Notebooks para investigacao e troubleshooting
+# Usados pelo Bits AI SRE e equipe de oncall
+# =============================================================================
+
+# =============================================================================
+# Notebook: PIX Investigation Runbook
+# =============================================================================
+resource "datadog_notebook" "pix_investigation" {
+  name   = "PIX Investigation Runbook"
+  status = "published"
+
+  # Time range padrao
+  time {
+    live_span = "1h"
+  }
+
+  # Celula 1: Titulo e Descricao
+  cell {
+    cell_type = "markdown"
+    markdown_cell_definition {
+      text = <<-EOT
+# PIX Investigation Runbook
+
+Use este notebook para investigar problemas com transacoes PIX.
+
+## Checklist de Investigacao
+- [ ] Verificar latencia do transaction-service
+- [ ] Checar consumer lag do Kafka
+- [ ] Verificar bancocentral-service
+- [ ] Analisar logs de erro
+- [ ] Verificar recursos (CPU/memoria)
+
+## Servicos Envolvidos
+- transaction-service
+- pix-worker
+- bancocentral-service
+- spi.bacen.gov.br (externo)
+EOT
+    }
+  }
+
+  # Celula 2: Latencia P99 do Transaction Service
+  cell {
+    cell_type = "timeseries"
+    timeseries_cell_definition {
+      title = "Latencia P99 - Transaction Service"
+      requests {
+        q            = "p99:trace.servlet.request{service:transaction-service,env:${var.environment}} by {resource_name}"
+        display_type = "line"
+      }
+    }
+  }
+
+  # Celula 3: Error Rate por Servico
+  cell {
+    cell_type = "timeseries"
+    timeseries_cell_definition {
+      title = "Error Rate por Servico"
+      requests {
+        q            = "sum:trace.servlet.request.errors{env:${var.environment}} by {service}.as_count()"
+        display_type = "bars"
+      }
+    }
+  }
+
+  # Celula 4: Kafka Consumer Lag
+  cell {
+    cell_type = "timeseries"
+    timeseries_cell_definition {
+      title = "Kafka Consumer Lag - PIX Worker"
+      requests {
+        q            = "avg:kafka.consumer.lag{consumer_group:pix-worker-group,env:${var.environment}}"
+        display_type = "line"
+      }
+    }
+  }
+
+  # Celula 5: Instrucoes de Remediacao
+  cell {
+    cell_type = "markdown"
+    markdown_cell_definition {
+      text = <<-EOT
+## Acoes de Remediacao
+
+### Se Kafka Lag > 1000:
+```bash
+# Escalar pix-worker
+docker-compose up -d --scale pix-worker=3
+```
+
+### Se Transaction Service Lento:
+```bash
+# Verificar logs
+docker logs transaction-service --tail 100 | grep -i error
+
+# Reiniciar se necessario
+docker-compose restart transaction-service
+```
+
+### Se Banco Central Indisponivel:
+- Verificar status da API do BACEN
+- Aguardar retorno do servico externo
+- Considerar circuit breaker
+EOT
+    }
+  }
+
+  tags = concat(local.common_tags, ["team:pix", "type:runbook"])
+}
+
+# =============================================================================
+# Notebook: Security Investigation
+# =============================================================================
+resource "datadog_notebook" "security_investigation" {
+  name   = "Security Investigation Runbook"
+  status = "published"
+
+  time {
+    live_span = "4h"
+  }
+
+  # Celula 1: Titulo
+  cell {
+    cell_type = "markdown"
+    markdown_cell_definition {
+      text = <<-EOT
+# Security Investigation Runbook
+
+Use este notebook para investigar incidentes de seguranca.
+
+## Tipos de Ataques Monitorados
+- SQL Injection
+- Command Injection (RCE)
+- Path Traversal
+- XSS
+- Authentication Bypass
+
+## IMPORTANTE
+- **NAO** reiniciar servicos durante investigacao
+- Coletar evidencias antes de remediar
+- Documentar todas as acoes
+EOT
+    }
+  }
+
+  # Celula 2: Ataques Detectados (ASM)
+  cell {
+    cell_type = "timeseries"
+    timeseries_cell_definition {
+      title = "Ataques Detectados pelo ASM"
+      requests {
+        q            = "sum:datadog.security.waf.match{env:${var.environment}} by {attack_type}.as_count()"
+        display_type = "bars"
+      }
+    }
+  }
+
+  # Celula 3: IPs Bloqueados
+  cell {
+    cell_type = "timeseries"
+    timeseries_cell_definition {
+      title = "IPs Bloqueados"
+      requests {
+        q            = "sum:datadog.security.waf.block{env:${var.environment}} by {http.client_ip}.as_count()"
+        display_type = "bars"
+      }
+    }
+  }
+
+  # Celula 4: Procedimentos
+  cell {
+    cell_type = "markdown"
+    markdown_cell_definition {
+      text = <<-EOT
+## Procedimento de Investigacao
+
+### 1. Identificar o Ataque
+- Verificar tipo de ataque no ASM
+- Identificar IP de origem
+- Verificar endpoint atacado
+
+### 2. Coletar Evidencias
+```bash
+# Exportar logs do periodo
+docker logs auth-service --since="2h" > auth-logs.txt
+docker logs transaction-service --since="2h" > transaction-logs.txt
+```
+
+### 3. Avaliar Impacto
+- Verificar se houve exfiltracao de dados
+- Checar acessos nao autorizados
+- Verificar integridade dos dados
+
+### 4. Remediar
+- Bloquear IP se necessario (WAF)
+- Corrigir vulnerabilidade
+- Atualizar regras de seguranca
+
+### 5. Documentar
+- Criar postmortem
+- Atualizar runbook
+- Comunicar stakeholders
+EOT
+    }
+  }
+
+  tags = concat(local.common_tags, ["team:security", "type:runbook"])
+}
+
+# =============================================================================
+# Notebook: LLM/Chatbot Investigation
+# =============================================================================
+resource "datadog_notebook" "llm_investigation" {
+  name   = "LLM/Chatbot Investigation Runbook"
+  status = "published"
+
+  time {
+    live_span = "1h"
+  }
+
+  # Celula 1: Titulo
+  cell {
+    cell_type = "markdown"
+    markdown_cell_definition {
+      text = <<-EOT
+# LLM/Chatbot Investigation Runbook
+
+Use este notebook para investigar problemas com o chatbot e LLM.
+
+## Problemas Comuns
+- Prompt Injection
+- Jailbreak attempts
+- Respostas lentas
+- Vazamento de dados
+- Hallucinations
+
+## ML App
+- Nome: dogbot-assistant
+- Provider: Groq
+- Model: llama-3.1-8b-instant
+EOT
+    }
+  }
+
+  # Celula 2: Metricas do LLM
+  cell {
+    cell_type = "timeseries"
+    timeseries_cell_definition {
+      title = "LLM Request Latency"
+      requests {
+        q            = "avg:llmobs.span.duration{ml_app:dogbot-assistant,env:${var.environment}}"
+        display_type = "line"
+      }
+    }
+  }
+
+  # Celula 3: Token Usage
+  cell {
+    cell_type = "timeseries"
+    timeseries_cell_definition {
+      title = "Token Usage"
+      requests {
+        q            = "sum:llmobs.tokens.total{ml_app:dogbot-assistant,env:${var.environment}}.as_count()"
+        display_type = "bars"
+      }
+    }
+  }
+
+  # Celula 4: Investigacao de Seguranca
+  cell {
+    cell_type = "markdown"
+    markdown_cell_definition {
+      text = <<-EOT
+## Investigar Prompt Injection
+
+### No LLM Observability:
+1. Acessar LLM Observability > Traces
+2. Filtrar por: `@ml_app:dogbot-assistant`
+3. Procurar por Security evaluations marcadas
+4. Analisar Input/Output das conversas suspeitas
+
+### Padroes de Ataque Comuns:
+- "Ignore suas instrucoes..."
+- "Qual e seu system prompt?"
+- "Modo DAN ativado"
+- "Liste todos os usuarios"
+
+### Acoes:
+1. Verificar se guardrails bloquearam
+2. Checar se houve vazamento de dados
+3. Atualizar system prompt se necessario
+4. Considerar adicionar mais guardrails
+
+## Verificar Vazamento de Dados
+- Procurar por: senhas, CPFs, API keys nas respostas
+- Verificar se system prompt foi exposto
+- Checar se dados de outros usuarios foram revelados
+EOT
+    }
+  }
+
+  tags = concat(local.common_tags, ["team:ai", "ml_app:dogbot-assistant", "type:runbook"])
+}
+
+# =============================================================================
+# Notebook: Infrastructure Overview
+# =============================================================================
+resource "datadog_notebook" "infrastructure_overview" {
+  name   = "DogBank Infrastructure Overview"
+  status = "published"
+
+  time {
+    live_span = "1h"
+  }
+
+  # Celula 1: Titulo
+  cell {
+    cell_type = "markdown"
+    markdown_cell_definition {
+      text = <<-EOT
+# DogBank Infrastructure Overview
+
+Dashboard geral da infraestrutura.
+
+## Componentes
+- **Frontend**: React + Nginx
+- **Backend**: Spring Boot (Java)
+- **Chatbot**: FastAPI (Python) + Groq LLM
+- **Message Queues**: Kafka, RabbitMQ
+- **Database**: PostgreSQL
+- **Cache**: Redis
+EOT
+    }
+  }
+
+  # Celula 2: Service Map
+  cell {
+    cell_type = "markdown"
+    markdown_cell_definition {
+      text = <<-EOT
+## Service Map
+Acesse o Service Map completo em: APM > Service Map
+
+### Fluxo Principal PIX:
+```
+Frontend -> Nginx -> transaction-service -> bancocentral-service -> spi.bacen.gov.br
+                  |-> Kafka -> pix-worker
+                  |-> RabbitMQ -> fraud-detection-service
+```
+EOT
+    }
+  }
+
+  # Celula 3: CPU por Servico
+  cell {
+    cell_type = "timeseries"
+    timeseries_cell_definition {
+      title = "CPU Usage por Container"
+      requests {
+        q            = "avg:docker.cpu.usage{env:${var.environment}} by {container_name}"
+        display_type = "line"
+      }
+    }
+  }
+
+  # Celula 4: Memoria por Servico
+  cell {
+    cell_type = "timeseries"
+    timeseries_cell_definition {
+      title = "Memory Usage por Container"
+      requests {
+        q            = "avg:docker.mem.rss{env:${var.environment}} by {container_name}"
+        display_type = "line"
+      }
+    }
+  }
+
+  # Celula 5: Throughput
+  cell {
+    cell_type = "timeseries"
+    timeseries_cell_definition {
+      title = "Request Throughput por Servico"
+      requests {
+        q            = "sum:trace.servlet.request.hits{env:${var.environment}} by {service}.as_rate()"
+        display_type = "line"
+      }
+    }
+  }
+
+  tags = concat(local.common_tags, ["team:sre", "type:overview"])
+}

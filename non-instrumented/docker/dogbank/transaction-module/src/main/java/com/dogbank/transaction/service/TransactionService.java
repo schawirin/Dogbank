@@ -401,9 +401,10 @@ public class TransactionService {
     }
     
     public List<Transaction> listarTransacoesPorConta(Long accountId) {
-        return transactionRepository.findAllByAccountOriginIdOrderByDateDesc(accountId);
+        // Busca transações onde a conta é origem OU destino (enviadas e recebidas)
+        return transactionRepository.findAllByAccountId(accountId);
     }
-    
+
     public String generateAuthCode(Transaction tx) {
         return UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }

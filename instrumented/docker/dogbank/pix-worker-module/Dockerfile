@@ -26,9 +26,6 @@ WORKDIR /app
 # Install wget for health checks
 RUN apk add --no-cache wget
 
-# Download Datadog Java Agent (using ADD is more reliable than curl)
-ADD https://dtdg.co/latest-java-tracer dd-java-agent.jar
-
 # Copy JAR from builder
 COPY --from=builder /app/target/*.jar app.jar
 
@@ -51,5 +48,4 @@ ENV DD_PROFILING_ENABLED="true"
 ENV DD_DATA_STREAMS_ENABLED="true"
 ENV DD_TRACE_KAFKA_ENABLED="true"
 
-# Run with Datadog Java agent
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -javaagent:/app/dd-java-agent.jar -jar app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

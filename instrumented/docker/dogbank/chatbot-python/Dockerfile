@@ -29,6 +29,5 @@ EXPOSE 8083
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8083/api/chatbot/health || exit 1
 
-# Run with ddtrace for LLM Observability
-# The ddtrace-run command automatically instruments the application
-CMD ["ddtrace-run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8083"]
+# Datadog APM auto-instrumentation is injected by the Datadog Admission Controller
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8083"]

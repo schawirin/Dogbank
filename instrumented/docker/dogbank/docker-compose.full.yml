@@ -96,6 +96,8 @@ services:
       com.datadoghq.ad.logs: '[{"source": "postgresql", "service": "dogbank-postgres", "log_processing_rules": [{"type": "multi_line", "name": "log_start_with_date", "pattern": "^\\d{4}-\\d{2}-\\d{2}"}]}]'
       com.datadoghq.tags.env: "dogbank"
       com.datadoghq.tags.service: "dogbank-postgres"
+      com.datadoghq.tags.team: "platform"
+      com.datadoghq.tags.owner: "dogbank-team"
 
   # ===========================================================================
   # 🔴 CACHE - Redis
@@ -122,6 +124,10 @@ services:
       com.datadoghq.ad.init_configs: '[{}]'
       com.datadoghq.ad.instances: '[{"host":"%%host%%", "port":"6379"}]'
       com.datadoghq.ad.logs: '[{"source": "redis", "service": "dogbank-redis"}]'
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.service: "dogbank-redis"
+      com.datadoghq.tags.team: "platform"
+      com.datadoghq.tags.owner: "dogbank-team"
 
   # ===========================================================================
   # 📨 KAFKA - Message Queue for PIX Transactions (KRaft Mode - No Zookeeper!)
@@ -169,6 +175,10 @@ services:
     restart: unless-stopped
     labels:
       com.datadoghq.ad.logs: '[{"source": "kafka", "service": "dogbank-kafka"}]'
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.service: "dogbank-kafka"
+      com.datadoghq.tags.team: "platform"
+      com.datadoghq.tags.owner: "dogbank-team"
 
   # Kafka topic initialization
   kafka-init:
@@ -229,6 +239,10 @@ services:
       com.datadoghq.ad.init_configs: '[{}]'
       com.datadoghq.ad.instances: '[{"rabbitmq_api_url": "http://%%host%%:15672/api/", "username": "dogbank", "password": "dog1234"}]'
       com.datadoghq.ad.logs: '[{"source": "rabbitmq", "service": "dogbank-rabbitmq"}]'
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.service: "dogbank-rabbitmq"
+      com.datadoghq.tags.team: "platform"
+      com.datadoghq.tags.owner: "dogbank-team"
 
 
 
@@ -322,6 +336,8 @@ services:
       com.datadoghq.tags.env: "dogbank"
       com.datadoghq.tags.service: "spi.bacen.gov.br"
       com.datadoghq.tags.version: "1.0.0"
+      com.datadoghq.tags.team: "external"
+      com.datadoghq.tags.owner: "bacen"
 
   # ===========================================================================
   # 🏛️ BANCO CENTRAL SERVICE
@@ -373,6 +389,8 @@ services:
       com.datadoghq.tags.env: "dogbank"
       com.datadoghq.tags.service: "bancocentral-service"
       com.datadoghq.tags.version: "1.0.0"
+      com.datadoghq.tags.team: "pix"
+      com.datadoghq.tags.owner: "dogbank-team"
 
   # ===========================================================================
   # 🔑 AUTH SERVICE
@@ -427,6 +445,8 @@ services:
       com.datadoghq.tags.env: "dogbank"
       com.datadoghq.tags.service: "auth-service"
       com.datadoghq.tags.version: "1.0.0"
+      com.datadoghq.tags.team: "security"
+      com.datadoghq.tags.owner: "dogbank-team"
 
   # ===========================================================================
   # 💳 ACCOUNT SERVICE
@@ -476,6 +496,8 @@ services:
       com.datadoghq.tags.env: "dogbank"
       com.datadoghq.tags.service: "account-service"
       com.datadoghq.tags.version: "1.0.0"
+      com.datadoghq.tags.team: "accounts"
+      com.datadoghq.tags.owner: "dogbank-team"
 
   # ===========================================================================
   # 💸 TRANSACTION SERVICE
@@ -551,6 +573,8 @@ services:
       com.datadoghq.tags.env: "dogbank"
       com.datadoghq.tags.service: "transaction-service"
       com.datadoghq.tags.version: "1.0.0"
+      com.datadoghq.tags.team: "pix"
+      com.datadoghq.tags.owner: "dogbank-team"
 
 
   # ===========================================================================
@@ -569,7 +593,7 @@ services:
       # LLM Configuration - Choose your provider:
       # =================================================================
       # GROQ - Default, super fast inference, free tier
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}  # Get from https://console.groq.com/
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-***REMOVED_GROQ_API_KEY***}  # Groq API key
       OPENAI_API_BASE_URL: ${OPENAI_API_BASE_URL:-https://api.groq.com/openai/v1}
       OPENAI_MODEL: ${OPENAI_MODEL:-llama-3.1-8b-instant}  # llama-3.1-8b-instant, mixtral-8x7b-32768
       # 
@@ -622,6 +646,11 @@ services:
     restart: unless-stopped
     labels:
       com.datadoghq.ad.logs: '[{"source": "python", "service": "chatbot-service"}]'
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.service: "chatbot-service"
+      com.datadoghq.tags.version: "2.0.0"
+      com.datadoghq.tags.team: "ai"
+      com.datadoghq.tags.owner: "dogbank-team"
 
 
   # ===========================================================================
@@ -655,6 +684,10 @@ services:
     restart: unless-stopped
     labels:
       com.datadoghq.ad.logs: '[{"source": "ollama", "service": "ollama"}]'
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.service: "ollama"
+      com.datadoghq.tags.team: "ai"
+      com.datadoghq.tags.owner: "dogbank-team"
     # Uncomment for GPU support (NVIDIA)
     # deploy:
     #   resources:
@@ -714,6 +747,8 @@ services:
       com.datadoghq.tags.env: "dogbank"
       com.datadoghq.tags.service: "pix-worker"
       com.datadoghq.tags.version: "1.0.0"
+      com.datadoghq.tags.team: "pix"
+      com.datadoghq.tags.owner: "dogbank-team"
 
 
   # ===========================================================================
@@ -763,6 +798,8 @@ services:
       com.datadoghq.tags.env: "dogbank"
       com.datadoghq.tags.service: "fraud-detection-service"
       com.datadoghq.tags.version: "1.0.0"
+      com.datadoghq.tags.team: "security"
+      com.datadoghq.tags.owner: "dogbank-team"
 
   # ===========================================================================
   # 🌐 FRONTEND - React + Nginx
@@ -784,6 +821,11 @@ services:
     restart: unless-stopped
     labels:
       com.datadoghq.ad.logs: '[{"source": "nginx", "service": "dogbank-frontend"}]'
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.service: "dogbank-frontend"
+      com.datadoghq.tags.version: "1.0.0"
+      com.datadoghq.tags.team: "frontend"
+      com.datadoghq.tags.owner: "dogbank-team"
 
   # ===========================================================================
   # 🚪 NGINX GATEWAY - Proxy Reverso
@@ -815,24 +857,29 @@ services:
       com.datadoghq.ad.init_configs: '[{}]'
       com.datadoghq.ad.instances: '[{"nginx_status_url": "http://%%host%%:80/nginx_status"}]'
       com.datadoghq.ad.logs: '[{"source": "nginx", "service": "dogbank-nginx"}]'
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.service: "dogbank-nginx"
+      com.datadoghq.tags.team: "platform"
+      com.datadoghq.tags.owner: "dogbank-team"
 
   # ===========================================================================
-  # 🤖 LOAD GENERATOR + SECURITY ATTACKER
+  # 🤖 LOAD GENERATOR + SECURITY ATTACKER + CHATBOT TESTER
   # ===========================================================================
-  # Simula transacoes PIX automaticas + ataques de seguranca para demonstracao
+  # Simula transacoes PIX automaticas + ataques de seguranca + testes de LLM
   #
   # Cenarios de Carga:
   #   - Transacoes normais, erro R$ 100, COAF (>= R$ 50k), saldo insuficiente
   #
   # Cenarios de Ataque (para demonstrar Datadog ASM/IAST):
-  #   - SQL Injection (extracao de dados)
-  #   - RCE/Command Injection
-  #   - Path Traversal
-  #   - XSS (Cross-Site Scripting)
-  #   - Authentication Bypass
-  #   - IDOR (Insecure Direct Object Reference)
+  #   - SQL Injection, RCE, Path Traversal, XSS, Auth Bypass, IDOR
   #
-  # RUN_MODE: "load" (apenas transacoes), "security" (apenas ataques), "both"
+  # Cenarios de Chatbot (para demonstrar Datadog LLM Observability):
+  #   - Perguntas legitimas (saldo, PIX, taxas)
+  #   - Prompt Injection (extrair system prompt, credenciais)
+  #   - Jailbreak (DAN mode, modo desenvolvedor)
+  #   - Data Exfiltration (listar CPFs, saldos)
+  #
+  # RUN_MODE: "load", "security", "chatbot", "both", ou "all"
   # ===========================================================================
 
   load-generator:
@@ -846,6 +893,8 @@ services:
       transaction-service:
         condition: service_healthy
       account-service:
+        condition: service_healthy
+      chatbot-service:
         condition: service_healthy
     environment:
       # Service URLs
@@ -868,16 +917,26 @@ services:
       # =================================================================
       ATTACK_MIN_INTERVAL: "8"
       ATTACK_MAX_INTERVAL: "20"
-      PROB_SQL_INJECTION: "0.30"    # 30% SQL Injection
+      PROB_SQL_INJECTION: "0.25"    # 25% SQL Injection (com exfiltracao)
+      PROB_LOG4SHELL: "0.15"        # 15% Log4Shell/JNDI RCE (CVE-2021-44228)
       PROB_RCE: "0.15"              # 15% RCE/Command Injection
-      PROB_PATH_TRAVERSAL: "0.15"   # 15% Path Traversal
+      PROB_PATH_TRAVERSAL: "0.10"   # 10% Path Traversal
       PROB_XSS: "0.15"              # 15% XSS
-      PROB_AUTH_BYPASS: "0.15"      # 15% Auth Bypass
+      PROB_AUTH_BYPASS: "0.10"      # 10% Auth Bypass
       PROB_IDOR: "0.10"             # 10% IDOR
       # =================================================================
-      # Run Mode: "load", "security", or "both"
+      # Chatbot Tester Config - Para demonstrar Datadog LLM Observability
       # =================================================================
-      RUN_MODE: "both"
+      CHATBOT_MIN_INTERVAL: "5"
+      CHATBOT_MAX_INTERVAL: "15"
+      PROB_LEGITIMATE: "0.50"       # 50% Perguntas legitimas
+      PROB_PROMPT_INJECTION: "0.30" # 30% Prompt injection
+      PROB_JAILBREAK: "0.10"        # 10% Jailbreak
+      PROB_DATA_EXFIL: "0.10"       # 10% Data exfiltration
+      # =================================================================
+      # Run Mode: "load", "security", "chatbot", "both", ou "all"
+      # =================================================================
+      RUN_MODE: "all"
     networks:
       - dogbank-network
     restart: unless-stopped
@@ -885,6 +944,9 @@ services:
       com.datadoghq.ad.logs: '[{"source": "python", "service": "load-generator"}]'
       com.datadoghq.tags.env: "dogbank"
       com.datadoghq.tags.service: "load-generator"
+      com.datadoghq.tags.version: "1.0.0"
+      com.datadoghq.tags.team: "sre"
+      com.datadoghq.tags.owner: "dogbank-team"
 
 # =============================================================================
 # 🌐 NETWORKS

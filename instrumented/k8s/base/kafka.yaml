@@ -30,6 +30,23 @@ spec:
         # Datadog Kafka integration
         ad.datadoghq.com/kafka.logs: '[{"source": "kafka", "service": "kafka"}]'
     spec:
+      # Init container to format storage for KRaft mode
+      initContainers:
+        - name: kafka-init-storage
+          image: apache/kafka:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              if [ ! -f /var/lib/kafka/data/meta.properties ]; then
+                echo "Formatting Kafka storage for KRaft mode..."
+                /opt/kafka/bin/kafka-storage.sh format -t dogbank-kafka-cluster-001 -c /opt/kafka/config/kraft/server.properties || true
+              else
+                echo "Kafka storage already formatted"
+              fi
+          volumeMounts:
+            - name: kafka-data
+              mountPath: /var/lib/kafka/data
       containers:
         - name: kafka
           image: apache/kafka:latest
@@ -47,7 +64,7 @@ spec:
             - name: KAFKA_PROCESS_ROLES
               value: "broker,controller"
             - name: KAFKA_CONTROLLER_QUORUM_VOTERS
-              value: "1@kafka:9093"
+              value: "1@kafka-0.kafka.dogbank.svc.cluster.local:9093"
             - name: KAFKA_CONTROLLER_LISTENER_NAMES
               value: "CONTROLLER"
             # Listeners
@@ -73,42 +90,41 @@ spec:
               value: "3"
             - name: KAFKA_LOG_RETENTION_HOURS
               value: "24"
-            # Cluster ID
+            - name: KAFKA_LOG_SEGMENT_BYTES
+              value: "1073741824"
+            # Cluster ID for KRaft
             - name: CLUSTER_ID
               value: "dogbank-kafka-cluster-001"
           resources:
             requests:
-              memory: "512Mi"
+              memory: "1Gi"
               cpu: "500m"
             limits:
-              memory: "1Gi"
-              cpu: "1000m"
+              memory: "2Gi"
+              cpu: "1500m"
           volumeMounts:
             - name: kafka-data
               mountPath: /var/lib/kafka/data
           livenessProbe:
-            exec:
-              command:
-                - /bin/sh
-                - -c
-                - /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list || exit 1
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 6
+          readinessProbe:
+            tcpSocket:
+              port: 9092
             initialDelaySeconds: 45
             periodSeconds: 10
-            timeoutSeconds: 10
-          readinessProbe:
-            exec:
-              command:
-                - /bin/sh
-                - -c
-                - /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list || exit 1
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
   volumeClaimTemplates:
     - metadata:
         name: kafka-data
       spec:
         accessModes: ["ReadWriteOnce"]
+        storageClassName: gp2
         resources:
           requests:
             storage: 2Gi
@@ -145,6 +161,7 @@ metadata:
   labels:
     app: kafka-init
 spec:
+  backoffLimit: 10
   template:
     metadata:
       labels:
@@ -159,11 +176,24 @@ spec:
             - -c
             - |
               echo 'Waiting for Kafka to be ready...'
-              sleep 30
+
+              # Wait up to 3 minutes for Kafka to be available
+              for i in $(seq 1 36); do
+                if /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:29092 > /dev/null 2>&1; then
+                  echo "Kafka is ready!"
+                  break
+                fi
+                echo "Waiting for Kafka... ($i/36)"
+                sleep 5
+              done
+
               echo 'Creating Kafka topics...'
-              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-transactions --partitions 3 --replication-factor 1
-              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-results --partitions 3 --replication-factor 1
-              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-notifications --partitions 3 --replication-factor 1
-              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-dlq --partitions 1 --replication-factor 1
-              echo 'Topics created:'
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-transactions --partitions 3 --replication-factor 1 --config retention.ms=86400000
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-results --partitions 3 --replication-factor 1 --config retention.ms=86400000
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-notifications --partitions 3 --replication-factor 1 --config retention.ms=86400000
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-dlq --partitions 1 --replication-factor 1 --config retention.ms=604800000
+
+              echo 'Topics created successfully:'
               /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list
+
+              echo 'Kafka initialization complete!'

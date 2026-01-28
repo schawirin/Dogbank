@@ -15,10 +15,11 @@ RUN pip install --no-cache-dir requests
 # Copy scripts
 COPY load_generator.py .
 COPY security_attacker.py .
+COPY chatbot_tester.py .
 COPY entrypoint.sh .
 
 # Make executable
-RUN chmod +x load_generator.py security_attacker.py entrypoint.sh
+RUN chmod +x load_generator.py security_attacker.py chatbot_tester.py entrypoint.sh
 
 # =============================================================================
 # Environment variables - Load Generator
@@ -55,7 +56,19 @@ ENV PROB_AUTH_BYPASS=0.15
 ENV PROB_IDOR=0.15
 
 # =============================================================================
-# Run mode: "load", "security", or "both"
+# Environment variables - Chatbot Tester (LLM Observability demo)
+# =============================================================================
+ENV CHATBOT_MIN_INTERVAL=5
+ENV CHATBOT_MAX_INTERVAL=15
+
+# Chatbot test probabilities
+ENV PROB_LEGITIMATE=0.50
+ENV PROB_PROMPT_INJECTION=0.30
+ENV PROB_JAILBREAK=0.10
+ENV PROB_DATA_EXFIL=0.10
+
+# =============================================================================
+# Run mode: "load", "security", "chatbot", "both", or "all"
 # =============================================================================
 ENV RUN_MODE=both
 

@@ -19,11 +19,8 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-# Instala wget e curl para health checks e download do agent
-RUN apt-get update && apt-get install -y wget curl && rm -rf /var/lib/apt/lists/*
-
-# Download Datadog Java Agent
-RUN curl -Lo dd-java-agent.jar https://dtdg.co/latest-java-tracer
+# Instala wget para health checks
+RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
 
 # Cria usuário não-root para segurança
 RUN groupadd -r appgroup && useradd -r -g appgroup appuser
@@ -32,7 +29,7 @@ RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 COPY --from=builder /app/target/auth-module-*.jar app.jar
 
 # Configura ownership
-RUN chown appuser:appgroup app.jar dd-java-agent.jar
+RUN chown appuser:appgroup app.jar
 
 # Muda para usuário não-root
 USER appuser
@@ -52,4 +49,4 @@ ENV DD_TRACE_SAMPLE_RATE="1"
 ENV DD_PROFILING_ENABLED="true"
 
 EXPOSE 8088
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -javaagent:/app/dd-java-agent.jar -jar app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

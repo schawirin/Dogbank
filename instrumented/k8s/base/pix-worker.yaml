@@ -29,7 +29,7 @@ spec:
         tags.datadoghq.com/service: pix-worker
         tags.datadoghq.com/version: "1.0.0"
       annotations:
-        # Datadog APM - Java auto-instrumentation
+        # Datadog Admission Controller - automatically injects DD Java agent
         admission.datadoghq.com/java-lib.version: "latest"
         # Datadog Logs
         ad.datadoghq.com/pix-worker.logs: '[{"source": "java", "service": "pix-worker"}]'
