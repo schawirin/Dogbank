@@ -37,7 +37,7 @@ spec:
     spec:
       containers:
         - name: fraud-detection-service
-          image: dogbank/fraud-detection-service:latest
+          image: schawirin/dogbank-fraud-detection-service:latest
           imagePullPolicy: IfNotPresent
           env:
             # =================================================================

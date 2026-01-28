@@ -33,7 +33,7 @@ spec:
     spec:
       containers:
         - name: transaction-service
-          image: dogbank/transaction-service:latest
+          image: schawirin/dogbank-transaction-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8087

@@ -36,7 +36,7 @@ spec:
     spec:
       containers:
         - name: chatbot-service
-          image: dogbank/chatbot-service:latest
+          image: schawirin/dogbank-chatbot-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8083

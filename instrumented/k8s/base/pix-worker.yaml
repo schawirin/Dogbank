@@ -36,7 +36,7 @@ spec:
     spec:
       containers:
         - name: pix-worker
-          image: dogbank/pix-worker:latest
+          image: schawirin/dogbank-pix-worker:latest
           imagePullPolicy: IfNotPresent
           env:
             # =================================================================

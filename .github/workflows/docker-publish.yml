@@ -11,32 +11,36 @@ jobs:
       matrix:
         service:
           - name: auth
-            context: ./dogbank
-            dockerfile: ./dogbank/auth-module/Dockerfile
+            context: ./instrumented/docker/dogbank
+            dockerfile: ./instrumented/docker/dogbank/auth-module/Dockerfile
             image: schawirin/dogbank-auth-service
           - name: account
-            context: ./dogbank
-            dockerfile: ./dogbank/account-module/Dockerfile
+            context: ./instrumented/docker/dogbank
+            dockerfile: ./instrumented/docker/dogbank/account-module/Dockerfile
             image: schawirin/dogbank-account-service
           - name: transactions
-            context: ./dogbank
-            dockerfile: ./dogbank/transaction-module/Dockerfile
+            context: ./instrumented/docker/dogbank
+            dockerfile: ./instrumented/docker/dogbank/transaction-module/Dockerfile
             image: schawirin/dogbank-transaction-service
           - name: bancocentral
-            context: ./dogbank
-            dockerfile: ./dogbank/bancocentral-module/Dockerfile
+            context: ./instrumented/docker/dogbank
+            dockerfile: ./instrumented/docker/dogbank/bancocentral-module/Dockerfile
             image: schawirin/dogbank-bancocentral-service
-          - name: integration
-            context: ./dogbank
-            dockerfile: ./dogbank/integration-module/Dockerfile
-            image: schawirin/dogbank-integration-service
-          - name: notifications
-            context: ./dogbank
-            dockerfile: ./dogbank/notification-module/Dockerfile
-            image: schawirin/dogbank-notification-service
+          - name: fraud-detection
+            context: ./instrumented/docker/dogbank
+            dockerfile: ./instrumented/docker/dogbank/fraud-detection-module/Dockerfile
+            image: schawirin/dogbank-fraud-detection-service
+          - name: pix-worker
+            context: ./instrumented/docker/dogbank
+            dockerfile: ./instrumented/docker/dogbank/pix-worker-module/Dockerfile
+            image: schawirin/dogbank-pix-worker
+          - name: chatbot
+            context: ./instrumented/docker/dogbank/chatbot-python
+            dockerfile: ./instrumented/docker/dogbank/chatbot-python/Dockerfile
+            image: schawirin/dogbank-chatbot-service
           - name: frontend
-            context: ./dogbank-frontend
-            dockerfile: ./dogbank-frontend/Dockerfile
+            context: ./instrumented/docker/dogbank-frontend
+            dockerfile: ./instrumented/docker/dogbank-frontend/Dockerfile
             image: schawirin/dogbank-frontend
 
     steps:
@@ -97,16 +101,17 @@ jobs:
         run: |
           echo "🔄 Restarting deployments to pull latest images..."
 
-          # Restart all backend services
-          kubectl rollout restart deployment/auth -n default
-          kubectl rollout restart deployment/accounts -n default
-          kubectl rollout restart deployment/transactions -n default
-          kubectl rollout restart deployment/bancocentral -n default
-          kubectl rollout restart deployment/integration -n default
-          kubectl rollout restart deployment/notifications -n default
+          # Restart all backend services in dogbank namespace
+          kubectl rollout restart deployment/auth-service -n dogbank || true
+          kubectl rollout restart deployment/account-service -n dogbank || true
+          kubectl rollout restart deployment/transaction-service -n dogbank || true
+          kubectl rollout restart deployment/bancocentral-service -n dogbank || true
+          kubectl rollout restart deployment/fraud-detection-service -n dogbank || true
+          kubectl rollout restart deployment/pix-worker -n dogbank || true
+          kubectl rollout restart deployment/chatbot-service -n dogbank || true
 
           # Restart frontend
-          kubectl rollout restart deployment/dogbank-frontend -n default
+          kubectl rollout restart deployment/frontend -n dogbank || true
 
           echo "✅ All deployments restarted"
 
@@ -114,18 +119,18 @@ jobs:
         run: |
           echo "⏳ Waiting for rollouts to complete..."
 
-          kubectl rollout status deployment/auth -n default --timeout=5m
-          kubectl rollout status deployment/accounts -n default --timeout=5m
-          kubectl rollout status deployment/transactions -n default --timeout=5m
-          kubectl rollout status deployment/bancocentral -n default --timeout=5m
-          kubectl rollout status deployment/integration -n default --timeout=5m
-          kubectl rollout status deployment/notifications -n default --timeout=5m
-          kubectl rollout status deployment/dogbank-frontend -n default --timeout=5m
+          kubectl rollout status deployment/auth-service -n dogbank --timeout=5m || true
+          kubectl rollout status deployment/account-service -n dogbank --timeout=5m || true
+          kubectl rollout status deployment/transaction-service -n dogbank --timeout=5m || true
+          kubectl rollout status deployment/bancocentral-service -n dogbank --timeout=5m || true
+          kubectl rollout status deployment/fraud-detection-service -n dogbank --timeout=5m || true
+          kubectl rollout status deployment/pix-worker -n dogbank --timeout=5m || true
+          kubectl rollout status deployment/chatbot-service -n dogbank --timeout=5m || true
+          kubectl rollout status deployment/frontend -n dogbank --timeout=5m || true
 
           echo "✅ All deployments are ready!"
 
       - name: Verify pods
         run: |
           echo "📊 Current pod status:"
-          kubectl get pods -n default -l app=dogbank-frontend
-          kubectl get pods -n default | grep -E "(auth|accounts|transactions|bancocentral|integration|notifications)"
+          kubectl get pods -n dogbank

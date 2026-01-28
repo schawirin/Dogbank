@@ -33,7 +33,7 @@ spec:
     spec:
       containers:
         - name: bancocentral-service
-          image: dogbank/bancocentral-service:latest
+          image: schawirin/dogbank-bancocentral-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8085
