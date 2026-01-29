@@ -8,6 +8,19 @@ instrumented/k8s/secrets.local.sh
 non-instrumented/k8s/base/secrets.yaml
 non-instrumented/k8s/secrets.local.sh
 
+# Terraform State Files - contain secrets!
+*.tfplan
+*.tfstate
+*.tfstate.backup
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Environment files with secrets
+.env
+.env.local
+*.secret
+
 # Temporary files
 *.tmp
 *.swp

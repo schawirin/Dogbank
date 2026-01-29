@@ -593,7 +593,7 @@ services:
       # LLM Configuration - Choose your provider:
       # =================================================================
       # GROQ - Default, super fast inference, free tier
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-***REMOVED_GROQ_API_KEY***}  # Groq API key
+      OPENAI_API_KEY: ${OPENAI_API_KEY}  # Set via environment variable (get from https://console.groq.com/keys)
       OPENAI_API_BASE_URL: ${OPENAI_API_BASE_URL:-https://api.groq.com/openai/v1}
       OPENAI_MODEL: ${OPENAI_MODEL:-llama-3.1-8b-instant}  # llama-3.1-8b-instant, mixtral-8x7b-32768
       # 
