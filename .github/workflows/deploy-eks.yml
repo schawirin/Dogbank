@@ -71,7 +71,9 @@ jobs:
           kubectl apply -f instrumented/k8s/base/namespace.yaml
           kubectl apply -f instrumented/k8s/base/configmap.yaml
           # Note: secrets should be created manually via secrets.local.sh, not from git
-          kubectl apply -f instrumented/k8s/base/
+
+          # Apply all yaml files except kustomization.yaml and secrets.yaml
+          find instrumented/k8s/base/ -name '*.yaml' ! -name 'kustomization.yaml' ! -name 'secrets.yaml' ! -name 'namespace.yaml' ! -name 'configmap.yaml' -exec kubectl apply -f {} \;
           
           echo "Aguardando rollout dos deployments..."
           kubectl rollout status deployment/account-service -n dogbank --timeout=5m
