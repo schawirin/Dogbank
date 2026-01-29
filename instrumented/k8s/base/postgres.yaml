@@ -43,6 +43,8 @@ spec:
         tags.datadoghq.com/version: "15"
       annotations:
         # Datadog Autodiscovery for PostgreSQL DBM
+        # NOTE: Password is managed via ENC[] syntax for External Secrets
+        # Or set DD_POSTGRES_PASSWORD env var on Datadog Agent with secret
         ad.datadoghq.com/postgres.checks: |
           {
             "postgres": {
@@ -53,7 +55,7 @@ spec:
                   "host": "%%host%%",
                   "port": 5432,
                   "username": "datadog",
-                  "password": "datadog_password",
+                  "password": "ENC[k8s_secret@dogbank/postgres-secrets/DATADOG_PASSWORD]",
                   "dbname": "dogbank",
                   "tags": ["env:dogbank", "service:postgres"],
                   "query_samples": {

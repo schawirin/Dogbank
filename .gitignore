@@ -1,0 +1,24 @@
+# =============================================================================
+# DogBank - Git Ignore
+# =============================================================================
+
+# Kubernetes Secrets - NEVER commit these files!
+instrumented/k8s/base/secrets.yaml
+instrumented/k8s/secrets.local.sh
+non-instrumented/k8s/base/secrets.yaml
+non-instrumented/k8s/secrets.local.sh
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db

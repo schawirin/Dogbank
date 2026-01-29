@@ -1,0 +1,83 @@
+# =============================================================================
+# DogBank - Ingress with TLS/SSL (Let's Encrypt)
+# =============================================================================
+# HTTPS enabled with automatic certificate provisioning
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dogbank-ingress
+  namespace: dogbank
+  annotations:
+    # Ingress class
+    kubernetes.io/ingress.class: nginx
+    # Cert-manager annotations
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # Force HTTPS redirect
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # SSL configurations
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "HIGH:!aNULL:!MD5"
+    # Proxy settings
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    # CORS settings
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+spec:
+  tls:
+  - hosts:
+    - lab.dogbank.dog
+    secretName: dogbank-tls-cert
+  rules:
+  - host: lab.dogbank.dog
+    http:
+      paths:
+      # Frontend - React App
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 80
+      # API Services
+      - path: /api/auth
+        pathType: Prefix
+        backend:
+          service:
+            name: auth-service
+            port:
+              number: 8088
+      - path: /api/accounts
+        pathType: Prefix
+        backend:
+          service:
+            name: account-service
+            port:
+              number: 8089
+      - path: /api/transactions
+        pathType: Prefix
+        backend:
+          service:
+            name: transaction-service
+            port:
+              number: 8087
+      - path: /api/bancocentral
+        pathType: Prefix
+        backend:
+          service:
+            name: bancocentral-service
+            port:
+              number: 8085
+      - path: /api/chatbot
+        pathType: Prefix
+        backend:
+          service:
+            name: chatbot-service
+            port:
+              number: 8083

@@ -48,20 +48,17 @@ spec:
             # Database
             # =================================================================
             - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres:5432/dogbank"
+            - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 configMapKeyRef:
                   name: dogbank-config
-                  key: db-url
-            - name: SPRING_DATASOURCE_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: dogbank-secrets
-                  key: db-user
+                  key: POSTGRES_USER
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: dogbank-secrets
-                  key: db-password
+                  key: SPRING_DATASOURCE_PASSWORD
             # =================================================================
             # External Services
             # =================================================================

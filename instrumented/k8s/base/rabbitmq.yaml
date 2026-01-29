@@ -28,9 +28,10 @@ spec:
         tags.datadoghq.com/service: rabbitmq
       annotations:
         # Datadog RabbitMQ integration
+        # NOTE: Password is managed via ENC[] syntax for External Secrets
         ad.datadoghq.com/rabbitmq.check_names: '["rabbitmq"]'
         ad.datadoghq.com/rabbitmq.init_configs: '[{}]'
-        ad.datadoghq.com/rabbitmq.instances: '[{"rabbitmq_api_url": "http://%%host%%:15672/api/", "username": "dogbank", "password": "dog1234"}]'
+        ad.datadoghq.com/rabbitmq.instances: '[{"rabbitmq_api_url": "http://%%host%%:15672/api/", "username": "dogbank", "password": "ENC[k8s_secret@dogbank/dogbank-secrets/rabbitmq-password]"}]'
         ad.datadoghq.com/rabbitmq.logs: '[{"source": "rabbitmq", "service": "rabbitmq"}]'
     spec:
       containers:

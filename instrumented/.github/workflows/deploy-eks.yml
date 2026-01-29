@@ -1,0 +1,153 @@
+name: Deploy to EKS
+
+on:
+  push:
+    tags:
+      - 'v*'  # Dispara em tags como v1.0.0, v1.2.3, etc
+  workflow_dispatch:  # Permite execução manual
+    inputs:
+      version:
+        description: 'Version to deploy (e.g., v1.2.3)'
+        required: false
+        default: 'latest'
+
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER: eks-sandbox-datadog
+  ECR_REGISTRY: schawirin  # Seu Docker Hub registry
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION="$(git rev-parse --short HEAD)"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Deploying version: $VERSION"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER }}
+
+      - name: Install yq
+        run: |
+          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+          chmod +x /usr/local/bin/yq
+
+      - name: Update versions in K8s manifests
+        run: |
+          VERSION="${{ env.VERSION }}"
+          
+          # Lista de serviços para atualizar
+          SERVICES=(
+            "account-service"
+            "auth-service"
+            "bancocentral-service"
+            "transaction-service"
+            "fraud-detection-service"
+            "pix-worker"
+            "chatbot-service"
+          )
+          
+          for service in "${SERVICES[@]}"; do
+            FILE="k8s/base/${service}.yaml"
+            if [ -f "$FILE" ]; then
+              echo "Atualizando versão em $FILE para $VERSION"
+              
+              # Atualizar label tags.datadoghq.com/version nos metadata
+              yq eval -i "
+                select(.kind == \"Deployment\") |
+                .metadata.labels.\"tags.datadoghq.com/version\" = \"$VERSION\" |
+                .spec.template.metadata.labels.\"tags.datadoghq.com/version\" = \"$VERSION\"
+              " "$FILE"
+              
+              # Atualizar variável de ambiente DD_VERSION
+              yq eval -i "
+                select(.kind == \"Deployment\") |
+                (.spec.template.spec.containers[0].env[] | select(.name == \"DD_VERSION\") | .value) = \"$VERSION\"
+              " "$FILE"
+            fi
+          done
+          
+          # Atualizar ConfigMap com a versão
+          yq eval -i ".data.DD_VERSION = \"$VERSION\"" k8s/base/configmap.yaml
+
+      - name: Deploy to EKS
+        run: |
+          echo "Aplicando manifests no cluster EKS..."
+          kubectl apply -f k8s/base/namespace.yaml
+          kubectl apply -f k8s/base/configmap.yaml
+          kubectl apply -f k8s/base/secrets.yaml
+          kubectl apply -f k8s/base/
+          
+          echo "Aguardando rollout dos deployments..."
+          kubectl rollout status deployment/account-service -n dogbank --timeout=5m
+          kubectl rollout status deployment/auth-service -n dogbank --timeout=5m
+          kubectl rollout status deployment/transaction-service -n dogbank --timeout=5m
+          kubectl rollout status deployment/bancocentral-service -n dogbank --timeout=5m
+          kubectl rollout status deployment/chatbot-service -n dogbank --timeout=5m
+          kubectl rollout status deployment/fraud-detection-service -n dogbank --timeout=5m
+          kubectl rollout status deployment/pix-worker -n dogbank --timeout=5m
+
+      - name: Verify deployment
+        run: |
+          echo "=== Pods Status ==="
+          kubectl get pods -n dogbank
+          
+          echo ""
+          echo "=== Deployments ==="
+          kubectl get deployments -n dogbank -o wide
+          
+          echo ""
+          echo "=== Version deployed: ${{ env.VERSION }} ==="
+
+      - name: Create deployment annotation in Datadog
+        run: |
+          curl -X POST "https://api.datadoghq.com/api/v1/events" \
+            -H "Content-Type: application/json" \
+            -H "DD-API-KEY: ${{ secrets.DATADOG_API_KEY }}" \
+            -d @- << PAYLOAD
+          {
+            "title": "Deployment to EKS - Version ${{ env.VERSION }}",
+            "text": "Deployed version ${{ env.VERSION }} to cluster ${{ env.EKS_CLUSTER }}",
+            "tags": ["env:dogbank", "deployment", "version:${{ env.VERSION }}"],
+            "alert_type": "info"
+          }
+          PAYLOAD
+
+      - name: Notify success
+        if: success()
+        run: |
+          echo "✅ Deploy concluído com sucesso!"
+          echo "Versão: ${{ env.VERSION }}"
+          echo "Cluster: ${{ env.EKS_CLUSTER }}"
+          echo ""
+          echo "Acesse o Datadog para ver os traces:"
+          echo "https://app.datadoghq.com/apm/traces?query=env%3Adogbank%20version%3A${{ env.VERSION }}"
+
+      - name: Notify failure
+        if: failure()
+        run: |
+          echo "❌ Deploy falhou!"
+          echo "Verifique os logs acima para mais detalhes."

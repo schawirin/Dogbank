@@ -38,6 +38,11 @@ spec:
             - containerPort: 8084
               name: http
           env:
+            # Application
+            - name: SPRING_PROFILES_ACTIVE
+              value: "docker"
+            - name: SERVER_PORT
+              value: "8084"
             # Database
             - name: SPRING_DATASOURCE_URL
               value: "jdbc:postgresql://postgres:5432/dogbank"
@@ -78,6 +83,30 @@ spec:
                 configMapKeyRef:
                   name: dogbank-config
                   key: NOTIFICATION_SERVICE_URL
+            # Kafka
+            - name: KAFKA_ENABLED
+              value: "true"
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:29092"
+            # RabbitMQ
+            - name: RABBITMQ_ENABLED
+              value: "true"
+            - name: RABBITMQ_HOST
+              value: "rabbitmq"
+            - name: RABBITMQ_PORT
+              value: "5672"
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: rabbitmq-user
+            - name: RABBITMQ_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: rabbitmq-password
+            - name: RABBITMQ_VHOST
+              value: "dogbank"
             # Datadog APM
             - name: DD_ENV
               valueFrom:
@@ -120,27 +149,42 @@ spec:
                 configMapKeyRef:
                   name: dogbank-config
                   key: DD_IAST_ENABLED
+            - name: DD_RUNTIME_METRICS_ENABLED
+              value: "true"
+            - name: DD_TRACE_SAMPLE_RATE
+              value: "1"
+            # Data Streams Monitoring - Kafka & RabbitMQ visibility
+            - name: DD_DATA_STREAMS_ENABLED
+              value: "true"
+            - name: DD_TRACE_KAFKA_ENABLED
+              value: "true"
+            - name: DD_TRACE_RABBITMQ_ENABLED
+              value: "true"
+            - name: DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED
+              value: "true"
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "200m"
-            limits:
               memory: "512Mi"
-              cpu: "500m"
+              cpu: "300m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
           livenessProbe:
             httpGet:
               path: /actuator/health
               port: 8084
-            initialDelaySeconds: 60
-            periodSeconds: 15
-            timeoutSeconds: 5
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8084
-            initialDelaySeconds: 30
+            initialDelaySeconds: 90
             periodSeconds: 10
             timeoutSeconds: 5
+            failureThreshold: 3
 
 ---
 apiVersion: v1
