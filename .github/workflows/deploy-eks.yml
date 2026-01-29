@@ -58,40 +58,12 @@ jobs:
       - name: Update versions in K8s manifests
         run: |
           VERSION="${{ env.VERSION }}"
-          
-          # Lista de serviços para atualizar
-          SERVICES=(
-            "account-service"
-            "auth-service"
-            "bancocentral-service"
-            "transaction-service"
-            "fraud-detection-service"
-            "pix-worker"
-            "chatbot-service"
-          )
-          
-          for service in "${SERVICES[@]}"; do
-            FILE="instrumented/k8s/base/${service}.yaml"
-            if [ -f "$FILE" ]; then
-              echo "Atualizando versão em $FILE para $VERSION"
 
-              # Atualizar label tags.datadoghq.com/version nos metadata
-              yq eval -i "
-                select(.kind == \"Deployment\") |
-                .metadata.labels.\"tags.datadoghq.com/version\" = \"$VERSION\" |
-                .spec.template.metadata.labels.\"tags.datadoghq.com/version\" = \"$VERSION\"
-              " "$FILE"
-
-              # Atualizar variável de ambiente DD_VERSION
-              yq eval -i "
-                select(.kind == \"Deployment\") |
-                (.spec.template.spec.containers[0].env[] | select(.name == \"DD_VERSION\") | .value) = \"$VERSION\"
-              " "$FILE"
-            fi
-          done
-
-          # Atualizar ConfigMap com a versão
+          # Atualizar ConfigMap com a versão (deployments referenciam daqui via configMapKeyRef)
+          echo "Atualizando DD_VERSION no ConfigMap para $VERSION"
           yq eval -i ".data.DD_VERSION = \"$VERSION\"" instrumented/k8s/base/configmap.yaml
+
+          echo "✓ ConfigMap atualizado com versão $VERSION"
 
       - name: Deploy to EKS
         run: |
