@@ -36,7 +36,10 @@ resources:
   - frontend.yaml
   - nginx.yaml
   - ingress.yaml
-  
+
+  # Autoscaling
+  - hpa.yaml
+
   # Datadog
   - datadog-agent.yaml
   - datadog-cluster-agent.yaml

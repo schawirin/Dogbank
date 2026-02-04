@@ -27,6 +27,12 @@ spec:
         # Datadog Admission Controller
         admission.datadoghq.com/enabled: "true"
         admission.datadoghq.com/java-lib.version: "latest"
+        # Explicitly disable unused language libraries
+        admission.datadoghq.com/js-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/python-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/dotnet-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/ruby-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/php-lib.config.v1: '{"disabled":true}'
         # Datadog Logs
         ad.datadoghq.com/notification-service.logs: '[{"source":"java","service":"notification-service"}]'
     spec:
@@ -109,11 +115,11 @@ spec:
               value: "-javaagent:/datadog/dd-java-agent.jar"
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "200m"
-            limits:
               memory: "512Mi"
-              cpu: "500m"
+              cpu: "300m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
           livenessProbe:
             httpGet:
               path: /actuator/health

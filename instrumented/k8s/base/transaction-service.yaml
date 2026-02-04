@@ -27,9 +27,22 @@ spec:
       annotations:
         # Datadog Admission Controller - automatically injects DD Java agent
         admission.datadoghq.com/java-lib.version: "latest"
+        # Explicitly disable unused language libraries
+        admission.datadoghq.com/js-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/python-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/dotnet-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/ruby-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/php-lib.config.v1: '{"disabled":true}'
         # Datadog Logs
         ad.datadoghq.com/transaction-service.logs: '[{"source":"java","service":"transaction-service"}]'
     spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: transaction-service
       containers:
         - name: transaction-service
           image: schawirin/dogbank-transaction-service:latest
@@ -107,6 +120,23 @@ spec:
                   key: rabbitmq-password
             - name: RABBITMQ_VHOST
               value: "dogbank"
+            # Spring RabbitMQ (required by Spring Boot)
+            - name: SPRING_RABBITMQ_HOST
+              value: "rabbitmq"
+            - name: SPRING_RABBITMQ_PORT
+              value: "5672"
+            - name: SPRING_RABBITMQ_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: SPRING_RABBITMQ_USERNAME
+            - name: SPRING_RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: SPRING_RABBITMQ_PASSWORD
+            - name: SPRING_RABBITMQ_VIRTUAL_HOST
+              value: "dogbank"
             # Datadog APM
             - name: DD_ENV
               valueFrom:
@@ -164,16 +194,16 @@ spec:
               value: "true"
           resources:
             requests:
-              memory: "512Mi"
+              memory: "768Mi"
               cpu: "300m"
             limits:
-              memory: "1Gi"
+              memory: "2Gi"
               cpu: "1000m"
           livenessProbe:
             httpGet:
               path: /actuator/health
               port: 8084
-            initialDelaySeconds: 90
+            initialDelaySeconds: 120
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 3
@@ -197,7 +227,7 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - port: 8087
+    - port: 8084
       targetPort: 8084
       name: http
   selector:

@@ -32,6 +32,12 @@ spec:
       annotations:
         # Datadog Admission Controller - automatically injects DD Java agent
         admission.datadoghq.com/java-lib.version: "latest"
+        # Explicitly disable unused language libraries
+        admission.datadoghq.com/js-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/python-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/dotnet-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/ruby-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/php-lib.config.v1: '{"disabled":true}'
         # Datadog Logs
         ad.datadoghq.com/fraud-detection-service.logs: '[{"source": "java", "service": "fraud-detection-service"}]'
     spec:
@@ -100,7 +106,7 @@ spec:
           resources:
             requests:
               memory: "512Mi"
-              cpu: "250m"
+              cpu: "300m"
             limits:
-              memory: "1Gi"
-              cpu: "500m"
+              memory: "1536Mi"
+              cpu: "1000m"

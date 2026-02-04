@@ -21,20 +21,7 @@ spec:
     apm:
       instrumentation:
         enabled: true
-        targets:
-          - name: "default-target"
-            ddTraceVersions:
-              java: "1"
-              python: "4"
-              js: "5"
-              php: "1"
-              dotnet: "3"
-              ruby: "2"
-            ddTraceConfigs:
-              - name: "DD_PROFILING_ENABLED"
-                value: "auto"
-              - name: "DD_DATA_STREAMS_ENABLED"
-                value: "true"
+        # No default targets - let pod annotations control lib injection
     logCollection:
       enabled: true
       containerCollectAll: true

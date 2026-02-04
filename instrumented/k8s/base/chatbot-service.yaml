@@ -30,7 +30,13 @@ spec:
         tags.datadoghq.com/version: "2.0.0"
       annotations:
         # Datadog APM - Python auto-instrumentation
-        #admission.datadoghq.com/python-lib.version: "latest"
+        admission.datadoghq.com/python-lib.version: "latest"
+        # Explicitly disable unused language libraries
+        admission.datadoghq.com/java-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/js-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/dotnet-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/ruby-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/php-lib.config.v1: '{"disabled":true}'
         # Datadog Logs
         ad.datadoghq.com/chatbot-service.logs: '[{"source": "python", "service": "chatbot-service"}]'
     spec:
@@ -43,24 +49,33 @@ spec:
               name: http
           env:
             # =================================================================
-            # LLM Configuration - Groq (Default)
+            # LLM Configuration - Groq (Default) + Gemini (Fallback)
             # =================================================================
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: dogbank-secrets
-                  key: groq-api-key
+                  key: GROQ_API_KEY
             - name: OPENAI_API_BASE_URL
               value: "https://api.groq.com/openai/v1"
             - name: OPENAI_MODEL
               value: "llama-3.1-8b-instant"
+            # Gemini fallback (when Groq hits rate limit)
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: GEMINI_API_KEY
+                  optional: true
+            - name: GEMINI_MODEL
+              value: "gemini-1.5-flash"
             # =================================================================
             # Service URLs
             # =================================================================
             - name: ACCOUNT_SERVICE_URL
               value: "http://account-service:8089"
             - name: TRANSACTION_SERVICE_URL
-              value: "http://transaction-service:8087"
+              value: "http://transaction-service:8084"
             - name: AUTH_SERVICE_URL
               value: "http://auth-service:8088"
             # =================================================================

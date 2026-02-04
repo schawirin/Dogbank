@@ -41,10 +41,10 @@ spec:
             ddTraceVersions:
               java: "1"
               python: "4"
-              js: "5"
-              php: "1"
-              dotnet: "3"
-              ruby: "2"
+             # js: "5"
+             # php: "1"
+             # dotnet: "3"
+             # ruby: "2"
             ddTraceConfigs:
               - name: "DD_PROFILING_ENABLED"
                 value: "auto"

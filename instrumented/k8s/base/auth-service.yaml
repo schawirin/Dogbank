@@ -27,9 +27,22 @@ spec:
       annotations:
         # Datadog Admission Controller - automatically injects DD Java agent
         admission.datadoghq.com/java-lib.version: "latest"
+        # Explicitly disable unused language libraries
+        admission.datadoghq.com/js-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/python-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/dotnet-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/ruby-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/php-lib.config.v1: '{"disabled":true}'
         # Datadog Logs
         ad.datadoghq.com/auth-service.logs: '[{"source":"java","service":"auth-service"}]'
     spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: auth-service
       containers:
         - name: auth-service
           image: schawirin/dogbank-auth-service:latest
@@ -106,23 +119,23 @@ spec:
                   key: DD_IAST_ENABLED
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "200m"
-            limits:
               memory: "512Mi"
-              cpu: "500m"
+              cpu: "250m"
+            limits:
+              memory: "1536Mi"
+              cpu: "1000m"
           livenessProbe:
             httpGet:
               path: /actuator/health
               port: 8088
-            initialDelaySeconds: 60
+            initialDelaySeconds: 120
             periodSeconds: 15
             timeoutSeconds: 5
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8088
-            initialDelaySeconds: 30
+            initialDelaySeconds: 90
             periodSeconds: 10
             timeoutSeconds: 5
 

@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-generator
+  namespace: dogbank
+  labels:
+    app: load-generator
+    tags.datadoghq.com/env: "dogbank"
+    tags.datadoghq.com/service: "load-generator"
+    tags.datadoghq.com/version: "1.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: load-generator
+  template:
+    metadata:
+      labels:
+        app: load-generator
+        tags.datadoghq.com/env: "dogbank"
+        tags.datadoghq.com/service: "load-generator"
+        tags.datadoghq.com/version: "1.0"
+        admission.datadoghq.com/enabled: "false"
+      annotations:
+        admission.datadoghq.com/enabled: "false"
+        ad.datadoghq.com/load-generator.logs: '[{"source":"load-generator","service":"load-generator"}]'
+    spec:
+      containers:
+      - name: load-generator
+        image: schawirin/dogbank-load-generator:latest
+        imagePullPolicy: Always
+        command: ["/bin/bash", "entrypoint.sh"]
+        env:
+        # Run mode
+        - name: RUN_MODE
+          value: "both"
+        # Service URLs
+        - name: AUTH_SERVICE_URL
+          value: "http://auth-service:8088"
+        - name: ACCOUNT_SERVICE_URL
+          value: "http://account-service:8089"
+        - name: TRANSACTION_SERVICE_URL
+          value: "http://transaction-service:8084"
+        - name: CHATBOT_SERVICE_URL
+          value: "http://chatbot-service:8083"
+        - name: NGINX_URL
+          value: "http://nginx:80"
+
+        # Attack configuration - MODERATE FOR STABILITY
+        - name: ATTACK_MIN_INTERVAL
+          value: "30"
+        - name: ATTACK_MAX_INTERVAL
+          value: "60"
+
+        # Attack probabilities - REDUCED FOR STABILITY
+        - name: PROB_SQL_INJECTION
+          value: "0.20"
+        - name: PROB_RCE
+          value: "0.20"
+        - name: PROB_LOG4SHELL
+          value: "0.15"
+        - name: PROB_PATH_TRAVERSAL
+          value: "0.15"
+        - name: PROB_XSS
+          value: "0.10"
+        - name: PROB_AUTH_BYPASS
+          value: "0.10"
+        - name: PROB_IDOR
+          value: "0.10"
+
+        # Datadog tags
+        - name: DD_ENV
+          value: "dogbank"
+        - name: DD_SERVICE
+          value: "load-generator"
+        - name: DD_VERSION
+          value: "1.0"
+
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: load-generator
+  namespace: dogbank
+  labels:
+    app: load-generator
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: load-generator
+  type: ClusterIP
