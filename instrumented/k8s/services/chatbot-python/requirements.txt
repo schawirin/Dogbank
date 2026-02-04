@@ -1,0 +1,20 @@
+# Web Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+
+# HTTP Client
+httpx==0.26.0
+requests==2.31.0
+
+# OpenAI Client (works with Ollama)
+openai==1.12.0
+
+# Google Gemini (fallback for rate limits)
+google-generativeai==0.3.2
+
+# Datadog APM & LLM Observability
+ddtrace>=2.6.0
+
+# Utilities
+pydantic==2.5.3
+python-dotenv==1.0.0

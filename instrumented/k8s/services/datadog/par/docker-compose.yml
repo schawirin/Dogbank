@@ -1,0 +1,40 @@
+# =============================================================================
+# DogBank - Private Action Runner (PAR)
+# =============================================================================
+# Permite executar comandos docker-compose via Datadog Workflow Automation
+# Para auto-remediacao de servicos
+# =============================================================================
+
+version: "3.8"
+
+services:
+  private-action-runner:
+    image: gcr.io/datadoghq/private-action-runner:v1.17.0
+    container_name: dogbank-private-action-runner
+    hostname: dogbank-par
+    environment:
+      # Datadog Site (US1)
+      - DD_SITE=datadoghq.com
+    volumes:
+      # Configuracao do PAR (read-only)
+      - ./config:/config:ro
+      # Docker socket para executar compose commands
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Diretorio do projeto DogBank (read-only para seguranca)
+      - ../../:/dogbank:ro
+    working_dir: /dogbank
+    networks:
+      - dogbank_default
+    restart: unless-stopped
+    labels:
+      # Datadog Autodiscovery para logs
+      com.datadoghq.ad.logs: '[{"source": "private-action-runner", "service": "private-action-runner"}]'
+      # Tags para organizacao
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.service: "private-action-runner"
+      com.datadoghq.tags.team: "sre"
+
+networks:
+  dogbank_default:
+    external: true
+    name: dogbank_default

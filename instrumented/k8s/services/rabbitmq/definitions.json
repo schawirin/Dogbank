@@ -1,0 +1,177 @@
+{
+  "rabbit_version": "3.12.0",
+  "users": [
+    {
+      "name": "dogbank",
+      "password_hash": "UvzFnuIF/i5ZsMBnO4JpIImeo1RtfgGOhBSBzfL5G35tq+z6",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": ["administrator"]
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "dogbank"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "dogbank",
+      "vhost": "dogbank",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "pix.processing",
+      "vhost": "dogbank",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "pix.direct",
+      "vhost": "dogbank",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "pix.dlx",
+      "vhost": "dogbank",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "coaf.exchange",
+      "vhost": "dogbank",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "pix.fraud",
+      "vhost": "dogbank",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-dead-letter-exchange": "pix.dlx",
+        "x-message-ttl": 300000
+      }
+    },
+    {
+      "name": "pix.balance",
+      "vhost": "dogbank",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-dead-letter-exchange": "pix.dlx",
+        "x-message-ttl": 300000
+      }
+    },
+    {
+      "name": "pix.notification",
+      "vhost": "dogbank",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-dead-letter-exchange": "pix.dlx",
+        "x-message-ttl": 600000
+      }
+    },
+    {
+      "name": "pix.audit",
+      "vhost": "dogbank",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    },
+    {
+      "name": "pix.dlq",
+      "vhost": "dogbank",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    },
+    {
+      "name": "coaf.notifications",
+      "vhost": "dogbank",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-message-ttl": 604800000,
+        "x-max-length": 10000
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "source": "pix.processing",
+      "vhost": "dogbank",
+      "destination": "pix.fraud",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "pix.processing",
+      "vhost": "dogbank",
+      "destination": "pix.balance",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "pix.processing",
+      "vhost": "dogbank",
+      "destination": "pix.notification",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "pix.processing",
+      "vhost": "dogbank",
+      "destination": "pix.audit",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "pix.dlx",
+      "vhost": "dogbank",
+      "destination": "pix.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "coaf.exchange",
+      "vhost": "dogbank",
+      "destination": "coaf.notifications",
+      "destination_type": "queue",
+      "routing_key": "coaf.notification",
+      "arguments": {}
+    }
+  ]
+}

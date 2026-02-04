@@ -11,37 +11,41 @@ jobs:
       matrix:
         service:
           - name: auth
-            context: ./instrumented/docker/dogbank
-            dockerfile: ./instrumented/docker/dogbank/auth-module/Dockerfile
+            context: ./instrumented/k8s/services
+            dockerfile: ./instrumented/k8s/services/auth-module/Dockerfile
             image: schawirin/dogbank-auth-service
           - name: account
-            context: ./instrumented/docker/dogbank
-            dockerfile: ./instrumented/docker/dogbank/account-module/Dockerfile
+            context: ./instrumented/k8s/services
+            dockerfile: ./instrumented/k8s/services/account-module/Dockerfile
             image: schawirin/dogbank-account-service
           - name: transactions
-            context: ./instrumented/docker/dogbank
-            dockerfile: ./instrumented/docker/dogbank/transaction-module/Dockerfile
+            context: ./instrumented/k8s/services
+            dockerfile: ./instrumented/k8s/services/transaction-module/Dockerfile
             image: schawirin/dogbank-transaction-service
           - name: bancocentral
-            context: ./instrumented/docker/dogbank
-            dockerfile: ./instrumented/docker/dogbank/bancocentral-module/Dockerfile
+            context: ./instrumented/k8s/services
+            dockerfile: ./instrumented/k8s/services/bancocentral-module/Dockerfile
             image: schawirin/dogbank-bancocentral-service
           - name: fraud-detection
-            context: ./instrumented/docker/dogbank/fraud-detection-module
-            dockerfile: ./instrumented/docker/dogbank/fraud-detection-module/Dockerfile
+            context: ./instrumented/k8s/services/fraud-detection-module
+            dockerfile: ./instrumented/k8s/services/fraud-detection-module/Dockerfile
             image: schawirin/dogbank-fraud-detection-service
           - name: pix-worker
-            context: ./instrumented/docker/dogbank/pix-worker-module
-            dockerfile: ./instrumented/docker/dogbank/pix-worker-module/Dockerfile
+            context: ./instrumented/k8s/services/pix-worker-module
+            dockerfile: ./instrumented/k8s/services/pix-worker-module/Dockerfile
             image: schawirin/dogbank-pix-worker
           - name: chatbot
-            context: ./instrumented/docker/dogbank/chatbot-python
-            dockerfile: ./instrumented/docker/dogbank/chatbot-python/Dockerfile
+            context: ./instrumented/k8s/services/chatbot-python
+            dockerfile: ./instrumented/k8s/services/chatbot-python/Dockerfile
             image: schawirin/dogbank-chatbot-service
           - name: frontend
-            context: ./instrumented/docker/dogbank-frontend
-            dockerfile: ./instrumented/docker/dogbank-frontend/Dockerfile
+            context: ./instrumented/k8s/services/frontend
+            dockerfile: ./instrumented/k8s/services/frontend/Dockerfile
             image: schawirin/dogbank-frontend
+          - name: load-generator
+            context: ./instrumented/k8s/services/load-generator
+            dockerfile: ./instrumented/k8s/services/load-generator/Dockerfile
+            image: schawirin/dogbank-load-generator
 
     steps:
       - uses: actions/checkout@v4
@@ -113,6 +117,9 @@ jobs:
           # Restart frontend
           kubectl rollout restart deployment/frontend -n dogbank || true
 
+          # Restart load-generator
+          kubectl rollout restart deployment/load-generator -n dogbank || true
+
           echo "✅ All deployments restarted"
 
       - name: Wait for rollout to complete
@@ -127,6 +134,7 @@ jobs:
           kubectl rollout status deployment/pix-worker -n dogbank --timeout=5m || true
           kubectl rollout status deployment/chatbot-service -n dogbank --timeout=5m || true
           kubectl rollout status deployment/frontend -n dogbank --timeout=5m || true
+          kubectl rollout status deployment/load-generator -n dogbank --timeout=5m || true
 
           echo "✅ All deployments are ready!"
 

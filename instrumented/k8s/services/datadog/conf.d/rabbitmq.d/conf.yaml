@@ -1,0 +1,37 @@
+# RabbitMQ Integration for Datadog
+# https://docs.datadoghq.com/integrations/rabbitmq/
+
+init_config:
+
+instances:
+  - rabbitmq_api_url: http://rabbitmq:15672/api/
+    rabbitmq_user: dogbank
+    rabbitmq_pass: dog1234
+    tag_families: true
+    collect_node_metrics: true
+    
+    # Queue patterns to monitor (including COAF compliance queue)
+    queues:
+      - pix.fraud
+      - pix.balance
+      - pix.notification
+      - pix.audit
+      - pix.dlq
+      - coaf.notifications
+    
+    # Exchange patterns to monitor (including COAF exchange)
+    exchanges:
+      - pix.processing
+      - pix.direct
+      - pix.dlx
+      - coaf.exchange
+    
+    tags:
+      - env:dogbank
+      - service:rabbitmq
+      - team:dogbank
+
+logs:
+  - type: docker
+    source: rabbitmq
+    service: dogbank-rabbitmq

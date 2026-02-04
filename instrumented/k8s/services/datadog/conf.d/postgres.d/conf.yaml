@@ -1,0 +1,46 @@
+## Datadog Database Monitoring (DBM) for PostgreSQL
+## https://docs.datadoghq.com/database_monitoring/setup_postgres/selfhosted/
+
+init_config:
+
+instances:
+  - host: postgres
+    port: 5432
+    username: datadog
+    password: datadog_password
+    dbname: dogbank
+    
+    ## Database Monitoring - Enable DBM
+    dbm: true
+    
+    ## Collect query metrics
+    collect_activity_metrics: true
+    collect_database_size_metrics: true
+    collect_default_database: true
+    
+    ## Schema collection (requires Datadog Agent 7.54+)
+    collect_schemas:
+      enabled: true
+      max_tables: 1000
+      max_columns: 50
+    
+    ## Query samples and explain plans
+    query_samples:
+      enabled: true
+    query_metrics:
+      enabled: true
+    query_activity:
+      enabled: true
+    
+    ## Collect pg_stat_statements metrics
+    pg_stat_statements_view: pg_stat_statements
+    
+    ## Relations to collect metrics from
+    relations:
+      - relation_regex: .*
+    
+    ## Tags for this instance
+    tags:
+      - env:dogbank
+      - service:dogbank-postgres
+      - project:dogbank

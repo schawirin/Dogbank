@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <Properties>
+        <!-- Propriedades para Datadog -->
+        <Property name="serviceName">${env:DD_SERVICE:-transaction-service}</Property>
+        <Property name="serviceVersion">${env:DD_VERSION:-1.0.0}</Property>
+        <Property name="environment">${env:DD_ENV:-dogbank}</Property>
+    </Properties>
+
+    <Appenders>
+        <!-- Console Appender com JSON para Datadog -->
+        <Console name="ConsoleJson" target="SYSTEM_OUT">
+            <JsonTemplateLayout eventTemplateUri="classpath:DatadogLogLayout.json"/>
+        </Console>
+        
+        <!-- Console Appender padrão para debug local -->
+        <Console name="ConsoleText" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+        </Console>
+    </Appenders>
+
+    <Loggers>
+        <!-- Logger específico para métricas de negócio PIX -->
+        <Logger name="pix.metrics" level="info" additivity="false">
+            <AppenderRef ref="ConsoleJson"/>
+        </Logger>
+        
+        <!-- Logger para transações -->
+        <Logger name="com.dogbank.transaction" level="info" additivity="false">
+            <AppenderRef ref="ConsoleJson"/>
+        </Logger>
+        
+        <!-- Root logger -->
+        <Root level="info">
+            <AppenderRef ref="ConsoleJson"/>
+        </Root>
+
+        <!-- Spring Framework -->
+        <Logger name="org.springframework.web" level="info"/>
+        <Logger name="org.springframework.security" level="warn"/>
+        
+        <!-- Hibernate -->
+        <Logger name="org.hibernate" level="warn"/>
+        
+        <!-- Tomcat -->
+        <Logger name="org.apache.catalina" level="warn"/>
+        <Logger name="org.apache.tomcat" level="warn"/>
+        
+        <!-- Silence noisy libraries -->
+        <Logger name="io.micrometer" level="error"/>
+        <Logger name="io.netty" level="error"/>
+        <Logger name="reactor.netty" level="error"/>
+        <Logger name="io.lettuce" level="error"/>
+        <Logger name="com.zaxxer.hikari" level="warn"/>
+        <Logger name="org.apache.kafka" level="warn"/>
+    </Loggers>
+</Configuration>

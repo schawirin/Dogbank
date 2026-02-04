@@ -1,0 +1,30 @@
+# =============================================================================
+# DogBank - Private Action Runner Configuration
+# =============================================================================
+# Configuracao principal do PAR
+# Docs: https://docs.datadoghq.com/actions/private_actions/
+# =============================================================================
+
+# Runner identification (will be set by Datadog during registration)
+# runnerName: dogbank-par
+
+# Actions configuration
+privateActionRunner:
+  # =============================================================================
+  # Script Action - Permite executar comandos shell
+  # =============================================================================
+  script:
+    enabled: true
+    credentialsFile: /config/credentials/script.yaml
+
+  # =============================================================================
+  # HTTP Action - Para chamadas HTTP customizadas (opcional)
+  # =============================================================================
+  # http:
+  #   enabled: true
+  #   credentialsFile: /config/credentials/http.yaml
+
+# Logging configuration
+logging:
+  level: info
+  format: json
