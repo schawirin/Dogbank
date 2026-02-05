@@ -27,8 +27,27 @@ spec:
         tags.datadoghq.com/env: dogbank
         tags.datadoghq.com/service: kafka
       annotations:
-        # Datadog Kafka integration
-        ad.datadoghq.com/kafka.logs: '[{"source": "kafka", "service": "kafka"}]'
+        # Datadog Kafka integration with Data Stream Monitoring (DSM)
+        ad.datadoghq.com/kafka.check_names: '["kafka"]'
+        ad.datadoghq.com/kafka.init_configs: '[{}]'
+        ad.datadoghq.com/kafka.instances: |
+          [
+            {
+              "host": "%%host%%",
+              "port": 9092,
+              "kafka_connect_str": ["%%host%%:9092"],
+              "kafka_consumer_offsets": true,
+              "consumer_groups": true,
+              "monitor_unlisted_consumer_groups": true,
+              "data_streams_enabled": true,
+              "tags": [
+                "env:dogbank",
+                "service:kafka",
+                "cluster_name:dogbank-kafka"
+              ]
+            }
+          ]
+        ad.datadoghq.com/kafka.logs: '[{"source": "kafka", "service": "kafka", "tags": ["env:dogbank"]}]'
     spec:
       # Init container to format storage for KRaft mode
       initContainers:
@@ -57,6 +76,8 @@ spec:
               name: internal
             - containerPort: 9093
               name: controller
+            - containerPort: 9999
+              name: jmx
           env:
             # KRaft mode configuration
             - name: KAFKA_NODE_ID
@@ -95,6 +116,11 @@ spec:
             # Cluster ID for KRaft
             - name: CLUSTER_ID
               value: "dogbank-kafka-cluster-001"
+            # JMX for Datadog monitoring
+            - name: KAFKA_JMX_OPTS
+              value: "-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -Dcom.sun.management.jmxremote.port=9999 -Dcom.sun.management.jmxremote.rmi.port=9999"
+            - name: JMX_PORT
+              value: "9999"
           resources:
             requests:
               memory: "1Gi"
@@ -137,6 +163,18 @@ metadata:
   namespace: dogbank
   labels:
     app: kafka
+  annotations:
+    # Kafka Consumer check for cluster monitoring
+    ad.datadoghq.com/service.checks: |-
+      {
+        "kafka_consumer": {
+           "init_config": {},
+           "instances": [{
+              "kafka_connect_str": ["kafka:9092"],
+              "enable_cluster_monitoring": true
+           }]
+        }
+      }
 spec:
   type: ClusterIP
   ports:

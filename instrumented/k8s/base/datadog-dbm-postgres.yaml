@@ -1,0 +1,87 @@
+# =============================================================================
+# Datadog Database Monitoring - PostgreSQL RDS Configuration
+# =============================================================================
+# Habilita Database Monitoring (DBM) para RDS PostgreSQL
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: datadog-dbm-postgres
+  namespace: dogbank
+data:
+  postgres.yaml: |-
+    init_config:
+
+    instances:
+      - host: dogbank-postgres.c102aia0et2w.us-east-1.rds.amazonaws.com
+        port: 5432
+        username: datadog
+        password: ENC[k8s_secret@dogbank/postgres-secrets/DATADOG_PASSWORD]
+        dbname: dogbank
+        ssl: require
+
+        # Enable Database Monitoring
+        dbm: true
+
+        # Query metrics collection
+        query_metrics:
+          enabled: true
+          collection_interval: 10
+
+        # Query samples collection
+        query_samples:
+          enabled: true
+          collection_interval: 1
+
+        # Query activity collection
+        query_activity:
+          enabled: true
+          collection_interval: 10
+
+        # Execution plans collection
+        collect_execution_plans:
+          enabled: true
+          collection_interval: 600
+
+        # Settings collection
+        collect_settings:
+          enabled: true
+          collection_interval: 600
+
+        # Bloat metrics
+        collect_bloat_metrics:
+          enabled: true
+          collection_interval: 600
+
+        # Database size metrics
+        collect_database_size_metrics:
+          enabled: true
+
+        # Connection metrics
+        collect_connection_metrics:
+          enabled: true
+
+        # Replication metrics (for read replicas)
+        collect_replication_metrics:
+          enabled: true
+
+        # Schema collection
+        collect_schemas:
+          enabled: true
+
+        # Tags
+        tags:
+          - "env:dogbank"
+          - "service:postgres"
+          - "db:rds"
+          - "cluster:dogbank-postgres"
+
+        # Relations to monitor (all by default)
+        relations:
+          - relation_regex: ".*"
+
+        # AWS RDS specific
+        aws:
+          instance_endpoint: dogbank-postgres.c102aia0et2w.us-east-1.rds.amazonaws.com
+          region: us-east-1

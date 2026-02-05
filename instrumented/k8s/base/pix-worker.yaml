@@ -106,7 +106,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: dogbank-secrets
-                  key: dd-api-key
+                  key: DD_API_KEY
             - name: DD_METRICS_ENABLED
               value: "true"
           resources:

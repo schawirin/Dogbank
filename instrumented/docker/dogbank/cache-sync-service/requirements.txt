@@ -1,0 +1,8 @@
+# Kafka Consumer (confluent-kafka for Datadog DSM support)
+confluent-kafka==2.3.0
+
+# Redis Client
+redis==5.0.1
+
+# Datadog APM
+ddtrace>=2.6.0

@@ -31,6 +31,7 @@ resources:
   - pix-worker.yaml
   - fraud-detection-service.yaml
   - ollama.yaml
+  - cache-sync-service.yaml
   
   # Frontend
   - frontend.yaml
@@ -41,10 +42,5 @@ resources:
   - hpa.yaml
 
   # Datadog
-  - datadog-agent.yaml
-  - datadog-cluster-agent.yaml
-
-commonLabels:
-  app.kubernetes.io/name: dogbank
-  app.kubernetes.io/part-of: dogbank
-  app.kubernetes.io/managed-by: kustomize
+  - datadog-agent-cr.yaml
+  - datadog-dbm-postgres.yaml

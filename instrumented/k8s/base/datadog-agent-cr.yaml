@@ -57,3 +57,54 @@ spec:
       enabled: true
     liveProcessCollection:
       enabled: true
+  override:
+    clusterAgent:
+      extraConfd:
+        configDataMap:
+          postgres.yaml: |-
+            cluster_check: true
+            init_config:
+            instances:
+              - host: dogbank-postgres.c102aia0et2w.us-east-1.rds.amazonaws.com
+                port: 5432
+                username: datadog
+                password: ENC[k8s_secret@dogbank/postgres-secrets/DATADOG_PASSWORD]
+                dbname: dogbank
+                ssl: require
+                dbm: true
+                query_metrics:
+                  enabled: true
+                  collection_interval: 10
+                query_samples:
+                  enabled: true
+                  collection_interval: 1
+                query_activity:
+                  enabled: true
+                  collection_interval: 10
+                collect_execution_plans:
+                  enabled: true
+                  collection_interval: 600
+                collect_settings:
+                  enabled: true
+                  collection_interval: 600
+                collect_bloat_metrics:
+                  enabled: true
+                  collection_interval: 600
+                collect_database_size_metrics:
+                  enabled: true
+                collect_connection_metrics:
+                  enabled: true
+                collect_replication_metrics:
+                  enabled: true
+                collect_schemas:
+                  enabled: true
+                tags:
+                  - "env:dogbank"
+                  - "service:postgres"
+                  - "db:rds"
+                  - "cluster:dogbank-postgres"
+                relations:
+                  - relation_regex: ".*"
+                aws:
+                  instance_endpoint: dogbank-postgres.c102aia0et2w.us-east-1.rds.amazonaws.com
+                  region: us-east-1
