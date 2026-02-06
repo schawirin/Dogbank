@@ -28,6 +28,20 @@ public class TransactionController {
 
     @PostMapping("/pix")
     public ResponseEntity<TransactionResponse> transferirViaPix(@RequestBody TransactionRequest request) {
+        // Validação de senha obrigatória
+        if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
+            log.error("❌ Tentativa de PIX sem senha! Account: {}", request.getAccountOriginId());
+            throw new RuntimeException("Senha é obrigatória para transferências PIX");
+        }
+
+        // Validar senha com auth-service
+        boolean senhaValida = transactionService.validarSenha(request.getAccountOriginId(), request.getPassword());
+        if (!senhaValida) {
+            log.error("❌ Senha inválida para PIX! Account: {}", request.getAccountOriginId());
+            throw new RuntimeException("Senha incorreta");
+        }
+
+        log.info("✅ Senha validada. Processando PIX...");
         ZonedDateTime startedAt = ZonedDateTime.now();
         Transaction tx = transactionService.transferirPix(
             request.getAccountOriginId(),

@@ -8,6 +8,7 @@ public class TransactionRequest {
     private BigDecimal amount;
     private String pixKeyDestination;  // Para transferências via PIX
     private String description;  // Descrição opcional da transferência
+    private String password;  // Senha da conta para validação (obrigatória para PIX)
 
     // Getters e Setters
     public Long getAccountOriginId() {
@@ -43,5 +44,12 @@ public class TransactionRequest {
     }
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+    public void setPassword(String password) {
+        this.password = password;
     }
 }

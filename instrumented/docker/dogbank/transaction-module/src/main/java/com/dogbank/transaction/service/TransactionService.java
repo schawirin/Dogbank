@@ -44,13 +44,16 @@ public class TransactionService {
     
     @Autowired(required = false)
     private KafkaProducerService kafkaProducerService;
-    
+
     @Autowired(required = false)
     private RabbitMQProducerService rabbitMQProducerService;
-    
+
+    @Autowired(required = false)
+    private EventPublisherService eventPublisherService;
+
     @Value("${kafka.enabled:false}")
     private boolean kafkaEnabled;
-    
+
     @Value("${rabbitmq.enabled:false}")
     private boolean rabbitmqEnabled;
     
@@ -177,9 +180,10 @@ public class TransactionService {
             
             // Atualiza saldos
             BigDecimal saldoDepois = origin.getBalance().subtract(amount);
+            BigDecimal saldoDestinoDepois = dest.getBalance().add(amount);
             updateAccountBalance(origin.getId(), saldoDepois);
-            updateAccountBalance(dest.getId(), dest.getBalance().add(amount));
-            
+            updateAccountBalance(dest.getId(), saldoDestinoDepois);
+
             MDC.put("saldo_depois", saldoDepois.toString());
             
             // Persiste transação
@@ -200,9 +204,47 @@ public class TransactionService {
             tx.setDescription("PIX para " + userDest.getNome());
             
             Transaction saved = transactionRepository.save(tx);
-            
+
             long durationMs = calcularDuracao(startedAt);
-            
+
+            // Publica eventos para event-driven architecture (CQRS - Command completed)
+            if (eventPublisherService != null) {
+                try {
+                    // Evento 1: Saldo origem atualizado
+                    eventPublisherService.publishBalanceUpdated(
+                        accountOriginId,
+                        amount.negate(), // delta negativo (saída)
+                        saldoDepois,
+                        "pix_transfer_out",
+                        saved.getId().toString()
+                    );
+
+                    // Evento 2: Saldo destino atualizado
+                    eventPublisherService.publishBalanceUpdated(
+                        dest.getId(),
+                        amount, // delta positivo (entrada)
+                        saldoDestinoDepois,
+                        "pix_transfer_in",
+                        saved.getId().toString()
+                    );
+
+                    // Evento 3: PIX concluído
+                    eventPublisherService.publishPixCompleted(
+                        saved.getId().toString(),
+                        accountOriginId,
+                        dest.getId(),
+                        amount,
+                        pixKeyDestination,
+                        saldoDepois,
+                        saldoDestinoDepois
+                    );
+
+                    log.info("✅ Published event-driven events for PIX transaction {}", saved.getId());
+                } catch (Exception e) {
+                    log.warn("⚠️ Failed to publish event-driven events (non-blocking): {}", e.getMessage());
+                }
+            }
+
             // Registra sucesso com métricas completas
             pixMetrics.registrarPixSucesso(
                 saved.getId(),
@@ -533,6 +575,55 @@ public class TransactionService {
                 "error", "Erro interno",
                 "errorCode", "INTERNAL_ERROR"
             );
+        }
+    }
+
+    /**
+     * Valida senha do usuário chamando o auth-service
+     */
+    public boolean validarSenha(Long accountId, String senha) {
+        try {
+            // Buscar user_id da conta
+            AccountModel account = getAccountById(accountId);
+            if (account == null) {
+                log.error("❌ Conta não encontrada para validação de senha: {}", accountId);
+                return false;
+            }
+
+            Long userId = account.getUsuarioId();
+
+            // Chamar auth-service para validar senha
+            String url = authServiceUrl + "/api/users/" + userId + "/validate-password";
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("senha", senha);
+
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+            try {
+                ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
+                Map<String, Object> responseBody = response.getBody();
+
+                if (responseBody != null && Boolean.TRUE.equals(responseBody.get("valid"))) {
+                    log.info("✅ Senha validada com sucesso para user_id={}", userId);
+                    return true;
+                } else {
+                    log.warn("⚠️ Senha inválida para user_id={}", userId);
+                    return false;
+                }
+            } catch (HttpClientErrorException e) {
+                if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+                    log.warn("⚠️ Senha incorreta para user_id={}", userId);
+                    return false;
+                }
+                throw e;
+            }
+
+        } catch (Exception e) {
+            log.error("❌ Erro ao validar senha: {}", e.getMessage());
+            return false;
         }
     }
 }

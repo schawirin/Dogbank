@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ConfigDict
 import httpx
 import redis
 
@@ -140,22 +140,13 @@ class ChatMessage(BaseModel):
     content: str
 
 class ChatRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     message: str
-    user_id: int = 1
-    account_id: int = 1
-    session_id: Optional[str] = None
+    user_id: Optional[int] = Field(None, alias='userId')
+    account_id: Optional[int] = Field(None, alias='accountId')
+    session_id: Optional[str] = Field(None, alias='sessionId')
     history: Optional[List[ChatMessage]] = None
-
-    class Config:
-        # Allow both camelCase (from frontend) and snake_case
-        populate_by_name = True
-
-        # Define aliases for camelCase fields from frontend
-        fields = {
-            'user_id': {'alias': 'userId'},
-            'account_id': {'alias': 'accountId'},
-            'session_id': {'alias': 'sessionId'},
-        }
 
 class ChatResponse(BaseModel):
     success: bool
@@ -492,11 +483,16 @@ def process_chat(request: ChatRequest) -> ChatResponse:
     """
     user_message = request.message
 
+    # Validate required fields
+    if not request.account_id:
+        logger.error("❌ Missing account_id in request")
+        raise HTTPException(status_code=400, detail="account_id is required")
+
     # Log incoming request for debugging
     logger.info(f"📥 Chat request - account_id={request.account_id}, user_id={request.user_id}, message='{user_message[:50]}...'")
 
-    # Get user_id from account_id if not provided
-    user_id = request.user_id if request.user_id and request.user_id != 1 else get_user_id_from_account(request.account_id)
+    # Always get user_id from account_id to ensure consistency
+    user_id = get_user_id_from_account(request.account_id)
     user_name = get_user_name(request.account_id)
     balance = get_balance(request.account_id)
 
