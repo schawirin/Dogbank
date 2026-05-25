@@ -86,6 +86,15 @@
       <optional>true</optional>
     </dependency>
 
+    <!-- Datadog Trace API - EventTrackerV2 para AAP login.success/failure events.
+         Scope 'provided': fornecido em runtime pelo dd-java-agent (admission controller). -->
+    <dependency>
+      <groupId>com.datadoghq</groupId>
+      <artifactId>dd-trace-api</artifactId>
+      <version>1.42.0</version>
+      <scope>provided</scope>
+    </dependency>
+
     <!-- Testes -->
     <dependency>
       <groupId>org.springframework.boot</groupId>

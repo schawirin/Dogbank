@@ -10,16 +10,17 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install dependencies
-RUN pip install --no-cache-dir requests
+RUN pip install --no-cache-dir requests psycopg2-binary
 
 # Copy scripts
 COPY load_generator.py .
 COPY security_attacker.py .
 COPY chatbot_tester.py .
+COPY db_chaos_generator.py .
 COPY entrypoint.sh .
 
 # Make executable
-RUN chmod +x load_generator.py security_attacker.py chatbot_tester.py entrypoint.sh
+RUN chmod +x load_generator.py security_attacker.py chatbot_tester.py db_chaos_generator.py entrypoint.sh
 
 # =============================================================================
 # Environment variables - Load Generator
@@ -35,25 +36,47 @@ ENV MIN_INTERVAL=2
 ENV MAX_INTERVAL=5
 
 # Load Generator probabilities
-ENV PROB_NORMAL=0.60
-ENV PROB_ERROR_100=0.15
-ENV PROB_COAF=0.10
-ENV PROB_INSUFFICIENT=0.15
+ENV PROB_NORMAL=0.50
+ENV PROB_ERROR_100=0.10
+ENV PROB_COAF=0.05
+ENV PROB_INSUFFICIENT=0.10
+ENV PROB_DB_LOCK=0.10
+ENV PROB_SLOW_QUERY=0.08
+ENV PROB_DEADLOCK=0.05
+ENV PROB_DB_WAIT=0.02
 
 # =============================================================================
 # Environment variables - Security Attacker
 # =============================================================================
+# External target (public FQDN) -> sai pelo NAT, IP publico vira flagged_ip no AAP
+ENV EXTERNAL_TARGET=true
+ENV PUBLIC_BASE_URL=https://lab.dogbank.dog
+
 # Interval between attacks (seconds)
 ENV ATTACK_MIN_INTERVAL=5
 ENV ATTACK_MAX_INTERVAL=15
 
-# Attack probabilities
+# Attack probabilities (somam ~1.0)
 ENV PROB_SQL_INJECTION=0.25
-ENV PROB_RCE=0.15
-ENV PROB_PATH_TRAVERSAL=0.15
-ENV PROB_XSS=0.15
-ENV PROB_AUTH_BYPASS=0.15
-ENV PROB_IDOR=0.15
+ENV PROB_RCE=0.20
+ENV PROB_LOG4SHELL=0.10
+ENV PROB_PATH_TRAVERSAL=0.07
+ENV PROB_XSS=0.05
+ENV PROB_AUTH_BYPASS=0.03
+ENV PROB_IDOR=0.05
+ENV PROB_CREDENTIAL_STUFFING=0.15
+ENV PROB_DDOS=0.05
+ENV PROB_POST_EXPLOIT=0.05
+
+# Brute force / credential stuffing config
+ENV BRUTE_WORKERS=10
+ENV BRUTE_ATTEMPTS_PER_BURST=60
+
+# DDoS leve (desligado por default - habilitar so durante demo)
+ENV ATTACK_DDOS_ENABLED=false
+ENV DDOS_RPS=20
+ENV DDOS_BURST_SECONDS=10
+ENV DDOS_WORKERS=20
 
 # =============================================================================
 # Environment variables - Chatbot Tester (LLM Observability demo)
@@ -68,9 +91,18 @@ ENV PROB_JAILBREAK=0.10
 ENV PROB_DATA_EXFIL=0.10
 
 # =============================================================================
-# Run mode: "load", "security", "chatbot", "both", or "all"
+# Environment variables - DB Chaos Generator (DBM demo)
 # =============================================================================
-ENV RUN_MODE=both
+ENV POSTGRES_HOST=postgres
+ENV POSTGRES_PORT=5432
+ENV POSTGRES_DB=dogbank
+ENV POSTGRES_USER=dogbank
+ENV POSTGRES_PASSWORD=dogbank123
+
+# =============================================================================
+# Run mode: "load", "security", "chatbot", "db_chaos", "both", or "all"
+# =============================================================================
+ENV RUN_MODE=all
 
 # Run
 CMD ["./entrypoint.sh"]

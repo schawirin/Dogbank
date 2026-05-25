@@ -26,13 +26,13 @@ spec:
         tags.datadoghq.com/version: "1.0.0"
       annotations:
         # Datadog Admission Controller - automatically injects DD Java agent
-        admission.datadoghq.com/java-lib.version: "latest"
+        #admission.datadoghq.com/java-lib.version: "latest"
         # Explicitly disable unused language libraries
-        admission.datadoghq.com/js-lib.config.v1: '{"disabled":true}'
-        admission.datadoghq.com/python-lib.config.v1: '{"disabled":true}'
-        admission.datadoghq.com/dotnet-lib.config.v1: '{"disabled":true}'
-        admission.datadoghq.com/ruby-lib.config.v1: '{"disabled":true}'
-        admission.datadoghq.com/php-lib.config.v1: '{"disabled":true}'
+        #admission.datadoghq.com/js-lib.config.v1: '{"disabled":true}'
+        #admission.datadoghq.com/python-lib.config.v1: '{"disabled":true}'
+        #admission.datadoghq.com/dotnet-lib.config.v1: '{"disabled":true}'
+        #admission.datadoghq.com/ruby-lib.config.v1: '{"disabled":true}'
+        #admission.datadoghq.com/php-lib.config.v1: '{"disabled":true}'
         # Datadog Logs
         ad.datadoghq.com/auth-service.logs: '[{"source":"java","service":"auth-service"}]'
     spec:
@@ -51,9 +51,12 @@ spec:
             - containerPort: 8088
               name: http
           env:
-            # Database
+            # Database - RDS
             - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://postgres:5432/dogbank"
+              valueFrom:
+                configMapKeyRef:
+                  name: dogbank-config
+                  key: db-url
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 configMapKeyRef:
@@ -117,25 +120,29 @@ spec:
                 configMapKeyRef:
                   name: dogbank-config
                   key: DD_IAST_ENABLED
+            # Spring lê via relaxed binding: DOGBANK_ADMIN_BLOCK_TOKEN -> dogbank.admin.block-token
+            # Usado pelo endpoint /api/auth/admin/block-user (Datadog ATO Response Workflow)
+            - name: DOGBANK_ADMIN_BLOCK_TOKEN
+              valueFrom:
+                configMapKeyRef:
+                  name: dogbank-config
+                  key: ADMIN_BLOCK_TOKEN
           resources:
             requests:
-              memory: "512Mi"
-              cpu: "250m"
-            limits:
-              memory: "1536Mi"
-              cpu: "1000m"
+              memory: "256Mi"
+              cpu: "200m"
           livenessProbe:
             httpGet:
               path: /actuator/health
               port: 8088
-            initialDelaySeconds: 120
+            initialDelaySeconds: 300
             periodSeconds: 15
             timeoutSeconds: 5
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8088
-            initialDelaySeconds: 90
+            initialDelaySeconds: 240
             periodSeconds: 10
             timeoutSeconds: 5
 

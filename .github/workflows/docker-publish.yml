@@ -11,40 +11,40 @@ jobs:
       matrix:
         service:
           - name: auth
-            context: ./instrumented/k8s/services
-            dockerfile: ./instrumented/k8s/services/auth-module/Dockerfile
+            context: ./instrumented/docker/dogbank
+            dockerfile: ./instrumented/docker/dogbank/auth-module/Dockerfile
             image: schawirin/dogbank-auth-service
           - name: account
-            context: ./instrumented/k8s/services
-            dockerfile: ./instrumented/k8s/services/account-module/Dockerfile
+            context: ./instrumented/docker/dogbank
+            dockerfile: ./instrumented/docker/dogbank/account-module/Dockerfile
             image: schawirin/dogbank-account-service
           - name: transactions
-            context: ./instrumented/k8s/services
-            dockerfile: ./instrumented/k8s/services/transaction-module/Dockerfile
+            context: ./instrumented/docker/dogbank
+            dockerfile: ./instrumented/docker/dogbank/transaction-module/Dockerfile
             image: schawirin/dogbank-transaction-service
           - name: bancocentral
-            context: ./instrumented/k8s/services
-            dockerfile: ./instrumented/k8s/services/bancocentral-module/Dockerfile
+            context: ./instrumented/docker/dogbank
+            dockerfile: ./instrumented/docker/dogbank/bancocentral-module/Dockerfile
             image: schawirin/dogbank-bancocentral-service
           - name: fraud-detection
-            context: ./instrumented/k8s/services/fraud-detection-module
-            dockerfile: ./instrumented/k8s/services/fraud-detection-module/Dockerfile
+            context: ./instrumented/docker/dogbank
+            dockerfile: ./instrumented/docker/dogbank/fraud-detection-module/Dockerfile
             image: schawirin/dogbank-fraud-detection-service
           - name: pix-worker
-            context: ./instrumented/k8s/services/pix-worker-module
-            dockerfile: ./instrumented/k8s/services/pix-worker-module/Dockerfile
+            context: ./instrumented/docker/dogbank
+            dockerfile: ./instrumented/docker/dogbank/pix-worker-module/Dockerfile
             image: schawirin/dogbank-pix-worker
           - name: chatbot
-            context: ./instrumented/k8s/services/chatbot-python
-            dockerfile: ./instrumented/k8s/services/chatbot-python/Dockerfile
+            context: ./instrumented/docker/dogbank/chatbot-python
+            dockerfile: ./instrumented/docker/dogbank/chatbot-python/Dockerfile
             image: schawirin/dogbank-chatbot-service
-          - name: frontend
-            context: ./instrumented/k8s/services/frontend
-            dockerfile: ./instrumented/k8s/services/frontend/Dockerfile
-            image: schawirin/dogbank-frontend
+          - name: cache-sync-service
+            context: ./instrumented/docker/dogbank/cache-sync-service
+            dockerfile: ./instrumented/docker/dogbank/cache-sync-service/Dockerfile
+            image: schawirin/dogbank-cache-sync-service
           - name: load-generator
-            context: ./instrumented/k8s/services/load-generator
-            dockerfile: ./instrumented/k8s/services/load-generator/Dockerfile
+            context: ./instrumented/docker/dogbank/load-generator
+            dockerfile: ./instrumented/docker/dogbank/load-generator/Dockerfile
             image: schawirin/dogbank-load-generator
 
     steps:
@@ -85,11 +85,14 @@ jobs:
     if: success()
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-east-1
 
       - name: Install kubectl
@@ -100,6 +103,44 @@ jobs:
       - name: Configure kubectl for EKS
         run: |
           aws eks update-kubeconfig --name eks-sandbox-datadog --region us-east-1
+
+      - name: Apply K8s manifests (configmap + deployments + services)
+        run: |
+          echo "📦 Aplicando manifests do namespace dogbank..."
+
+          # Garante namespace e configmap antes (outras refs dependem deles)
+          kubectl apply -f instrumented/k8s/base/namespace.yaml
+          kubectl apply -f instrumented/k8s/base/configmap.yaml
+
+          # Aplica todo o resto exceto:
+          # - secrets.yaml: criado manualmente via secrets.local.sh (contem placeholders)
+          # - kustomization.yaml: nao e um recurso
+          # - migration-blocked-job.yaml: Jobs sao imutaveis, tratado em step separado
+          # - *.bak: backups
+          find instrumented/k8s/base/ -maxdepth 1 -name '*.yaml' \
+            ! -name 'namespace.yaml' \
+            ! -name 'configmap.yaml' \
+            ! -name 'secrets.yaml' \
+            ! -name 'kustomization.yaml' \
+            ! -name 'migration-blocked-job.yaml' \
+            -exec kubectl apply -f {} \;
+
+          echo "✅ Manifests aplicados"
+
+      - name: Run DB migration (idempotent ALTER TABLE blocked)
+        run: |
+          echo "🗄️  Rodando migration: adicionar coluna 'blocked' em usuarios..."
+          # Jobs sao imutaveis -> delete antes do apply garante re-execucao a cada deploy
+          kubectl delete job migration-blocked-column -n dogbank --ignore-not-found
+          kubectl apply -f instrumented/k8s/base/migration-blocked-job.yaml
+          # Espera ate completar (max 2min)
+          if ! kubectl wait --for=condition=complete job/migration-blocked-column -n dogbank --timeout=2m; then
+            echo "❌ Migration falhou. Logs:"
+            kubectl logs job/migration-blocked-column -n dogbank --tail=100 || true
+            exit 1
+          fi
+          echo "📋 Logs da migration:"
+          kubectl logs job/migration-blocked-column -n dogbank --tail=50
 
       - name: Rollout restart deployments
         run: |

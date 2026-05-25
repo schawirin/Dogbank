@@ -10,10 +10,12 @@ metadata:
     app: dogbank
     tags.datadoghq.com/env: dogbank
 data:
-  # Database
+  # Database - RDS PostgreSQL
   POSTGRES_DB: "dogbank"
   POSTGRES_USER: "dogbank"
-  
+  POSTGRES_HOST: "dogbank-postgres.c102aia0et2w.us-east-1.rds.amazonaws.com"
+  POSTGRES_PORT: "5432"
+
   # Service URLs (internal k8s DNS)
   AUTH_SERVICE_URL: "http://auth-service:8088"
   ACCOUNT_SERVICE_URL: "http://account-service:8089"
@@ -33,7 +35,7 @@ data:
 
   # Kafka
   KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
-  db-url: "jdbc:postgresql://postgres:5432/dogbank"
+  db-url: "jdbc:postgresql://dogbank-postgres.c102aia0et2w.us-east-1.rds.amazonaws.com:5432/dogbank"
   
   # Spring profiles
   SPRING_PROFILES_ACTIVE: "docker"
@@ -45,9 +47,13 @@ data:
   DD_AGENT_HOST: "datadog-agent"
   DD_TRACE_AGENT_PORT: "8126"
   DD_LOGS_INJECTION: "true"
-  DD_PROFILING_ENABLED: "true"
+  DD_PROFILING_ENABLED: "false"
   DD_APPSEC_ENABLED: "true"
-  DD_IAST_ENABLED: "false"
+  DD_IAST_ENABLED: "true"
+
+  # Admin endpoint protection (Datadog ATO Response Workflow -> /api/auth/admin/*)
+  # Demo: valor fixo. Producao real -> mover para secret.
+  ADMIN_BLOCK_TOKEN: "dogbank-admin-token-demo"
 
 ---
 apiVersion: v1

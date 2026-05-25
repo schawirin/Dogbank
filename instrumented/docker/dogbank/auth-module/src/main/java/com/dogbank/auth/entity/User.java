@@ -25,6 +25,9 @@ public class User {
     @Column(name = "chave_pix", unique = true, nullable = false)
     private String chavePix;
 
+    @Column(name = "blocked", nullable = false)
+    private Boolean blocked = false;
+
     // Construtor padrão (obrigatório para JPA)
     public User() {
     }
@@ -37,6 +40,7 @@ public class User {
         this.nome = nome;
         this.email = email;
         this.chavePix = chavePix;
+        this.blocked = false;
     }
 
     // Getters e Setters
@@ -86,5 +90,13 @@ public class User {
 
     public void setChavePix(String chavePix) {
         this.chavePix = chavePix;
+    }
+
+    public Boolean getBlocked() {
+        return blocked == null ? Boolean.FALSE : blocked;
+    }
+
+    public void setBlocked(Boolean blocked) {
+        this.blocked = blocked;
     }
 }

@@ -34,7 +34,8 @@ spec:
         # Run mode
         - name: RUN_MODE
           value: "both"
-        # Service URLs
+
+        # === Load Generator (transacoes legitimas) - usa DNS interno do cluster ===
         - name: AUTH_SERVICE_URL
           value: "http://auth-service:8088"
         - name: ACCOUNT_SERVICE_URL
@@ -46,27 +47,63 @@ spec:
         - name: NGINX_URL
           value: "http://nginx:80"
 
-        # Attack configuration - MODERATE FOR STABILITY
+        # === Security Attacker - sai via FQDN publico (NAT) para virar flagged_ip ===
+        - name: EXTERNAL_TARGET
+          value: "true"
+        - name: PUBLIC_BASE_URL
+          value: "https://lab.dogbank.dog"
+
+        # Load generator configuration - 1 minute interval (low system impact)
+        - name: MIN_INTERVAL
+          value: "60"
+        - name: MAX_INTERVAL
+          value: "60"
+
+        # Attack configuration - intervalo entre ataques (segundos)
+        # 30-90s para garantir volume continuo mas sustentavel
         - name: ATTACK_MIN_INTERVAL
           value: "30"
         - name: ATTACK_MAX_INTERVAL
-          value: "60"
+          value: "90"
 
-        # Attack probabilities - REDUCED FOR STABILITY
+        # Probabilidades por vetor (somam ~1.0)
         - name: PROB_SQL_INJECTION
-          value: "0.20"
+          value: "0.25"
         - name: PROB_RCE
           value: "0.20"
         - name: PROB_LOG4SHELL
-          value: "0.15"
+          value: "0.10"
         - name: PROB_PATH_TRAVERSAL
-          value: "0.15"
+          value: "0.07"
         - name: PROB_XSS
-          value: "0.10"
+          value: "0.05"
         - name: PROB_AUTH_BYPASS
-          value: "0.10"
+          value: "0.03"
         - name: PROB_IDOR
-          value: "0.10"
+          value: "0.05"
+        - name: PROB_CREDENTIAL_STUFFING
+          value: "0.15"
+        - name: PROB_DDOS
+          value: "0.05"
+        - name: PROB_POST_EXPLOIT
+          value: "0.05"
+
+        # Brute force / credential stuffing
+        - name: BRUTE_WORKERS
+          value: "10"
+        - name: BRUTE_ATTEMPTS_PER_BURST
+          value: "60"
+
+        # DDoS leve - DESLIGADO por padrao, ligar so durante demo:
+        #   kubectl set env deploy/load-generator ATTACK_DDOS_ENABLED=true -n dogbank
+        - name: ATTACK_DDOS_ENABLED
+          value: "false"
+        - name: DDOS_RPS
+          value: "20"
+        - name: DDOS_BURST_SECONDS
+          value: "10"
+        - name: DDOS_WORKERS
+          value: "20"
 
         # Datadog tags
         - name: DD_ENV

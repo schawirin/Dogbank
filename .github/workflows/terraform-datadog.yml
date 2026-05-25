@@ -1,0 +1,155 @@
+name: terraform-datadog
+
+# =============================================================================
+# Aplica os recursos Datadog (ASM detection rules, log pipelines, RDS) descritos
+# em instrumented/docker/dogbank/datadog/terraform/.
+#
+# Comportamento:
+#   - PR tocando os .tf  -> terraform plan + comenta o resumo no PR
+#   - push em main       -> terraform apply (auto-approve)
+#   - workflow_dispatch  -> apply manual (mesmo sem mudanca no path)
+# =============================================================================
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'instrumented/docker/dogbank/datadog/terraform/**.tf'
+      - '.github/workflows/terraform-datadog.yml'
+  pull_request:
+    paths:
+      - 'instrumented/docker/dogbank/datadog/terraform/**.tf'
+      - '.github/workflows/terraform-datadog.yml'
+  workflow_dispatch: {}
+
+# Evita runs paralelos corrompendo o terraform.tfstate (atualmente local/commitado).
+# Para retirar essa serializacao, migrar para backend remoto (S3 + DynamoDB lock).
+concurrency:
+  group: terraform-datadog
+  cancel-in-progress: false
+
+env:
+  TF_VERSION: '1.9.5'
+  TF_WORK_DIR: instrumented/docker/dogbank/datadog/terraform
+
+permissions:
+  contents: read
+  pull-requests: write  # para comentar o plan em PRs
+
+jobs:
+  plan:
+    name: Terraform Plan
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORK_DIR }}
+        run: terraform init -input=false
+
+      - name: Terraform Validate
+        working-directory: ${{ env.TF_WORK_DIR }}
+        run: terraform validate -no-color
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: ${{ env.TF_WORK_DIR }}
+        env:
+          TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
+          TF_VAR_datadog_app_key: ${{ secrets.DATADOG_APP_KEY }}
+        run: |
+          set +e
+          terraform plan -no-color -input=false -out=tfplan | tee plan_output.txt
+          echo "exitcode=$?" >> $GITHUB_OUTPUT
+
+      - name: Comment plan on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync(`${process.env.TF_WORK_DIR}/plan_output.txt`, 'utf8');
+            const truncated = plan.length > 60000 ? plan.slice(0, 60000) + '\n\n...[truncated]' : plan;
+            const body = `### 📋 Terraform Datadog Plan\n\n<details><summary>Click to expand</summary>\n\n\`\`\`hcl\n${truncated}\n\`\`\`\n\n</details>`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+
+      - name: Fail if plan errored
+        if: steps.plan.outputs.exitcode != '0'
+        run: exit 1
+
+  apply:
+    name: Terraform Apply
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORK_DIR }}
+        run: terraform init -input=false
+
+      - name: Terraform Validate
+        working-directory: ${{ env.TF_WORK_DIR }}
+        run: terraform validate -no-color
+
+      - name: Terraform Plan (saved)
+        working-directory: ${{ env.TF_WORK_DIR }}
+        env:
+          TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
+          TF_VAR_datadog_app_key: ${{ secrets.DATADOG_APP_KEY }}
+        run: terraform plan -no-color -input=false -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: ${{ env.TF_WORK_DIR }}
+        env:
+          TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
+          TF_VAR_datadog_app_key: ${{ secrets.DATADOG_APP_KEY }}
+        run: terraform apply -no-color -input=false -auto-approve tfplan
+
+      - name: Anota deploy no Datadog
+        if: success()
+        run: |
+          curl -s -X POST "https://api.datadoghq.com/api/v1/events" \
+            -H "Content-Type: application/json" \
+            -H "DD-API-KEY: ${{ secrets.DATADOG_API_KEY }}" \
+            -d @- <<PAYLOAD
+          {
+            "title": "Datadog Terraform applied - ${{ github.sha }}",
+            "text": "ASM detection rules + log pipelines aplicados via terraform-datadog.yml. Commit: ${{ github.sha }}",
+            "tags": ["env:dogbank", "tool:terraform", "iac:datadog"],
+            "alert_type": "info"
+          }
+          PAYLOAD
