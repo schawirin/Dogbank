@@ -46,6 +46,10 @@ jobs:
             context: ./instrumented/docker/dogbank/load-generator
             dockerfile: ./instrumented/docker/dogbank/load-generator/Dockerfile
             image: schawirin/dogbank-load-generator
+          - name: frontend
+            context: ./instrumented/docker/dogbank-frontend
+            dockerfile: ./instrumented/docker/dogbank-frontend/Dockerfile
+            image: schawirin/dogbank-frontend
 
     steps:
       - uses: actions/checkout@v4
