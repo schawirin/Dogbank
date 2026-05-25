@@ -11,15 +11,12 @@ name: terraform-datadog
 # =============================================================================
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'instrumented/docker/dogbank/datadog/terraform/**.tf'
-      - '.github/workflows/terraform-datadog.yml'
-  pull_request:
-    paths:
-      - 'instrumented/docker/dogbank/datadog/terraform/**.tf'
-      - '.github/workflows/terraform-datadog.yml'
+  # DESABILITADO TEMPORARIAMENTE em 2026-05-25:
+  # O terraform.tfstate esta gitignored -> CI inicia com state vazio a cada run ->
+  # apply CRIA monitores duplicados a cada push. Para reativar com seguranca:
+  #   1) migrar para backend remoto (S3 + DynamoDB lock), OU
+  #   2) commitar terraform.tfstate (anti-pattern mas funciona para demo).
+  # Por enquanto, so dispara manualmente via UI / gh workflow run.
   workflow_dispatch: {}
 
 # Evita runs paralelos corrompendo o terraform.tfstate (atualmente local/commitado).
