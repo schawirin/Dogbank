@@ -51,9 +51,12 @@ spec:
             - containerPort: 8089
               name: http
           env:
-            # Database
+            # Database - RDS
             - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://postgres:5432/dogbank"
+              valueFrom:
+                configMapKeyRef:
+                  name: dogbank-config
+                  key: db-url
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 configMapKeyRef:
@@ -125,11 +128,8 @@ spec:
                   key: DD_IAST_ENABLED
           resources:
             requests:
-              memory: "512Mi"
-              cpu: "250m"
-            limits:
-              memory: "1536Mi"
-              cpu: "1000m"
+              memory: "256Mi"
+              cpu: "200m"
           livenessProbe:
             httpGet:
               path: /actuator/health

@@ -45,10 +45,13 @@ spec:
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: "kafka:9092"
             # =================================================================
-            # Database
+            # Database - RDS (via configmap)
             # =================================================================
             - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://postgres:5432/dogbank"
+              valueFrom:
+                configMapKeyRef:
+                  name: dogbank-config
+                  key: db-url
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 configMapKeyRef:
