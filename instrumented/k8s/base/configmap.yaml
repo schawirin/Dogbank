@@ -19,7 +19,7 @@ data:
   # Service URLs (internal k8s DNS)
   AUTH_SERVICE_URL: "http://auth-service:8088"
   ACCOUNT_SERVICE_URL: "http://account-service:8089"
-  TRANSACTION_SERVICE_URL: "http://transaction-service:8087"
+  TRANSACTION_SERVICE_URL: "http://transaction-service:8084"
   BANCOCENTRAL_API_URL: "http://bancocentral-service:8085/api/bancocentral"
   NOTIFICATION_SERVICE_URL: "http://notification-service:8086"
   INTEGRATION_SERVICE_URL: "http://integration-service:8090"
