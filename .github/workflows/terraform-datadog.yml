@@ -70,8 +70,8 @@ jobs:
         id: plan
         working-directory: ${{ env.TF_WORK_DIR }}
         env:
-          TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
-          TF_VAR_datadog_app_key: ${{ secrets.DATADOG_APP_KEY }}
+          TF_VAR_datadog_api_key: ${{ secrets.DD_API_KEY }}
+          TF_VAR_datadog_app_key: ${{ secrets.DD_APP_KEY }}
         run: |
           set +e
           terraform plan -no-color -input=false -out=tfplan | tee plan_output.txt
@@ -128,15 +128,15 @@ jobs:
       - name: Terraform Plan (saved)
         working-directory: ${{ env.TF_WORK_DIR }}
         env:
-          TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
-          TF_VAR_datadog_app_key: ${{ secrets.DATADOG_APP_KEY }}
+          TF_VAR_datadog_api_key: ${{ secrets.DD_API_KEY }}
+          TF_VAR_datadog_app_key: ${{ secrets.DD_APP_KEY }}
         run: terraform plan -no-color -input=false -out=tfplan
 
       - name: Terraform Apply
         working-directory: ${{ env.TF_WORK_DIR }}
         env:
-          TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
-          TF_VAR_datadog_app_key: ${{ secrets.DATADOG_APP_KEY }}
+          TF_VAR_datadog_api_key: ${{ secrets.DD_API_KEY }}
+          TF_VAR_datadog_app_key: ${{ secrets.DD_APP_KEY }}
         run: terraform apply -no-color -input=false -auto-approve tfplan
 
       - name: Anota deploy no Datadog
@@ -144,7 +144,7 @@ jobs:
         run: |
           curl -s -X POST "https://api.datadoghq.com/api/v1/events" \
             -H "Content-Type: application/json" \
-            -H "DD-API-KEY: ${{ secrets.DATADOG_API_KEY }}" \
+            -H "DD-API-KEY: ${{ secrets.DD_API_KEY }}" \
             -d @- <<PAYLOAD
           {
             "title": "Datadog Terraform applied - ${{ github.sha }}",
