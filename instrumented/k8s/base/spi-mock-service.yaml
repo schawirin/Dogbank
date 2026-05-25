@@ -35,8 +35,8 @@ spec:
     spec:
       containers:
         - name: spi-mock-service
-          image: dogbank/spi-mock-service:latest
-          imagePullPolicy: IfNotPresent
+          image: schawirin/dogbank-spi-mock-service:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8090
               name: http

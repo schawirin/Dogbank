@@ -38,8 +38,8 @@ spec:
     spec:
       containers:
         - name: notification-service
-          image: dogbank/notification-service:latest
-          imagePullPolicy: IfNotPresent
+          image: schawirin/dogbank-notification-service:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8086
               name: http

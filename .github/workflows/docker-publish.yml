@@ -50,6 +50,16 @@ jobs:
             context: ./instrumented/docker/dogbank-frontend
             dockerfile: ./instrumented/docker/dogbank-frontend/Dockerfile
             image: schawirin/dogbank-frontend
+          # spi-mock-service: Dockerfile usa paths locais -> context e o proprio dir do modulo
+          - name: spi-mock-service
+            context: ./instrumented/docker/dogbank/spi-mock-service
+            dockerfile: ./instrumented/docker/dogbank/spi-mock-service/Dockerfile
+            image: schawirin/dogbank-spi-mock-service
+          # notification: Dockerfile usa prefixo -> context e o dir pai
+          - name: notification
+            context: ./instrumented/docker/dogbank
+            dockerfile: ./instrumented/docker/dogbank/notification-module/Dockerfile
+            image: schawirin/dogbank-notification-service
 
     steps:
       - uses: actions/checkout@v4
@@ -158,6 +168,8 @@ jobs:
           kubectl rollout restart deployment/fraud-detection-service -n dogbank || true
           kubectl rollout restart deployment/pix-worker -n dogbank || true
           kubectl rollout restart deployment/chatbot-service -n dogbank || true
+          kubectl rollout restart deployment/spi-mock-service -n dogbank || true
+          kubectl rollout restart deployment/notification-service -n dogbank || true
 
           # Restart frontend
           kubectl rollout restart deployment/frontend -n dogbank || true
