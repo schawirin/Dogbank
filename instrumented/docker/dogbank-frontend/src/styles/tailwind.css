@@ -1,3 +1,81 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* =============================================================================
+   DogBank — Animations & Effects globais (UI redesign)
+   ========================================================================== */
+
+@layer utilities {
+  /* Keyframes */
+  @keyframes fadeSlideUp {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeSlideRight {
+    0% { opacity: 0; transform: translateX(-20px); }
+    100% { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.85; transform: scale(1.04); }
+  }
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%) skewX(-20deg); }
+    100% { transform: translateX(300%) skewX(-20deg); }
+  }
+
+  /* Utility classes */
+  .animate-slide-up {
+    animation: fadeSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-slide-right {
+    animation: fadeSlideRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+
+  /* Stagger delays em cascata para listas/grids */
+  .stagger-1 { animation-delay: 80ms; }
+  .stagger-2 { animation-delay: 160ms; }
+  .stagger-3 { animation-delay: 240ms; }
+  .stagger-4 { animation-delay: 320ms; }
+  .stagger-5 { animation-delay: 400ms; }
+
+  /* Glass panel (light theme - usado em sidebar/cards) */
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+
+  /* Cartao de credito com gradient + shimmer effect on hover */
+  .card-gradient {
+    background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-gradient::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%; width: 50%; height: 100%;
+    background: linear-gradient(to right,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.3) 50%,
+      rgba(255,255,255,0) 100%);
+    transform: skewX(-20deg);
+    transition: all 0.75s ease;
+  }
+
+  .card-gradient:hover::after {
+    left: 200%;
+  }
+}

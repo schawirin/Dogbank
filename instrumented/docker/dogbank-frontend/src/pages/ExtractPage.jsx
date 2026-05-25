@@ -156,62 +156,58 @@ const ExtractPage = () => {
   }
 
   return (
-    <div className="py-6 max-w-5xl mx-auto">
+    <div className="max-w-5xl mx-auto animate-slide-up space-y-6">
       {/* Cabeçalho */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-1">
-              Extrato Bancário
-            </h1>
-            <p className="text-slate-500">
-              {user?.nome || 'Cliente'} • Conta {accountData?.numero_conta || accountData?.accountNumber || '000000-0'}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-2 px-4 py-2 text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-            >
-              <Printer className="w-4 h-4" />
-              Imprimir
-            </button>
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-2 px-4 py-2 text-white bg-purple-600 rounded-xl hover:bg-purple-700 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              Exportar CSV
-            </button>
-          </div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Extrato de Movimentações</h1>
+          <p className="text-sm text-slate-500">
+            {user?.nome || 'Cliente'} • Conta {accountData?.numero_conta || accountData?.accountNumber || '000000-0'}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-2 px-4 py-2 text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:-translate-y-0.5 transition-all shadow-sm"
+          >
+            <Printer className="w-4 h-4" />
+            Imprimir
+          </button>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-5 py-2.5 text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl text-sm font-semibold transition-all shadow-lg shadow-purple-500/25"
+          >
+            <Download className="w-4 h-4" />
+            Exportar CSV
+          </button>
         </div>
       </div>
 
       {error && (
-        <Alert type="error" message={error} onClose={() => setError('')} className="mb-6" />
+        <Alert type="error" message={error} onClose={() => setError('')} />
       )}
 
       {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-slide-up stagger-1">
+        <div className="glass-panel rounded-2xl p-5 shadow-sm">
           <p className="text-sm text-slate-500 mb-1">Saldo Atual</p>
           <p className="text-2xl font-bold text-slate-900">
             {formatCurrency(accountData?.saldo || accountData?.balance || 0)}
           </p>
         </div>
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+        <div className="glass-panel rounded-2xl p-5 shadow-sm">
           <p className="text-sm text-slate-500 mb-1">Total Recebido</p>
           <p className="text-2xl font-bold text-green-600">
             +{formatCurrency(totals.received)}
           </p>
         </div>
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+        <div className="glass-panel rounded-2xl p-5 shadow-sm">
           <p className="text-sm text-slate-500 mb-1">Total Enviado</p>
           <p className="text-2xl font-bold text-red-600">
             -{formatCurrency(totals.sent)}
           </p>
         </div>
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+        <div className="glass-panel rounded-2xl p-5 shadow-sm">
           <p className="text-sm text-slate-500 mb-1">Transações</p>
           <p className="text-2xl font-bold text-slate-900">
             {filteredTransactions.length}
@@ -220,7 +216,7 @@ const ExtractPage = () => {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm mb-6">
+      <div className="glass-panel rounded-2xl p-4 shadow-sm animate-slide-up stagger-2">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-slate-400" />
@@ -252,7 +248,7 @@ const ExtractPage = () => {
       </div>
 
       {/* Lista de Transações */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="glass-panel rounded-3xl shadow-sm overflow-hidden animate-slide-up stagger-3">
         <div className="p-4 border-b border-slate-100">
           <h2 className="text-lg font-semibold text-slate-900">
             Histórico de Transações
@@ -460,14 +456,13 @@ const ExtractPage = () => {
       </div>
 
       {/* Botão de voltar */}
-      <div className="mt-6">
-        <Button 
-          variant="secondary" 
+      <div>
+        <button
           onClick={() => navigate('/dashboard')}
-          className="text-slate-600"
+          className="inline-flex items-center gap-2 px-4 py-2 text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:-translate-y-0.5 transition-all shadow-sm"
         >
           ← Voltar ao Dashboard
-        </Button>
+        </button>
       </div>
     </div>
   );

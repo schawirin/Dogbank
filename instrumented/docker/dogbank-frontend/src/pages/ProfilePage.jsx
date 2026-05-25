@@ -145,13 +145,13 @@ const ProfilePage = () => {
   const pixKey = user?.chavePix || accountData?.chavePix || email;
 
   return (
-    <div className="py-6 max-w-5xl mx-auto">
+    <div className="max-w-5xl mx-auto animate-slide-up">
       {/* Cabeçalho */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 mb-1">
+        <h1 className="text-2xl font-bold text-slate-800 mb-1">
           Meu Perfil
         </h1>
-        <p className="text-slate-500">
+        <p className="text-sm text-slate-500">
           Gerencie suas informações pessoais e configurações
         </p>
       </div>

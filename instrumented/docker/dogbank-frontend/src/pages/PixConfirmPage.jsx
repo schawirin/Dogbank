@@ -6,6 +6,8 @@ import pixService from '../services/pixService';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import PixErrorModal from '../components/common/PixErrorModal';
+import PixStepIndicator from '../components/pix/PixStepIndicator';
+import { ChevronLeft } from 'lucide-react';
 
 const PixConfirmPage = () => {
   const { state } = useLocation();
@@ -154,7 +156,7 @@ const PixConfirmPage = () => {
   };
 
   return (
-    <div className="py-6">
+    <div className="max-w-2xl mx-auto animate-slide-up">
       {/* Modal de erro amigável */}
       <PixErrorModal
         isOpen={showErrorModal}
@@ -163,21 +165,22 @@ const PixConfirmPage = () => {
         errorType={errorType}
       />
 
-      {/* Header moderno */}
-      <div className="mb-8">
-        <button 
+      {/* Header com voltar */}
+      <div className="flex items-center gap-4 mb-6">
+        <button
           onClick={() => navigate('/dashboard/pix')}
-          className="flex items-center text-primary-600 hover:text-primary-700 mb-4 transition-colors"
           disabled={loading}
+          className="w-10 h-10 rounded-full bg-white shadow-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:text-purple-600 hover:border-purple-200 transition-colors disabled:opacity-50"
         >
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Voltar
+          <ChevronLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-3xl font-bold text-neutral-900 mb-2">Confirmar PIX</h1>
-        <p className="text-neutral-600">Revise os dados e confirme sua transferência</p>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Confirmar PIX</h1>
+          <p className="text-sm text-slate-500">Revise os dados e confirme sua transferência</p>
+        </div>
       </div>
+
+      <PixStepIndicator current={2} />
 
       {/* Loading Screen - Animação moderna */}
       {loading && (

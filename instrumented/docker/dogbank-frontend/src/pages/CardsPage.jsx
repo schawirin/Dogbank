@@ -109,13 +109,13 @@ const CardsPage = () => {
   }
 
   return (
-    <div className="py-6">
+    <div className="animate-slide-up">
       {/* Cabeçalho */}
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-neutral-800">
+        <h1 className="text-2xl font-bold text-slate-800">
           Meus Cartões
         </h1>
-        <p className="text-neutral-500">
+        <p className="text-sm text-slate-500">
           Gerencie seus cartões de crédito
         </p>
       </div>

@@ -39,9 +39,13 @@
   width: 400px;
   height: 650px;
   max-height: calc(100vh - 48px);
-  background: #ffffff;
-  border-radius: 20px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  /* Light glassmorphism */
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 24px;
+  box-shadow: 0 24px 80px rgba(124, 58, 237, 0.15), 0 0 0 1px rgba(124, 58, 237, 0.04);
   display: flex;
   flex-direction: column;
   overflow: hidden;

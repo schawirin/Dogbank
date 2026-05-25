@@ -7,6 +7,8 @@ import pixService from '../services/pixService';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Alert from '../components/common/Alert';
+import PixStepIndicator from '../components/pix/PixStepIndicator';
+import { ChevronLeft } from 'lucide-react';
 
 const PixTransferPage = () => {
   const { user } = useAuth();
@@ -142,21 +144,22 @@ const PixTransferPage = () => {
 
   /* ------------ RENDER ------------ */
   return (
-    <div className="py-6">
-      {/* Header moderno */}
-      <div className="mb-8">
-        <button 
+    <div className="max-w-2xl mx-auto animate-slide-up">
+      {/* Header com voltar */}
+      <div className="flex items-center gap-4 mb-6">
+        <button
           onClick={() => navigate('/dashboard')}
-          className="flex items-center text-primary-600 hover:text-primary-700 mb-4 transition-colors"
+          className="w-10 h-10 rounded-full bg-white shadow-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:text-purple-600 hover:border-purple-200 transition-colors"
         >
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Voltar
+          <ChevronLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-3xl font-bold text-neutral-900 mb-2">PIX</h1>
-        <p className="text-neutral-600">Envie dinheiro de forma rápida e segura</p>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Área PIX</h1>
+          <p className="text-sm text-slate-500">Envie e receba dinheiro instantaneamente</p>
+        </div>
       </div>
+
+      <PixStepIndicator current={1} />
 
       {generalError && (
         <Alert

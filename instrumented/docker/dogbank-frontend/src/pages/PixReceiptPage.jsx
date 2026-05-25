@@ -4,6 +4,7 @@ import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import Button from '../components/common/Button';
 import pixService from '../services/pixService';
 import { useAuth } from '../hooks/useAuth';
+import PixStepIndicator from '../components/pix/PixStepIndicator';
 
 const PixReceiptPage = () => {
   const location = useLocation();
@@ -127,7 +128,10 @@ const PixReceiptPage = () => {
   const senderCpf = user?.cpf || localStorage.getItem('cpf') || '';
 
   return (
-    <div className="py-6 max-w-2xl mx-auto relative">
+    <div className="max-w-2xl mx-auto relative animate-slide-up">
+      <div className="print:hidden">
+        <PixStepIndicator current={3} />
+      </div>
       {/* Confetti Animation */}
       {showConfetti && (
         <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
