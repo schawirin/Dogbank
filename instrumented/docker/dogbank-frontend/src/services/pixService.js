@@ -114,7 +114,8 @@ const pixService = {
       accountOriginId: sourceAccountId,
       pixKeyDestination: pixKey,
       amount,
-      description
+      description,
+      password
     };
 
     try {
