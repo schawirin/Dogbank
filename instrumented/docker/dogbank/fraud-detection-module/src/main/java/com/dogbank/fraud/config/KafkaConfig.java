@@ -29,8 +29,7 @@ public class KafkaConfig {
     @Value("${spring.kafka.consumer.group-id:fraud-detection-group}")
     private String groupId;
 
-    @Bean
-    public ObjectMapper objectMapper() {
+    private ObjectMapper buildMapper() {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
@@ -39,7 +38,7 @@ public class KafkaConfig {
 
     @Bean
     public ConsumerFactory<String, PixTransaction> consumerFactory() {
-        JsonDeserializer<PixTransaction> deserializer = new JsonDeserializer<>(PixTransaction.class, objectMapper());
+        JsonDeserializer<PixTransaction> deserializer = new JsonDeserializer<>(PixTransaction.class, buildMapper());
         deserializer.setRemoveTypeHeaders(false);
         deserializer.addTrustedPackages("*");
         deserializer.setUseTypeMapperForKey(true);

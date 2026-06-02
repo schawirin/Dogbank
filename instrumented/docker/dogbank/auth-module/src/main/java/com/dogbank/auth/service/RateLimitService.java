@@ -2,7 +2,7 @@ package com.dogbank.auth.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -22,7 +22,7 @@ public class RateLimitService {
     private static final int MAX_ATTEMPTS_PER_MINUTE = 5;
     private static final int BLOCK_DURATION_MINUTES  = 15;
 
-    private final RedisTemplate<String, String> redisTemplate;
+    private final StringRedisTemplate redisTemplate;
 
     public boolean isBlocked(String cpf) {
         return Boolean.TRUE.equals(redisTemplate.hasKey("rate_limit:blocked:" + cpf));
