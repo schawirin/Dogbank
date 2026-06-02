@@ -1,7 +1,6 @@
 # =============================================================================
-# DogBank - Ingress Resource
-# =============================================================================
-# Use this instead of LoadBalancer if you have an Ingress Controller
+# DogBank - Ingress Resource (lab.dogbank.dog with TLS)
+# Mirrors ingress-tls.yaml — kept for kustomization compatibility
 # =============================================================================
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -11,20 +10,25 @@ metadata:
   labels:
     app: dogbank
   annotations:
-    # Nginx Ingress Controller annotations
-    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "HIGH:!aNULL:!MD5"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
-    # Enable CORS
     nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
     nginx.ingress.kubernetes.io/cors-allow-origin: "*"
-    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, PUT, POST, DELETE, PATCH, OPTIONS"
-    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization"
 spec:
-  ingressClassName: nginx
+  tls:
+  - hosts:
+    - lab.dogbank.dog
+    secretName: dogbank-tls-cert
   rules:
-    - host: dogbank.local
+    - host: lab.dogbank.dog
       http:
         paths:
           # Frontend
@@ -58,7 +62,7 @@ spec:
               service:
                 name: transaction-service
                 port:
-                  number: 8087
+                  number: 8084
           # Banco Central Service
           - path: /api/bancocentral
             pathType: Prefix
@@ -67,11 +71,11 @@ spec:
                 name: bancocentral-service
                 port:
                   number: 8085
-          # Notification Service
-          - path: /api/notifications
+          # Chatbot Service
+          - path: /api/chatbot
             pathType: Prefix
             backend:
               service:
-                name: notification-service
+                name: chatbot-service
                 port:
-                  number: 8086
+                  number: 8083
