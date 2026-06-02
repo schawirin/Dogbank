@@ -8,12 +8,11 @@ FROM maven:3.9-eclipse-temurin-21 AS builder
 
 WORKDIR /app
 
-# Copy pom.xml and download dependencies
-COPY pom.xml pom.xml
+# Context is parent dir (./instrumented/docker/dogbank), so reference subdir
+COPY pix-worker-module/pom.xml pom.xml
 RUN mvn dependency:go-offline -B
 
-# Copy source code and build
-COPY src src
+COPY pix-worker-module/src src
 RUN mvn clean package -DskipTests
 
 # =============================================================================
