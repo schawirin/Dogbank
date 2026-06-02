@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cache-sync-service
+  namespace: dogbank
+  labels:
+    app: cache-sync-service
+    tags.datadoghq.com/env: "dogbank"
+    tags.datadoghq.com/service: "cache-sync-service"
+    tags.datadoghq.com/version: "1.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cache-sync-service
+  template:
+    metadata:
+      labels:
+        app: cache-sync-service
+        tags.datadoghq.com/env: "dogbank"
+        tags.datadoghq.com/service: "cache-sync-service"
+        tags.datadoghq.com/version: "1.0"
+      annotations:
+        ad.datadoghq.com/cache-sync-service.logs: '[{"source":"python","service":"cache-sync-service"}]'
+    spec:
+      containers:
+      - name: cache-sync-service
+        image: schawirin/dogbank-cache-sync-service:latest
+        imagePullPolicy: Always
+        env:
+        # Kafka Configuration
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka:9092"
+        - name: KAFKA_GROUP_ID
+          value: "cache-sync-service"
+
+        # Redis Configuration
+        - name: REDIS_HOST
+          value: "redis"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_DB
+          value: "0"
+        - name: REDIS_TRANSACTION_LIMIT
+          value: "50"
+
+        # Datadog Configuration
+        - name: DD_ENV
+          value: "dogbank"
+        - name: DD_SERVICE
+          value: "cache-sync-service"
+        - name: DD_VERSION
+          value: "1.0"
+        - name: DD_LOGS_INJECTION
+          value: "true"
+        - name: DD_TRACE_SAMPLE_RATE
+          value: "1"
+        - name: DD_PROFILING_ENABLED
+          value: "true"
+        - name: DD_DATA_STREAMS_ENABLED
+          value: "true"
+
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import redis; r=redis.Redis(host='redis', port=6379); r.ping()"
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3

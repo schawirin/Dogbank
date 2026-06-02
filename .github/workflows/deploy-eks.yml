@@ -108,6 +108,7 @@ jobs:
           kubectl rollout status deployment/chatbot-service -n dogbank --timeout=5m
           kubectl rollout status deployment/fraud-detection-service -n dogbank --timeout=5m
           kubectl rollout status deployment/pix-worker -n dogbank --timeout=5m
+          kubectl rollout status deployment/load-generator -n dogbank --timeout=5m || true
 
       - name: Verify deployment
         run: |

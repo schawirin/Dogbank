@@ -3,15 +3,18 @@ package com.dogbank.transaction.controller;
 import com.dogbank.transaction.dto.TransactionRequest;
 import com.dogbank.transaction.dto.TransactionResponse;
 import com.dogbank.transaction.entity.Transaction;
+import com.dogbank.transaction.service.IdempotencyService;
 import com.dogbank.transaction.service.TransactionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/transactions")
@@ -19,15 +22,31 @@ import java.util.Map;
 public class TransactionController {
 
     private static final Logger log = LoggerFactory.getLogger(TransactionController.class);
-    
-    private final TransactionService transactionService;
 
-    public TransactionController(TransactionService transactionService) {
-        this.transactionService = transactionService;
+    private final TransactionService transactionService;
+    private final IdempotencyService idempotencyService;
+
+    public TransactionController(TransactionService transactionService,
+                                 IdempotencyService idempotencyService) {
+        this.transactionService  = transactionService;
+        this.idempotencyService  = idempotencyService;
     }
 
     @PostMapping("/pix")
-    public ResponseEntity<TransactionResponse> transferirViaPix(@RequestBody TransactionRequest request) {
+    public ResponseEntity<?> transferirViaPix(
+            @RequestBody TransactionRequest request,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey) {
+
+        // Idempotency check — prevents double-spend on retries
+        String effectiveKey = idempotencyKey != null ? idempotencyKey
+                : "auto-" + request.getAccountOriginId() + "-" + request.getPixKeyDestination();
+        String txId = UUID.randomUUID().toString();
+        if (!idempotencyService.tryConsume(effectiveKey, txId)) {
+            String existing = idempotencyService.getExistingTransactionId(effectiveKey);
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", "Duplicate request", "transactionId", existing != null ? existing : ""));
+        }
+
         // Validação de senha obrigatória
         if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
             log.error("❌ Tentativa de PIX sem senha! Account: {}", request.getAccountOriginId());

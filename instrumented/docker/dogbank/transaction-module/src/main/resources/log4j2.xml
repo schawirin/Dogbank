@@ -12,6 +12,15 @@
         <Console name="ConsoleJson" target="SYSTEM_OUT">
             <JsonTemplateLayout eventTemplateUri="classpath:DatadogLogLayout.json"/>
         </Console>
+        <RollingFile name="FileJson"
+                     fileName="/var/log/dogbank/${env:DD_SERVICE:-transaction-service}.log"
+                     filePattern="/var/log/dogbank/${env:DD_SERVICE:-transaction-service}-%d{yyyy-MM-dd}-%i.log.gz">
+            <JsonTemplateLayout eventTemplateUri="classpath:DatadogLogLayout.json"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="10 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="3"/>
+        </RollingFile>
         
         <!-- Console Appender padrão para debug local -->
         <Console name="ConsoleText" target="SYSTEM_OUT">
@@ -23,16 +32,19 @@
         <!-- Logger específico para métricas de negócio PIX -->
         <Logger name="pix.metrics" level="info" additivity="false">
             <AppenderRef ref="ConsoleJson"/>
+            <AppenderRef ref="FileJson"/>
         </Logger>
         
         <!-- Logger para transações -->
         <Logger name="com.dogbank.transaction" level="info" additivity="false">
             <AppenderRef ref="ConsoleJson"/>
+            <AppenderRef ref="FileJson"/>
         </Logger>
         
         <!-- Root logger -->
         <Root level="info">
             <AppenderRef ref="ConsoleJson"/>
+            <AppenderRef ref="FileJson"/>
         </Root>
 
         <!-- Spring Framework -->

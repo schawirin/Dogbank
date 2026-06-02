@@ -1,0 +1,80 @@
+services:
+  frontend:
+    build:
+      context: ../dogbank-mobile-app
+      dockerfile: Dockerfile
+    healthcheck: !override
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  postgres:
+    ports: !reset []
+
+  redis:
+    ports: !reset []
+
+  kafka:
+    ports: !reset []
+
+  rabbitmq:
+    ports: !reset []
+
+  datadog-agent:
+    ports: !reset []
+    volumes: !override
+      - dogbank_logs:/var/log/dogbank:ro
+      - ./datadog/conf.d/postgres.d/conf.yaml:/etc/datadog-agent/conf.d/postgres.d/conf.yaml:ro
+      - ./datadog/conf.d/kafka.d/conf.yaml:/etc/datadog-agent/conf.d/kafka.d/conf.yaml:ro
+      - ./datadog/conf.d/rabbitmq.d/conf.yaml:/etc/datadog-agent/conf.d/rabbitmq.d/conf.yaml:ro
+      - ./datadog/conf.d/dogbank_java_logs.d/conf.yaml:/etc/datadog-agent/conf.d/dogbank_java_logs.d/conf.yaml:ro
+
+  spi-mock-service:
+    depends_on: !reset []
+
+  bancocentral-service:
+    depends_on: !reset []
+
+  auth-service:
+    depends_on: !reset []
+
+  account-service:
+    depends_on: !reset []
+
+  transaction-service:
+    depends_on: !reset []
+
+  chatbot-service:
+    depends_on: !reset []
+
+  ollama:
+    profiles:
+      - full-demo
+    ports: !reset []
+
+  pix-worker:
+    profiles:
+      - full-demo
+
+  fraud-detection-service:
+    profiles:
+      - full-demo
+
+  load-generator:
+    profiles:
+      - full-demo
+
+  nginx:
+    healthcheck: !override
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    ports: !override
+      - "8080:80"
+
+volumes:
+  dogbank_logs:
+    external: true

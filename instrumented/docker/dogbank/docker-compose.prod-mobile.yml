@@ -1,0 +1,202 @@
+services:
+  dogbank-log-init:
+    image: alpine:3.20
+    command: ["/bin/sh", "-c", "mkdir -p /var/log/dogbank && chmod 0777 /var/log/dogbank"]
+    volumes:
+      - dogbank_logs:/var/log/dogbank
+
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:7-jmx
+    environment:
+      DD_ENV: dogbank
+      DD_HOSTNAME: dogbank-local
+      DD_TAGS: "env:dogbank project:dogbank"
+      DD_DATA_STREAMS_ENABLED: "true"
+    volumes: !override
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+      - ./datadog/conf.d/postgres.d/conf.yaml:/etc/datadog-agent/conf.d/postgres.d/conf.yaml:ro
+      - ./datadog/conf.d/kafka.d/conf.yaml:/etc/datadog-agent/conf.d/kafka.d/conf.yaml:ro
+      - ./datadog/conf.d/rabbitmq.d/conf.yaml:/etc/datadog-agent/conf.d/rabbitmq.d/conf.yaml:ro
+      - ./datadog/conf.d/dogbank_java_logs.d/conf.yaml:/etc/datadog-agent/conf.d/dogbank_java_logs.d/conf.yaml:ro
+      - dogbank_logs:/var/log/dogbank:ro
+
+  postgres:
+    logging:
+      driver: k8s-file
+    labels:
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.version: "1.0.0"
+
+  redis:
+    logging:
+      driver: k8s-file
+    labels:
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.version: "1.0.0"
+
+  kafka:
+    expose:
+      - "9101"
+    environment:
+      KAFKA_JMX_PORT: "9101"
+      KAFKA_JMX_HOSTNAME: kafka
+      KAFKA_JMX_OPTS: "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.rmi.port=9101"
+    logging:
+      driver: k8s-file
+    labels:
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.version: "1.0.0"
+
+  rabbitmq:
+    logging:
+      driver: k8s-file
+    labels:
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.version: "1.0.0"
+
+  spi-mock-service:
+    logging:
+      driver: k8s-file
+    volumes:
+      - dogbank_logs:/var/log/dogbank
+    environment:
+      DD_ENV: dogbank
+      DD_VERSION: "1.0.0"
+      DD_TAGS: "env:dogbank project:dogbank"
+    labels:
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.version: "1.0.0"
+
+  bancocentral-service:
+    logging:
+      driver: k8s-file
+    volumes:
+      - dogbank_logs:/var/log/dogbank
+    environment:
+      DD_ENV: dogbank
+      DD_VERSION: "1.0.0"
+      DD_TAGS: "env:dogbank project:dogbank"
+    labels:
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.version: "1.0.0"
+
+  auth-service:
+    logging:
+      driver: k8s-file
+    volumes:
+      - dogbank_logs:/var/log/dogbank
+    environment:
+      DD_ENV: dogbank
+      DD_VERSION: "1.0.0"
+      DD_TAGS: "env:dogbank project:dogbank"
+    labels:
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.version: "1.0.0"
+
+  account-service:
+    logging:
+      driver: k8s-file
+    volumes:
+      - dogbank_logs:/var/log/dogbank
+    environment:
+      DD_ENV: dogbank
+      DD_VERSION: "1.0.0"
+      DD_TAGS: "env:dogbank project:dogbank"
+    labels:
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.version: "1.0.0"
+
+  transaction-service:
+    logging:
+      driver: k8s-file
+    volumes:
+      - dogbank_logs:/var/log/dogbank
+    environment:
+      DD_ENV: dogbank
+      DD_VERSION: "1.0.0"
+      DD_TAGS: "env:dogbank project:dogbank"
+    labels:
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.version: "1.0.0"
+
+  chatbot-service:
+    logging:
+      driver: k8s-file
+    environment:
+      DD_ENV: dogbank
+      DD_VERSION: "2.0.0"
+      DD_TAGS: "env:dogbank project:dogbank"
+    labels:
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.version: "2.0.0"
+
+  pix-worker:
+    profiles: !reset []
+    logging:
+      driver: k8s-file
+    volumes:
+      - dogbank_logs:/var/log/dogbank
+    environment:
+      DD_ENV: dogbank
+      DD_VERSION: "1.0.0"
+      DD_TAGS: "env:dogbank project:dogbank"
+      DD_DATA_STREAMS_ENABLED: "true"
+      DD_TRACE_KAFKA_ENABLED: "true"
+    labels:
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.version: "1.0.0"
+
+  fraud-detection-service:
+    profiles: !reset []
+    logging:
+      driver: k8s-file
+    volumes:
+      - dogbank_logs:/var/log/dogbank
+    environment:
+      DD_ENV: dogbank
+      DD_VERSION: "1.0.0"
+      DD_TAGS: "env:dogbank project:dogbank"
+      DD_DATA_STREAMS_ENABLED: "true"
+      DD_TRACE_RABBITMQ_ENABLED: "true"
+    labels:
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.version: "1.0.0"
+
+  frontend:
+    logging:
+      driver: k8s-file
+    labels:
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.version: "1.0.0"
+
+  nginx:
+    logging:
+      driver: k8s-file
+    labels:
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.version: "1.0.0"
+
+  load-generator:
+    profiles: !reset []
+    depends_on: !reset []
+    logging:
+      driver: k8s-file
+    environment:
+      DD_ENV: dogbank
+      DD_SERVICE: load-generator
+      DD_VERSION: "1.0.0"
+      DD_TAGS: "env:dogbank project:dogbank"
+      DD_AGENT_HOST: datadog-agent
+      DD_TRACE_AGENT_PORT: "8126"
+      DD_TRACE_SAMPLE_RATE: "1"
+      DD_LOGS_INJECTION: "true"
+      DD_TRACE_PROPAGATION_STYLE_EXTRACT: tracecontext,datadog,baggage
+      DD_TRACE_PROPAGATION_STYLE_INJECT: tracecontext,datadog,baggage
+      DOGBANK_LOAD_RUN_ID: "${DOGBANK_LOAD_RUN_ID:-dogbank}"
+    labels:
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.version: "1.0.0"
+
+volumes:
+  dogbank_logs:

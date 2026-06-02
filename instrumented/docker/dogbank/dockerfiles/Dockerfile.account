@@ -39,7 +39,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8089/actuator/health || exit 1
 
 # Configurações JVM otimizadas com Datadog Agent
-ENV JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC -XX:+UseContainerSupport"
+ENV JAVA_OPTS="-javaagent:/app/dd-java-agent.jar -Xms256m -Xmx512m -XX:+UseG1GC -XX:+UseContainerSupport"
 ENV DD_AGENT_HOST="datadog-agent"
 ENV DD_SERVICE="account-service"
 ENV DD_ENV="development"

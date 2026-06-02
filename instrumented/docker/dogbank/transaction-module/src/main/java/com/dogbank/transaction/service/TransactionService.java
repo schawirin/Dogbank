@@ -129,6 +129,18 @@ public class TransactionService {
                 log.error("Conta de destino não encontrada");
                 throw new RuntimeException("Conta de destino não encontrada");
             }
+
+            if (origin.getId().equals(dest.getId())) {
+                long durationMs = calcularDuracao(startedAt);
+                pixMetrics.registrarPixFalha(accountOriginId, pixKeyDestination, amount,
+                    "TRANSFERENCIA_PARA_SI_MESMO", "Não é possível transferir para si mesmo", "VALIDACAO", durationMs);
+                MDC.put("evento", "PIX_ERRO");
+                MDC.put("status_transacao", "ERRO_TRANSFERENCIA_PARA_SI_MESMO");
+                MDC.put("erro_codigo", "TRANSFERENCIA_PARA_SI_MESMO");
+                MDC.put("erro_mensagem", "Não é possível transferir para si mesmo");
+                log.error("Não é possível transferir para si mesmo - conta origem/destino: {}", origin.getId());
+                throw new RuntimeException("Não é possível transferir para si mesmo");
+            }
             
             String bancoDestino = dest.getBanco() != null ? dest.getBanco() : "DogBank";
             MDC.put("destinatario_id", dest.getId().toString());

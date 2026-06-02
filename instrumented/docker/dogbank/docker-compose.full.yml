@@ -195,6 +195,11 @@ services:
       /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-results --partitions 3 --replication-factor 1
       /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-notifications --partitions 3 --replication-factor 1
       /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic pix-dlq --partitions 1 --replication-factor 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic account-events --partitions 3 --replication-factor 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic auth-events --partitions 3 --replication-factor 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic fraud-events --partitions 3 --replication-factor 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic notification-dispatch --partitions 3 --replication-factor 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic audit-log --partitions 6 --replication-factor 1 --config retention.ms=604800000
       echo 'Topics created:'
       /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list
       "
@@ -251,7 +256,7 @@ services:
   # ===========================================================================
   
   datadog-agent:
-    image: gcr.io/datadoghq/agent:latest
+    image: gcr.io/datadoghq/agent:7  # >= 7.78.0 required for Kafka admin page preview
     container_name: datadog-agent
     environment:
       # API Key (obrigatório)
@@ -285,6 +290,7 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - ./datadog/conf.d/postgres.d/conf.yaml:/etc/datadog-agent/conf.d/postgres.d/conf.yaml:ro
       - ./datadog/conf.d/kafka.d/conf.yaml:/etc/datadog-agent/conf.d/kafka.d/conf.yaml:ro
+      - ./datadog/conf.d/kafka_consumer.d/conf.yaml:/etc/datadog-agent/conf.d/kafka_consumer.d/conf.yaml:ro
       - ./datadog/conf.d/rabbitmq.d/conf.yaml:/etc/datadog-agent/conf.d/rabbitmq.d/conf.yaml:ro
     ports:
       - "8126:8126"  # APM traces
@@ -317,6 +323,8 @@ services:
       DD_VERSION: "1.0.0"
       DD_LOGS_INJECTION: "true"
       DD_TRACE_SAMPLE_RATE: "1"
+      DD_TRACE_PROPAGATION_STYLE_EXTRACT: "tracecontext,datadog,baggage"
+      DD_TRACE_PROPAGATION_STYLE_INJECT: "tracecontext,datadog,baggage"
       DD_DATA_STREAMS_ENABLED: "true"
       DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED: "true"
     depends_on:
@@ -356,6 +364,7 @@ services:
       SERVER_PORT: 8085
       # SPI (Sistema de Pagamentos Instantâneos) - API externa do BACEN
       SPI_API_URL: http://spi-mock-service:8090
+      SPI_FALLBACK_APPROVE: "false"
       # Datadog APM - Full tracing enabled
       DD_AGENT_HOST: datadog-agent
       DD_TRACE_AGENT_PORT: 8126
@@ -365,9 +374,12 @@ services:
       DD_LOGS_INJECTION: "true"
       DD_PROFILING_ENABLED: "true"
       DD_TRACE_SAMPLE_RATE: "1"
+      DD_TRACE_PROPAGATION_STYLE_EXTRACT: "tracecontext,datadog,baggage"
+      DD_TRACE_PROPAGATION_STYLE_INJECT: "tracecontext,datadog,baggage"
       DD_RUNTIME_METRICS_ENABLED: "true"
     volumes:
       - ./dd-java-agent.jar:/app/dd-java-agent.jar:ro
+      - dogbank_logs:/var/log/dogbank
     depends_on:
       postgres:
         condition: service_healthy
@@ -408,6 +420,9 @@ services:
       SPRING_DATASOURCE_PASSWORD: dog1234
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SERVER_PORT: 8088
       JWT_SECRET: dogbank-secret-key-change-in-production
       JWT_EXPIRATION: 86400000
@@ -415,15 +430,23 @@ services:
       DD_AGENT_HOST: datadog-agent
       DD_TRACE_AGENT_PORT: 8126
       DD_SERVICE: auth-service
+      DD_DATA_STREAMS_ENABLED: "true"
+      DD_TRACE_KAFKA_ENABLED: "true"
+      DD_RUNTIME_METRICS_ENABLED: "true"
       DD_ENV: dogbank
       DD_VERSION: "1.0.0"
       DD_LOGS_INJECTION: "true"
       DD_PROFILING_ENABLED: "true"
       DD_TRACE_SAMPLE_RATE: "1"
+      DD_TRACE_PROPAGATION_STYLE_EXTRACT: "tracecontext,datadog,baggage"
+      DD_TRACE_PROPAGATION_STYLE_INJECT: "tracecontext,datadog,baggage"
       # Datadog ASM (Application Security) - Detecta ataques
       DD_APPSEC_ENABLED: "true"
       DD_IAST_ENABLED: "true"
       DD_APPSEC_RULES: "https://raw.githubusercontent.com/DataDog/appsec-event-rules/main/build/recommended.json"
+    volumes:
+      - ./dd-java-agent.jar:/app/dd-java-agent.jar:ro
+      - dogbank_logs:/var/log/dogbank
     depends_on:
       postgres:
         condition: service_healthy
@@ -472,9 +495,14 @@ services:
       DD_LOGS_INJECTION: "true"
       DD_PROFILING_ENABLED: "true"
       DD_TRACE_SAMPLE_RATE: "1"
+      DD_TRACE_PROPAGATION_STYLE_EXTRACT: "tracecontext,datadog,baggage"
+      DD_TRACE_PROPAGATION_STYLE_INJECT: "tracecontext,datadog,baggage"
       # Datadog ASM (Application Security) - Detecta ataques
       DD_APPSEC_ENABLED: "true"
       DD_IAST_ENABLED: "true"
+    volumes:
+      - ./dd-java-agent.jar:/app/dd-java-agent.jar:ro
+      - dogbank_logs:/var/log/dogbank
     depends_on:
       postgres:
         condition: service_healthy
@@ -516,10 +544,14 @@ services:
       SERVER_PORT: 8084
       BANCOCENTRAL_API_URL: http://bancocentral-service:8085/api/bancocentral
       ACCOUNT_SERVICE_URL: http://account-service:8089
+      AUTH_SERVICE_URL: http://auth-service:8088
       # Kafka
       KAFKA_ENABLED: "true"
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      # RabbitMQ
+      # Redis (idempotency keys)
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # RabbitMQ (legacy)
       RABBITMQ_ENABLED: "true"
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
@@ -535,6 +567,8 @@ services:
       DD_LOGS_INJECTION: "true"
       DD_PROFILING_ENABLED: "true"
       DD_TRACE_SAMPLE_RATE: "1"
+      DD_TRACE_PROPAGATION_STYLE_EXTRACT: "tracecontext,datadog,baggage"
+      DD_TRACE_PROPAGATION_STYLE_INJECT: "tracecontext,datadog,baggage"
       DD_RUNTIME_METRICS_ENABLED: "true"
       # Data Streams Monitoring - Kafka & RabbitMQ visibility
       DD_DATA_STREAMS_ENABLED: "true"
@@ -546,6 +580,7 @@ services:
       DD_IAST_ENABLED: "true"
     volumes:
       - ./dd-java-agent.jar:/app/dd-java-agent.jar:ro
+      - dogbank_logs:/var/log/dogbank
     depends_on:
       postgres:
         condition: service_healthy
@@ -554,6 +589,8 @@ services:
       account-service:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -622,6 +659,8 @@ services:
       DD_VERSION: "2.0.0"
       DD_LOGS_INJECTION: "true"
       DD_PROFILING_ENABLED: "true"
+      DD_TRACE_PROPAGATION_STYLE_EXTRACT: "tracecontext,datadog,baggage"
+      DD_TRACE_PROPAGATION_STYLE_INJECT: "tracecontext,datadog,baggage"
       # Datadog LLM Observability
       DD_LLMOBS_ENABLED: "1"
       DD_LLMOBS_ML_APP: "dogbot-assistant"
@@ -732,6 +771,10 @@ services:
       DD_LOGS_INJECTION: "true"
       DD_PROFILING_ENABLED: "true"
       DD_TRACE_KAFKA_ENABLED: "true"
+      DD_TRACE_SAMPLE_RATE: "1"
+      DD_RUNTIME_METRICS_ENABLED: "true"
+      DD_TRACE_PROPAGATION_STYLE_EXTRACT: "tracecontext,datadog,baggage"
+      DD_TRACE_PROPAGATION_STYLE_INJECT: "tracecontext,datadog,baggage"
       DD_API_KEY: ${DD_API_KEY:-dummy-key-for-local-dev}
       DD_METRICS_ENABLED: ${DD_METRICS_ENABLED:-false}
       # Data Streams Monitoring
@@ -755,38 +798,41 @@ services:
   # 🔍 FRAUD DETECTION SERVICE - RabbitMQ Consumer
   # ===========================================================================
   # Analyzes PIX transactions for fraud using ML simulation
-  # Consumes from RabbitMQ pix.fraud queue with FIFO guarantee
-  
+  # Consumes from Kafka pix-transactions topic with velocity checks via Redis
+
   fraud-detection-service:
     build:
       context: ./fraud-detection-module
       dockerfile: Dockerfile
     container_name: dogbank-fraud-detection
     depends_on:
-      rabbitmq:
+      kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       datadog-agent:
         condition: service_started
     environment:
-      # RabbitMQ
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: dogbank
-      RABBITMQ_PASS: dog1234
-      RABBITMQ_VHOST: dogbank
-      # Datadog APM + DSM - Full tracing for RabbitMQ visibility
+      # Kafka
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_GROUP_ID: fraud-detection-group
+      # Redis (velocity checks + dedup)
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Datadog APM + DSM - Full tracing for Kafka + Redis visibility
       DD_AGENT_HOST: datadog-agent
       DD_TRACE_AGENT_PORT: 8126
       DD_SERVICE: fraud-detection-service
       DD_ENV: dogbank
-      DD_VERSION: "1.0.0"
+      DD_VERSION: "2.0.0"
       DD_LOGS_INJECTION: "true"
       DD_PROFILING_ENABLED: "true"
       DD_TRACE_SAMPLE_RATE: "1"
+      DD_TRACE_PROPAGATION_STYLE_EXTRACT: "tracecontext,datadog,baggage"
+      DD_TRACE_PROPAGATION_STYLE_INJECT: "tracecontext,datadog,baggage"
       DD_RUNTIME_METRICS_ENABLED: "true"
-      # Data Streams Monitoring - RabbitMQ visibility in Service Map
       DD_DATA_STREAMS_ENABLED: "true"
-      DD_TRACE_RABBITMQ_ENABLED: "true"
+      DD_TRACE_KAFKA_ENABLED: "true"
       DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED: "true"
     volumes:
       - ./dd-java-agent.jar:/app/dd-java-agent.jar:ro
@@ -800,6 +846,89 @@ services:
       com.datadoghq.tags.version: "1.0.0"
       com.datadoghq.tags.team: "security"
       com.datadoghq.tags.owner: "dogbank-team"
+
+  # ===========================================================================
+  # 🔔 NOTIFICATION SERVICE - Kafka consumer for notification-dispatch
+  # ===========================================================================
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.notification
+    container_name: notification-service
+    depends_on:
+      kafka:
+        condition: service_healthy
+      datadog-agent:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-dogbank}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-dogbank}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-dog1234}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SERVER_PORT: 8083
+      DD_AGENT_HOST: datadog-agent
+      DD_TRACE_AGENT_PORT: 8126
+      DD_SERVICE: notification-service
+      DD_ENV: dogbank
+      DD_VERSION: "1.0.0"
+      DD_LOGS_INJECTION: "true"
+      DD_PROFILING_ENABLED: "true"
+      DD_TRACE_SAMPLE_RATE: "1"
+      DD_RUNTIME_METRICS_ENABLED: "true"
+      DD_DATA_STREAMS_ENABLED: "true"
+      DD_TRACE_KAFKA_ENABLED: "true"
+      DD_TRACE_PROPAGATION_STYLE_EXTRACT: "tracecontext,datadog,baggage"
+      DD_TRACE_PROPAGATION_STYLE_INJECT: "tracecontext,datadog,baggage"
+      DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED: "true"
+    volumes:
+      - ./dd-java-agent.jar:/app/dd-java-agent.jar:ro
+    networks:
+      - dogbank-network
+    restart: unless-stopped
+    labels:
+      com.datadoghq.ad.logs: '[{"source": "java", "service": "notification-service"}]'
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.service: "notification-service"
+
+  # ===========================================================================
+  # 🔄 CACHE SYNC SERVICE - Kafka consumer → Redis sync (Python)
+  # ===========================================================================
+
+  cache-sync-service:
+    build:
+      context: ./cache-sync-service
+      dockerfile: Dockerfile
+    container_name: cache-sync-service
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      datadog-agent:
+        condition: service_started
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_GROUP_ID: cache-sync-service
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DD_AGENT_HOST: datadog-agent
+      DD_TRACE_AGENT_PORT: 8126
+      DD_SERVICE: cache-sync-service
+      DD_ENV: dogbank
+      DD_VERSION: "1.0.0"
+      DD_LOGS_INJECTION: "true"
+      DD_TRACE_SAMPLE_RATE: "1"
+      # DSM para Python confluent-kafka
+      DD_DATA_STREAMS_ENABLED: "true"
+      DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED: "true"
+    networks:
+      - dogbank-network
+    restart: unless-stopped
+    labels:
+      com.datadoghq.ad.logs: '[{"source": "python", "service": "cache-sync-service"}]'
+      com.datadoghq.tags.env: "dogbank"
+      com.datadoghq.tags.service: "cache-sync-service"
 
   # ===========================================================================
   # 🌐 FRONTEND - React + Nginx
@@ -908,10 +1037,21 @@ services:
       # =================================================================
       MIN_INTERVAL: "3"
       MAX_INTERVAL: "8"
+      DOGBANK_LOAD_FORCE_COVERAGE: "1"
       PROB_NORMAL: "0.55"
       PROB_ERROR_100: "0.20"
       PROB_COAF: "0.10"
       PROB_INSUFFICIENT: "0.15"
+      PROB_SUCCESS: "0.35"
+      PROB_INVALID_PIX_KEY: "0.15"
+      PROB_INSUFFICIENT_BALANCE: "0.10"
+      PROB_SELF_TRANSFER: "0.08"
+      PROB_BC_TIMEOUT: "0.08"
+      PROB_BC_INTERNAL_ERROR: "0.05"
+      PROB_LIMIT_EXCEEDED: "0.07"
+      PROB_SPI_TIMEOUT: "0.05"
+      PROB_SPI_INTERNAL_ERROR: "0.04"
+      PROB_SPI_LIMIT_EXCEEDED: "0.03"
       # =================================================================
       # Security Attacker Config - Para demonstrar Datadog ASM/IAST
       # =================================================================
@@ -970,4 +1110,6 @@ volumes:
   rabbitmq_data:
     driver: local
   kafka_data:
+    driver: local
+  dogbank_logs:
     driver: local

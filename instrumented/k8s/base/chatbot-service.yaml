@@ -1,7 +1,7 @@
 # =============================================================================
 # Chatbot Service - DogBot AI Assistant
 # =============================================================================
-# Python FastAPI service with LLM integration (Groq by default)
+# Python FastAPI service with LLM integration (Qwen via Ollama)
 # Includes Datadog LLM Observability instrumentation
 # =============================================================================
 
@@ -49,17 +49,14 @@ spec:
               name: http
           env:
             # =================================================================
-            # LLM Configuration - Groq (Default) + Gemini (Fallback)
+            # LLM Configuration - Qwen via Ollama (Local)
             # =================================================================
             - name: OPENAI_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: dogbank-secrets
-                  key: GROQ_API_KEY
+              value: "not-needed"
             - name: OPENAI_API_BASE_URL
-              value: "https://api.groq.com/openai/v1"
+              value: "http://ollama:11434/v1"
             - name: OPENAI_MODEL
-              value: "llama-3.1-8b-instant"
+              value: "qwen2.5:3b"
             # Gemini fallback (when Groq hits rate limit)
             - name: GEMINI_API_KEY
               valueFrom:

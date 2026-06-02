@@ -47,14 +47,14 @@ public class SpiController {
         String spiTransactionId = generateSpiTransactionId();
         
         // Simula diferentes cenários de resposta
-        if (amount == 100.00) {
+        if (amount == 100.00 || amount == 101.01) {
             // Timeout simulado
             log.warn("⏱️ [BACEN-SPI] Timeout na validação - Valor: R$ {}", amount);
             simulateLongDelay();
             return errorResponse("SPI-TIMEOUT", "Timeout no processamento da transação", HttpStatus.REQUEST_TIMEOUT);
         }
         
-        if (amount == 666.66) {
+        if (amount == 666.66 || amount == 606.66) {
             // Erro interno do SPI
             log.error("❌ [BACEN-SPI] Erro interno do sistema SPI");
             return errorResponse("SPI-INTERNAL-ERROR", "Erro interno do Sistema de Pagamentos Instantâneos", HttpStatus.INTERNAL_SERVER_ERROR);

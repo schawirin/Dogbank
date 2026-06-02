@@ -20,23 +20,90 @@ Este guia mostra as melhores práticas para gerenciar secrets no Kubernetes sem 
 
 ---
 
+## ⚡ Quick Start: Adicionar Secrets do RabbitMQ
+
+Se você só precisa adicionar as secrets do RabbitMQ rapidamente:
+
+```bash
+# Configure kubectl
+aws eks update-kubeconfig --region us-east-1 --name eks-sandbox-datadog
+
+# Opção 1: Adicionar às secrets existentes (recomendado)
+kubectl create secret generic dogbank-secrets -n dogbank \
+  --from-literal=rabbitmq-user="dogbank" \
+  --from-literal=rabbitmq-password="dogbank123" \
+  --from-literal=SPRING_RABBITMQ_USERNAME="dogbank" \
+  --from-literal=SPRING_RABBITMQ_PASSWORD="dogbank123" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# Opção 2: Patch no secret existente
+kubectl patch secret dogbank-secrets -n dogbank --type='json' -p='[
+  {"op": "add", "path": "/data/rabbitmq-user", "value": "'$(echo -n "dogbank" | base64)'"},
+  {"op": "add", "path": "/data/rabbitmq-password", "value": "'$(echo -n "dogbank123" | base64)'"}
+]'
+
+# Verificar
+kubectl get secret dogbank-secrets -n dogbank -o jsonpath='{.data.rabbitmq-user}' | base64 -d
+kubectl get secret dogbank-secrets -n dogbank -o jsonpath='{.data.rabbitmq-password}' | base64 -d
+
+# Reiniciar pods que usam RabbitMQ
+kubectl rollout restart deployment/transaction-service -n dogbank
+kubectl rollout restart statefulset/rabbitmq -n dogbank
+kubectl rollout restart deployment/frontend -n dogbank
+
+echo "✅ Secrets do RabbitMQ adicionadas!"
+```
+
+**Valores para RabbitMQ:**
+- `rabbitmq-user` = `dogbank`
+- `rabbitmq-password` = `dogbank123`
+- `SPRING_RABBITMQ_USERNAME` = `dogbank` (para serviços Spring Boot)
+- `SPRING_RABBITMQ_PASSWORD` = `dogbank123` (para serviços Spring Boot)
+
+---
+
 ## 📋 Secrets Necessários
 
 ```yaml
 dogbank-secrets:
+  # Database
   - POSTGRES_PASSWORD         # Senha do PostgreSQL
-  - SPRING_DATASOURCE_PASSWORD  # Mesma senha do PostgreSQL
+  - SPRING_DATASOURCE_PASSWORD  # Mesma senha do PostgreSQL (para Spring Boot)
+  - SPRING_RABBITMQ_USERNAME  # Usuário RabbitMQ (para Spring Boot)
+  - SPRING_RABBITMQ_PASSWORD  # Senha RabbitMQ (para Spring Boot)
   - db-user                   # Usuário do banco (dogbank)
   - db-password               # Senha do banco
+
+  # Datadog
   - DD_API_KEY                # Datadog API Key
   - DD_APP_KEY                # Datadog Application Key
+  - dd-api-key                # Datadog API Key (formato alternativo)
+  - DATADOG_API_KEY           # Datadog API Key (formato alternativo)
+  - DATADOG_APP_KEY           # Datadog Application Key (formato alternativo)
   - VITE_DD_CLIENT_TOKEN      # Datadog RUM Client Token
   - VITE_DD_APPLICATION_ID    # Datadog RUM Application ID
-  - JWT_SECRET                # Secret para JWT tokens
-  - groq-api-key              # Groq LLM API Key
-  - rabbitmq-user             # Usuário RabbitMQ
-  - rabbitmq-password         # Senha RabbitMQ
   - dd-site                   # Datadog Site (datadoghq.com)
+
+  # LLM APIs
+  - GROQ_API_KEY              # Groq LLM API Key
+  - groq-api-key              # Groq LLM API Key (formato alternativo)
+  - GEMINI_API_KEY            # Google Gemini API Key (fallback)
+  - LLM_API_KEY               # LLM API Key genérica
+  - OPENAI_API_KEY            # OpenAI API Key (se usar)
+
+  # RabbitMQ (valores fixos para desenvolvimento)
+  - rabbitmq-user             # Usuário RabbitMQ = "dogbank"
+  - rabbitmq-password         # Senha RabbitMQ = "dogbank123"
+
+  # Segurança
+  - JWT_SECRET                # Secret para JWT tokens
+
+  # Banco Central (PIX)
+  - BACEN_API_KEY             # Chave API Banco Central
+  - BACEN_API_SECRET          # Secret API Banco Central
+  - BACEN_CLIENT_ID           # Client ID Banco Central
+  - BACEN_CLIENT_SECRET       # Client Secret Banco Central
+  - BACEN_CERT_PASSWORD       # Senha do certificado Banco Central
 
 postgres-secrets:
   - POSTGRES_PASSWORD         # Senha do PostgreSQL
@@ -109,15 +176,29 @@ kubectl create secret generic dogbank-secrets -n dogbank \
   --from-literal=DD_API_KEY="${DD_API_KEY}" \
   --from-literal=DD_APP_KEY="${DD_APP_KEY}" \
   --from-literal=dd-api-key="${DD_API_KEY}" \
+  --from-literal=DATADOG_API_KEY="${DD_API_KEY}" \
+  --from-literal=DATADOG_APP_KEY="${DD_APP_KEY}" \
   --from-literal=VITE_DD_CLIENT_TOKEN="${DD_CLIENT_TOKEN}" \
   --from-literal=VITE_DD_APPLICATION_ID="${DD_APPLICATION_ID}" \
   --from-literal=JWT_SECRET="${JWT_SECRET}" \
+  --from-literal=GROQ_API_KEY="${GROQ_API_KEY}" \
   --from-literal=groq-api-key="${GROQ_API_KEY}" \
+  --from-literal=LLM_API_KEY="${GROQ_API_KEY}" \
+  --from-literal=GEMINI_API_KEY="${GEMINI_API_KEY:-}" \
+  --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
   --from-literal=rabbitmq-user="dogbank" \
   --from-literal=rabbitmq-password="${RABBITMQ_PASSWORD}" \
+  --from-literal=SPRING_RABBITMQ_USERNAME="dogbank" \
+  --from-literal=SPRING_RABBITMQ_PASSWORD="${RABBITMQ_PASSWORD}" \
+  --from-literal=SPRING_REDIS_PASSWORD="${REDIS_PASSWORD:-redis123}" \
+  --from-literal=BACEN_API_KEY="${BACEN_API_KEY:-}" \
+  --from-literal=BACEN_API_SECRET="${BACEN_API_SECRET:-}" \
+  --from-literal=BACEN_CLIENT_ID="${BACEN_CLIENT_ID:-}" \
+  --from-literal=BACEN_CLIENT_SECRET="${BACEN_CLIENT_SECRET:-}" \
+  --from-literal=BACEN_CERT_PASSWORD="${BACEN_CERT_PASSWORD:-}" \
   --from-literal=dd-site="datadoghq.com"
 
-echo "✅ Secret 'dogbank-secrets' criado"
+echo "✅ Secret 'dogbank-secrets' criado com $(kubectl get secret dogbank-secrets -n dogbank -o jsonpath='{.data}' | jq 'keys | length') chaves"
 
 # Criar secret do PostgreSQL
 kubectl create secret generic postgres-secrets -n dogbank \
@@ -142,6 +223,41 @@ cd k8s
 chmod +x secrets.local.sh
 ./secrets.local.sh
 ```
+
+### Passo 2.1: Adicionar Secrets Individuais (Alternativa)
+
+Se você preferir criar secrets uma por uma ou adicionar secrets faltando:
+
+```bash
+# Configurar kubectl
+aws eks update-kubeconfig --region us-east-1 --name eks-sandbox-datadog
+
+# Adicionar secret do RabbitMQ (se estiver faltando)
+kubectl create secret generic dogbank-secrets -n dogbank \
+  --from-literal=rabbitmq-user="dogbank" \
+  --from-literal=rabbitmq-password="dogbank123" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# Adicionar secret do Gemini (fallback LLM)
+kubectl create secret generic dogbank-secrets -n dogbank \
+  --from-literal=GEMINI_API_KEY="sua_gemini_api_key" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# Adicionar múltiplas secrets de uma vez
+kubectl create secret generic dogbank-secrets -n dogbank \
+  --from-literal=rabbitmq-user="dogbank" \
+  --from-literal=rabbitmq-password="dogbank123" \
+  --from-literal=SPRING_RABBITMQ_USERNAME="dogbank" \
+  --from-literal=SPRING_RABBITMQ_PASSWORD="dogbank123" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# Verificar o que foi adicionado
+kubectl get secret dogbank-secrets -n dogbank -o jsonpath='{.data}' | jq 'keys'
+```
+
+**Importante:**
+- Use `--dry-run=client -o yaml | kubectl apply -f -` para **adicionar** secrets sem deletar as existentes
+- Use `kubectl create secret ... ` (sem dry-run) para **substituir** o secret completamente
 
 ### Passo 3: Verificar secrets
 

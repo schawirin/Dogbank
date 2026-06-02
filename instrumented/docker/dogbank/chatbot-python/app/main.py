@@ -40,10 +40,10 @@ patch_all()
 # =============================================================================
 
 # LLM API Configuration
-# Default: Groq API (super fast, free tier)
-# Alternative: Qwen, OpenAI, Ollama (local)
-LLM_BASE_URL = os.getenv("OPENAI_API_BASE_URL", "https://api.groq.com/openai/v1")
-LLM_MODEL = os.getenv("OPENAI_MODEL", "llama-3.1-8b-instant")  # llama-3.1-8b-instant, mixtral-8x7b-32768
+# Default: Qwen via Ollama (local)
+# Alternative: Groq, OpenAI, DashScope (cloud)
+LLM_BASE_URL = os.getenv("OPENAI_API_BASE_URL", "http://ollama:11434/v1")
+LLM_MODEL = os.getenv("OPENAI_MODEL", "qwen2.5:3b")
 LLM_API_KEY = os.getenv("OPENAI_API_KEY", "")  # Required for cloud APIs
 
 # Gemini API Configuration (fallback for rate limits)
@@ -60,6 +60,8 @@ def get_provider():
         return "openai"
     elif "ollama" in LLM_BASE_URL or "11434" in LLM_BASE_URL:
         return "ollama"
+    if "qwen" in LLM_MODEL.lower():
+        return "qwen"
     return "custom"
 
 LLM_PROVIDER = get_provider()

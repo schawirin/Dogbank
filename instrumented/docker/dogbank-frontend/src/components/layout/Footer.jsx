@@ -1,5 +1,5 @@
 import React from 'react';
-import dogbankLogo from '../../assets/images/dogbank-logo.png';
+import Logo from '../common/dogbank-logo';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -9,7 +9,7 @@ const Footer = () => {
       <div className="container mx-auto px-4">
         <div className="grid md:grid-cols-3 gap-8">
           <div>
-            <img src={dogbankLogo} alt="DogBank" className="h-12 w-auto object-contain mb-4" />
+            <Logo className="text-purple-600 mb-4" textClassName="text-2xl" iconClassName="w-6 h-6" />
             <p className="text-sm">
               DogBank é um projeto de simulação bancária que oferece serviços financeiros fictícios.
             </p>

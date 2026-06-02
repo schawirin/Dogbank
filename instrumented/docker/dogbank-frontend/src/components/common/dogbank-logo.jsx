@@ -1,17 +1,12 @@
-// src/components/common/Logo.jsx
 import React from 'react';
-import dogbankLogo from '../../assets/images/dogbank-logo.png';
 
-/**
- * Logo do DogBank com patinha ao final.
- * Pode receber classes extras para ajustar tamanho/estilo.
- */
-const Logo = ({ className = '' }) => (
-  <img
-    src={dogbankLogo}
-    alt="DogBank"
-    className={className}
-  />
+const Logo = ({ className = '', textClassName = 'text-[22px]', iconClassName = 'w-6 h-6' }) => (
+  <div className={`flex items-center gap-1.5 ${className}`}>
+    <span className={`${textClassName} font-bold tracking-tight leading-none`}>DogBank</span>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className={`${iconClassName} fill-current mb-1`}>
+      <path d="M226.5 92.9c14.3 7.3 22.8 23 21 38.6l-5.1 44.5c-2.4 20.8-22 35-42.5 31.6l-44.4-7.4c-15.5-2.6-26.6-16.7-25-32.5l5.1-50.6C137.9 94 159.2 81.3 178.6 85l47.9 7.9zm134.4 7.9l47.9-7.9c19.4-3.2 40.7 9.5 43 32.1l5.1 50.6c1.6 15.8-9.5 29.9-25 32.5l-44.4 7.4c-20.5 3.4-40.1-10.8-42.5-31.6l-5.1-44.5c-1.8-15.6 6.7-31.3 21-38.6zM256 272c-29.4 0-56-17.6-69.5-44.1l-14-27.5c-8.9-17.6-29.5-25.1-47.5-16.6l-37.3 17.6c-21.6 10.2-35.3 32.2-34.5 56.1l2.4 72c1.7 51.5 44 92.5 95.6 92.5h108.8c51.6 0 93.9-41 95.6-92.5l2.4-72c.8-23.9-12.9-45.9-34.5-56.1l-37.3-17.6c-18-8.5-38.6-1-47.5 16.6l-14 27.5c-13.5 26.5-40.1 44.1-69.5 44.1zM97.1 230c-15.5 2.6-31.1-6.1-36.4-21l-18-50.7C37.3 143.2 45.4 126 60.5 119.7l43.2-18c14.6-6.1 31.5 1 36.8 15.9l16.1 45.5c4.9 13.9-2.4 29.4-16.3 34.3l-43.2 12.6zm317.8 0l-43.2-12.6c-13.9-4.9-21.2-20.4-16.3-34.3l16.1-45.5c5.3-14.9 22.2-22 36.8-15.9l43.2 18c15.1 6.3 23.2 23.5 17.8 38.6l-18 50.7c-5.3 14.9-20.9 23.6-36.4 21z" />
+    </svg>
+  </div>
 );
 
 export default Logo;

@@ -217,7 +217,12 @@ public class UserService {
             }
 
             User user = userOpt.get();
-            boolean isValid = passwordEncoder.matches(rawPassword, user.getSenha());
+            String storedPassword = user.getSenha();
+            boolean encodedPassword = storedPassword != null
+                    && (storedPassword.startsWith("$2a$") || storedPassword.startsWith("$2b$") || storedPassword.startsWith("$2y$"));
+            boolean isValid = encodedPassword
+                    ? passwordEncoder.matches(rawPassword, storedPassword)
+                    : rawPassword.equals(storedPassword);
             
             if (isValid) {
                 logData.put("status", "success");

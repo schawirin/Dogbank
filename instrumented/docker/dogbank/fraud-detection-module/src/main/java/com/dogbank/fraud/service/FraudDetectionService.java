@@ -6,8 +6,6 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -15,9 +13,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 
 /**
@@ -37,7 +33,6 @@ import java.util.Random;
 @Service
 public class FraudDetectionService {
 
-    private final RabbitTemplate rabbitTemplate;
     private final Counter fraudDetectedCounter;
     private final Counter transactionsAnalyzedCounter;
     private final Counter coafNotificationsCounter;
@@ -54,19 +49,11 @@ public class FraudDetectionService {
     // Amount thresholds
     private static final BigDecimal HIGH_RISK_AMOUNT = new BigDecimal("5000");
     private static final BigDecimal CRITICAL_AMOUNT = new BigDecimal("10000");
-    
+
     // COAF threshold - R$ 50,000.00 (Brazilian regulation)
     private static final BigDecimal COAF_THRESHOLD = new BigDecimal("50000");
 
-    @Value("${coaf.exchange:coaf.exchange}")
-    private String coafExchange;
-
-    @Value("${coaf.routing-key:coaf.notification}")
-    private String coafRoutingKey;
-
-    public FraudDetectionService(MeterRegistry meterRegistry, RabbitTemplate rabbitTemplate) {
-        this.rabbitTemplate = rabbitTemplate;
-        
+    public FraudDetectionService(MeterRegistry meterRegistry) {
         this.fraudDetectedCounter = Counter.builder("fraud.detected")
             .description("Number of fraudulent transactions detected")
             .tag("service", "fraud-detection")
@@ -118,8 +105,8 @@ public class FraudDetectionService {
                 log.warn("🚨 [COAF] Data/Hora: {}", 
                     LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")));
                 
-                // Send notification to COAF queue
-                sendCoafNotification(transaction);
+                // COAF flag is set; FraudKafkaConsumer publishes to fraud-events with requiresCoafReport=true
+                coafNotificationsCounter.increment();
             }
 
             // Rule 1: Check blacklist
@@ -228,47 +215,8 @@ public class FraudDetectionService {
     }
 
     /**
-     * Send notification to COAF (Conselho de Controle de Atividades Financeiras)
-     * In production, this would integrate with SISCOAF (Sistema de Controle de Atividades Financeiras)
-     */
-    private void sendCoafNotification(PixTransaction transaction) {
-        try {
-            Map<String, Object> coafNotification = new HashMap<>();
-            coafNotification.put("type", "SUSPICIOUS_TRANSACTION");
-            coafNotification.put("transactionId", transaction.getTransactionId());
-            coafNotification.put("amount", transaction.getAmount().toString());
-            coafNotification.put("currency", "BRL");
-            coafNotification.put("sourceAccountId", transaction.getSourceAccountId());
-            coafNotification.put("sourceCpf", maskCpf(transaction.getSourceCpf()));
-            coafNotification.put("destinationPixKey", transaction.getDestinationPixKey());
-            coafNotification.put("timestamp", LocalDateTime.now().toString());
-            coafNotification.put("reason", "TRANSACTION_ABOVE_50K_THRESHOLD");
-            coafNotification.put("institutionCode", "DOGBANK");
-            coafNotification.put("institutionCnpj", "00.000.000/0001-00");
-            
-            // Send to RabbitMQ COAF queue
-            rabbitTemplate.convertAndSend(coafExchange, coafRoutingKey, coafNotification);
-            
-            coafNotificationsCounter.increment();
-            
-            log.info("📤 [COAF] Notificação enviada para fila COAF - TX: {}, Valor: R$ {}",
-                transaction.getTransactionId(),
-                transaction.getAmount());
-                
-        } catch (Exception e) {
-            log.error("❌ [COAF] Erro ao enviar notificação COAF - TX: {}: {}",
-                transaction.getTransactionId(),
-                e.getMessage());
-        }
-    }
-
-    /**
-     * Mask CPF for logging (show only last 4 digits)
-     */
     private String maskCpf(String cpf) {
-        if (cpf == null || cpf.length() < 4) {
-            return "***";
-        }
+        if (cpf == null || cpf.length() < 4) return "***";
         return "***.***.***-" + cpf.substring(cpf.length() - 2);
     }
 

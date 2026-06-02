@@ -56,8 +56,12 @@ CREATE TABLE IF NOT EXISTS usuarios (
     nome VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE,
     chave_pix VARCHAR(100) UNIQUE,
+    blocked BOOLEAN NOT NULL DEFAULT FALSE,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Keep older persisted demo volumes compatible with the auth service.
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS blocked BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Tabela de contas
 CREATE TABLE IF NOT EXISTS contas (

@@ -30,29 +30,12 @@ public class PixBancoCentralController {
         
         log.info("🔍 [BANCO CENTRAL] Validando PIX - Chave: {}, Valor: R$ {}", pixKey, valor);
 
-        // SIMULAÇÃO DE TIMEOUT - 100 reais
-        if (valor == 100.00) {
-            log.error("⏱️ [TIMEOUT] Simulação de timeout do Banco Central - Valor: R$ {}", valor);
-            try {
-                // Simula delay antes de falhar
-                Thread.sleep(5000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            return erroResponse("PIX-TIMEOUT", "Timeout ao conectar com Banco Central", HttpStatus.REQUEST_TIMEOUT);
-        }
-
         // Simulação de erros baseados nas regras definidas
         if (valor == 1000.00) {
             log.error("❌ [ERRO] Limite excedido - Valor: R$ {}", valor);
             return erroResponse("PIX-LIMITE-EXCEDIDO", "Limite de transação excedido", HttpStatus.BAD_REQUEST);
         }
-        
-        if (!pixKey.contains("@")) {
-            log.error("❌ [ERRO] Chave PIX inválida - Chave: {}", pixKey);
-            return erroResponse("PIX-CHAVE-INVALIDA", "Chave Pix inválida ou não encontrada", HttpStatus.BAD_REQUEST);
-        }
-        
+
         if (valor == 5000.00) {
             log.error("❌ [ERRO] Saldo insuficiente - Valor: R$ {}", valor);
             return erroResponse("PIX-SALDO-INSUFICIENTE", "Saldo insuficiente para a transação", HttpStatus.BAD_REQUEST);

@@ -58,6 +58,17 @@ spec:
     liveProcessCollection:
       enabled: true
   override:
+    # =========================================================================
+    # OPW - Redireciona logs do Agent para o Observability Pipelines Worker
+    # O Worker aplica Sensitive Data Scanner (mascaramento CPF) antes da ingestão
+    # Para desativar: remova ou comente o bloco nodeAgent.env abaixo
+    # =========================================================================
+    nodeAgent:
+      env:
+        - name: DD_OBSERVABILITY_PIPELINES_WORKER_LOGS_ENABLED
+          value: "true"
+        - name: DD_OBSERVABILITY_PIPELINES_WORKER_LOGS_URL
+          value: "http://opw-observability-pipelines-worker.dogbank.svc.cluster.local:8282"
     clusterAgent:
       extraConfd:
         configDataMap:

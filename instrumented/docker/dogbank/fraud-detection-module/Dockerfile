@@ -5,11 +5,10 @@
 FROM maven:3.9-eclipse-temurin-21-alpine AS builder
 
 WORKDIR /app
-# Context do build e o pai (./instrumented/docker/dogbank), entao referenciamos o subdir
-COPY fraud-detection-module/pom.xml pom.xml
+COPY pom.xml pom.xml
 RUN mvn dependency:go-offline -B
 
-COPY fraud-detection-module/src src
+COPY src src
 RUN mvn clean package -DskipTests
 
 # =============================================================================
@@ -33,7 +32,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 EXPOSE 8091
 
 # JVM and Datadog configuration
-ENV JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC -XX:+UseContainerSupport"
+ENV JAVA_OPTS="-javaagent:/app/dd-java-agent.jar -Xms256m -Xmx512m -XX:+UseG1GC -XX:+UseContainerSupport"
 ENV DD_AGENT_HOST="datadog-agent"
 ENV DD_SERVICE="fraud-detection-service"
 ENV DD_ENV="dogbank"

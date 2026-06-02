@@ -33,7 +33,18 @@ spec:
                 {
                   "host": "%%host%%",
                   "port": 6379,
-                  "tags": ["env:dogbank", "service:redis"]
+                  "tags": ["env:dogbank", "service:redis"],
+                  "command_stats": true,
+                  "slowlog-max-len": 128,
+                  "keys": [
+                    "session:*",
+                    "rate_limit:login:*",
+                    "rate_limit:transaction:*",
+                    "temp:*"
+                  ],
+                  "warn_on_missing_keys": true,
+                  "disable_connection_cache": false,
+                  "socket_timeout": 5
                 }
               ]
             }
@@ -50,13 +61,21 @@ spec:
             - redis-server
             - --appendonly
             - "yes"
+            - --slowlog-log-slower-than
+            - "10000"
+            - --slowlog-max-len
+            - "128"
+            - --maxmemory
+            - "100mb"
+            - --maxmemory-policy
+            - "allkeys-lru"
           resources:
             requests:
-              memory: "64Mi"
+              memory: "96Mi"
               cpu: "100m"
             limits:
-              memory: "128Mi"
-              cpu: "200m"
+              memory: "192Mi"
+              cpu: "250m"
           livenessProbe:
             exec:
               command:

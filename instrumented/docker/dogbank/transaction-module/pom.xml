@@ -108,7 +108,13 @@
             <artifactId>spring-kafka</artifactId>
         </dependency>
 
-        <!-- RabbitMQ -->
+        <!-- Redis (idempotency keys + distributed lock) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!-- RabbitMQ (legacy fraud routing — gradual migration) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-amqp</artifactId>

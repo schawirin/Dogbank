@@ -1,20 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Configuration status="WARN" packages="co.elastic.logging.log4j2">
+<Configuration status="WARN">
     <Appenders>
         <Console name="ConsoleAppender" target="SYSTEM_OUT">
-            <EcsLayout serviceName="${env:DD_SERVICE:-dogbank}"/>
+            <PatternLayout pattern="{&quot;timestamp&quot;:&quot;%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ}&quot;,&quot;level&quot;:&quot;%p&quot;,&quot;logger&quot;:&quot;%c&quot;,&quot;thread&quot;:&quot;%t&quot;,&quot;message&quot;:&quot;%enc{%m}{JSON}&quot;,&quot;dd.trace_id&quot;:&quot;%X{dd.trace_id}&quot;,&quot;dd.span_id&quot;:&quot;%X{dd.span_id}&quot;,&quot;service&quot;:&quot;${env:DD_SERVICE:-bancocentral-service}&quot;,&quot;env&quot;:&quot;${env:DD_ENV:-dogbank}&quot;,&quot;version&quot;:&quot;${env:DD_VERSION:-1.0.0}&quot;}%n"/>
         </Console>
+        <RollingFile name="FileAppender"
+                     fileName="/var/log/dogbank/${env:DD_SERVICE:-bancocentral-service}.log"
+                     filePattern="/var/log/dogbank/${env:DD_SERVICE:-bancocentral-service}-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="{&quot;timestamp&quot;:&quot;%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ}&quot;,&quot;level&quot;:&quot;%p&quot;,&quot;logger&quot;:&quot;%c&quot;,&quot;thread&quot;:&quot;%t&quot;,&quot;message&quot;:&quot;%enc{%m}{JSON}&quot;,&quot;dd.trace_id&quot;:&quot;%X{dd.trace_id}&quot;,&quot;dd.span_id&quot;:&quot;%X{dd.span_id}&quot;,&quot;service&quot;:&quot;${env:DD_SERVICE:-bancocentral-service}&quot;,&quot;env&quot;:&quot;${env:DD_ENV:-dogbank}&quot;,&quot;version&quot;:&quot;${env:DD_VERSION:-1.0.0}&quot;}%n"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="10 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="3"/>
+        </RollingFile>
     </Appenders>
 
     <Loggers>
         <!-- Root logger -->
         <Root level="info">
             <AppenderRef ref="ConsoleAppender"/>
+            <AppenderRef ref="FileAppender"/>
         </Root>
 
         <!-- Aplicação -->
         <Logger name="com.dogbank" level="info" additivity="false">
             <AppenderRef ref="ConsoleAppender"/>
+            <AppenderRef ref="FileAppender"/>
         </Logger>
 
         <!-- Spring Framework -->

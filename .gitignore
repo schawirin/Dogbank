@@ -35,3 +35,7 @@ non-instrumented/k8s/secrets.local.sh
 # OS
 .DS_Store
 Thumbs.db
+
+# Tool artifacts (not project code)
+.playwright-cli/
+finops-output/

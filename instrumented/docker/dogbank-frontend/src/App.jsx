@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, AuthContext } from './context/AuthContext';
 
 // Layout
 import MainLayout from './components/layout/MainLayout';
@@ -43,8 +43,8 @@ datadogRum.init({
     trackLongTasks: true,
     // Connect RUM with APM traces
     allowedTracingUrls: [
-        { match: /localhost/, propagatorTypes: ['tracecontext', 'datadog'] },
-        { match: /127\.0\.0\.1/, propagatorTypes: ['tracecontext', 'datadog'] },
+        { match: /^http:\/\/localhost:8080\/api\//, propagatorTypes: ['tracecontext', 'datadog'] },
+        { match: /^http:\/\/127\.0\.0\.1:8080\/api\//, propagatorTypes: ['tracecontext', 'datadog'] },
         { match: /\/api\//, propagatorTypes: ['tracecontext', 'datadog'] },
     ],
     // Enable tracing
@@ -54,41 +54,51 @@ datadogRum.init({
 // Start session replay recording
 datadogRum.startSessionReplayRecording();
 
+const AppContent = () => {
+  const { user } = useContext(AuthContext);
+
+  return (
+    <>
+      {/* Chatbot - Assistente Virtual com vulnerabilidade de Prompt Injection */}
+      <Chatbot accountId={user?.accountId} />
+      <Routes>
+        {/* Rotas públicas */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/password" element={<PasswordPage />} />
+
+        {/* Rotas protegidas dentro do MainLayout */}
+        <Route path="/dashboard" element={<MainLayout />}>
+          <Route index element={<DashboardPage />} />
+          <Route path="extrato" element={<ExtractPage />} />
+          <Route path="cartoes" element={<CardsPage />} />
+          <Route path="perfil" element={<ProfilePage />} />
+
+          {/* Fluxo PIX - rotas aninhadas dentro de /dashboard */}
+          <Route path="pix" element={<PixTransferPage />} />
+          <Route path="pix/confirm" element={<PixConfirmPage />} />
+          <Route path="pix/receipt" element={<PixReceiptPage />} />
+
+          {/* Outros */}
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+
+        {/* Rotas alternativas para compatibilidade com navegação direta */}
+        <Route path="/pix" element={<Navigate to="/dashboard/pix" replace />} />
+        <Route path="/pix/confirm" element={<Navigate to="/dashboard/pix/confirm" replace />} />
+        <Route path="/pix/receipt" element={<Navigate to="/dashboard/pix/receipt" replace />} />
+        <Route path="/cartoes" element={<Navigate to="/dashboard/cartoes" replace />} />
+        <Route path="/extrato" element={<Navigate to="/dashboard/extrato" replace />} />
+        <Route path="/perfil" element={<Navigate to="/dashboard/perfil" replace />} />
+        <Route path="/profile" element={<Navigate to="/dashboard/perfil" replace />} />
+      </Routes>
+    </>
+  );
+};
+
 const App = () => (
   <AuthProvider>
-    {/* Chatbot - Assistente Virtual com vulnerabilidade de Prompt Injection */}
-    <Chatbot />
-    <Routes>
-      {/* Rotas públicas */}
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/password" element={<PasswordPage />} />
-
-      {/* Rotas protegidas dentro do MainLayout */}
-      <Route path="/dashboard" element={<MainLayout />}>
-        <Route index element={<DashboardPage />} />
-        <Route path="extrato" element={<ExtractPage />} />
-        <Route path="cartoes" element={<CardsPage />} />
-        <Route path="perfil" element={<ProfilePage />} />
-
-        {/* Fluxo PIX - rotas aninhadas dentro de /dashboard */}
-        <Route path="pix" element={<PixTransferPage />} />
-        <Route path="pix/confirm" element={<PixConfirmPage />} />
-        <Route path="pix/receipt" element={<PixReceiptPage />} />
-
-        {/* Outros */}
-        <Route path="*" element={<NotFoundPage />} />
-      </Route>
-
-      {/* Rotas alternativas para compatibilidade com navegação direta */}
-      <Route path="/pix" element={<Navigate to="/dashboard/pix" replace />} />
-      <Route path="/pix/confirm" element={<Navigate to="/dashboard/pix/confirm" replace />} />
-      <Route path="/pix/receipt" element={<Navigate to="/dashboard/pix/receipt" replace />} />
-      <Route path="/cartoes" element={<Navigate to="/dashboard/cartoes" replace />} />
-      <Route path="/extrato" element={<Navigate to="/dashboard/extrato" replace />} />
-      <Route path="/perfil" element={<Navigate to="/dashboard/perfil" replace />} />
-      <Route path="/profile" element={<Navigate to="/dashboard/perfil" replace />} />
-    </Routes>
+    <AppContent />
   </AuthProvider>
 );
 

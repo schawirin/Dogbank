@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { ArrowLeft, Shield, Delete, AlertCircle, UserX } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import authService from '../services/authService';
-import dogbankLogo from '../assets/images/dogbank-logo.png';
+import Logo from '../components/common/dogbank-logo';
 
 const PIN_LENGTH = 6;
 const KEYPAD = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
@@ -210,8 +210,7 @@ const PasswordPage = () => {
         <div className={`relative z-10 text-white max-w-lg transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
           {/* Logo */}
           <div className="flex items-center gap-4 mb-12">
-            <img src={dogbankLogo} alt="DogBank" className="h-14 w-auto" />
-            <span className="text-2xl font-bold">DogBank</span>
+            <Logo className="text-white" textClassName="text-4xl" iconClassName="w-9 h-9" />
           </div>
 
           <h1 className="text-5xl font-bold mb-6 leading-tight">Acesso Seguro</h1>
@@ -247,7 +246,7 @@ const PasswordPage = () => {
 
           {/* Logo mobile */}
           <div className="lg:hidden flex justify-center mb-8">
-            <img src={dogbankLogo} alt="DogBank" className="h-12 w-auto" />
+            <Logo className="text-purple-600" textClassName="text-3xl" iconClassName="w-7 h-7" />
           </div>
 
           {/* Heading */}

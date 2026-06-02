@@ -4,6 +4,8 @@ import com.dogbank.auth.dto.AuthRequest;
 import com.dogbank.auth.dto.LoginResponse;
 import com.dogbank.auth.entity.User;
 import com.dogbank.auth.repository.UserRepository;
+import com.dogbank.auth.service.AuthEventPublisher;
+import com.dogbank.auth.service.RateLimitService;
 import datadog.trace.api.EventTracker;
 import datadog.trace.api.GlobalTracer;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,12 +24,18 @@ import java.util.Optional;
 public class AuthController {
 
     private final UserRepository userRepository;
+    private final RateLimitService rateLimitService;
+    private final AuthEventPublisher authEventPublisher;
 
     @Value("${dogbank.admin.block-token:changeme-block-token}")
     private String adminBlockToken;
 
-    public AuthController(UserRepository userRepository) {
-        this.userRepository = userRepository;
+    public AuthController(UserRepository userRepository,
+                          RateLimitService rateLimitService,
+                          AuthEventPublisher authEventPublisher) {
+        this.userRepository     = userRepository;
+        this.rateLimitService   = rateLimitService;
+        this.authEventPublisher = authEventPublisher;
     }
 
     @PostMapping("/login")
@@ -41,10 +49,18 @@ public class AuthController {
                     .body(Map.of("error", "cpf e senha são obrigatórios"));
         }
 
+        // Rate limit check (Redis sliding window)
+        if (rateLimitService.isBlocked(cpf)) {
+            authEventPublisher.publishRateLimitBlock(cpf);
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(Map.of("error", "Too many failed attempts. Try again in 15 minutes."));
+        }
+
         Optional<User> userOpt = userRepository.findByCpf(cpf);
         if (userOpt.isEmpty()) {
-            // Conta NAO existe -> exists=false (sinaliza password spraying / enum)
             tracker.trackLoginFailureEvent(cpf, false, Map.of("reason", "user_not_found"));
+            rateLimitService.recordFailedAttempt(cpf);
+            authEventPublisher.publishLoginFailure(cpf, "user_not_found", false);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "User not found"));
         }
@@ -52,30 +68,36 @@ public class AuthController {
         User user = userOpt.get();
 
         if (user.getBlocked()) {
-            // Conta marcada como comprometida pelo workflow do Datadog
             Map<String, String> meta = new HashMap<>();
             meta.put("usr.id", String.valueOf(user.getId()));
             meta.put("reason", "account_blocked");
             tracker.trackCustomEvent("users.login.blocked_attempt", meta);
+            authEventPublisher.publishLoginFailure(cpf, "account_blocked", true);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "Account temporarily blocked due to suspicious activity"));
         }
 
         if (!Objects.equals(pwd, user.getSenha())) {
-            // Conta existe mas senha errada -> exists=true (sinal classico de credential stuffing)
             Map<String, String> meta = new HashMap<>();
             meta.put("usr.id", String.valueOf(user.getId()));
             meta.put("reason", "wrong_password");
             tracker.trackLoginFailureEvent(cpf, true, meta);
+            boolean nowBlocked = rateLimitService.recordFailedAttempt(cpf);
+            authEventPublisher.publishLoginFailure(cpf, "wrong_password", true);
+            if (nowBlocked) {
+                authEventPublisher.publishAccountBlocked(String.valueOf(user.getId()), cpf, "rate_limit");
+            }
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "Invalid credentials"));
         }
 
-        // Sucesso -> emite users.login.success (Datadog correlaciona com falhas anteriores
-        // para detectar Account Takeover / credential stuffing succeeded)
+        // Login success — clear rate limit counters and emit events
+        rateLimitService.clearAttempts(cpf);
         Map<String, String> meta = new HashMap<>();
         meta.put("email", user.getEmail() == null ? "" : user.getEmail());
         tracker.trackLoginSuccessEvent(String.valueOf(user.getId()), meta);
+        authEventPublisher.publishLoginSuccess(String.valueOf(user.getId()), cpf,
+                user.getEmail() != null ? user.getEmail() : "");
 
         LoginResponse resp = new LoginResponse();
         resp.setMessage("Login successful");

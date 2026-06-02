@@ -110,6 +110,21 @@ spec:
                 configMapKeyRef:
                   name: dogbank-config
                   key: DD_IAST_ENABLED
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: dogbank-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
+            - name: DD_DATA_STREAMS_ENABLED
+              value: "true"
+            - name: DD_TRACE_KAFKA_ENABLED
+              value: "true"
+            - name: DD_TRACE_SAMPLE_RATE
+              value: "1"
+            - name: DD_RUNTIME_METRICS_ENABLED
+              value: "true"
+            - name: DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED
+              value: "true"
             # Java options for Datadog
             - name: JAVA_TOOL_OPTIONS
               value: "-javaagent:/datadog/dd-java-agent.jar"

@@ -34,15 +34,20 @@ AUTH_SERVICE_URL = os.getenv('AUTH_SERVICE_URL', 'http://auth-service:8088')
 TRANSACTION_SERVICE_URL = os.getenv('TRANSACTION_SERVICE_URL', 'http://transaction-service:8084')
 ACCOUNT_SERVICE_URL = os.getenv('ACCOUNT_SERVICE_URL', 'http://account-service:8089')
 
-# Intervalo entre transações (segundos)
-MIN_INTERVAL = float(os.getenv('MIN_INTERVAL', '2'))
-MAX_INTERVAL = float(os.getenv('MAX_INTERVAL', '5'))
+# Intervalo entre transações (segundos) - Ajustado para não sobrecarregar o sistema
+MIN_INTERVAL = float(os.getenv('MIN_INTERVAL', '60'))
+MAX_INTERVAL = float(os.getenv('MAX_INTERVAL', '60'))
 
 # Probabilidades de cenários
-PROB_NORMAL = float(os.getenv('PROB_NORMAL', '0.60'))       # 60% transações normais
-PROB_ERROR_100 = float(os.getenv('PROB_ERROR_100', '0.15'))  # 15% erro R$ 100
-PROB_COAF = float(os.getenv('PROB_COAF', '0.10'))           # 10% COAF (>= R$ 50k)
-PROB_INSUFFICIENT = float(os.getenv('PROB_INSUFFICIENT', '0.15'))  # 15% saldo insuficiente
+PROB_NORMAL = float(os.getenv('PROB_NORMAL', '0.50'))       # 50% transações normais
+PROB_ERROR_100 = float(os.getenv('PROB_ERROR_100', '0.10'))  # 10% erro R$ 100
+PROB_COAF = float(os.getenv('PROB_COAF', '0.05'))           # 5% COAF (>= R$ 50k)
+PROB_INSUFFICIENT = float(os.getenv('PROB_INSUFFICIENT', '0.10'))  # 10% saldo insuficiente
+# Novos cenários DBM
+PROB_DB_LOCK = float(os.getenv('PROB_DB_LOCK', '0.10'))     # 10% DB lock (R$ 7777.77)
+PROB_SLOW_QUERY = float(os.getenv('PROB_SLOW_QUERY', '0.08')) # 8% Slow query (R$ 8888.88)
+PROB_DEADLOCK = float(os.getenv('PROB_DEADLOCK', '0.05'))   # 5% Deadlock (R$ 9999.99)
+PROB_DB_WAIT = float(os.getenv('PROB_DB_WAIT', '0.02'))     # 2% DB wait (R$ 6666.66)
 
 
 @dataclass
@@ -83,6 +88,10 @@ class LoadGenerator:
             'error_100': 0,
             'coaf': 0,
             'insufficient': 0,
+            'db_lock': 0,
+            'slow_query': 0,
+            'deadlock': 0,
+            'db_wait': 0,
             'other_errors': 0
         }
 
@@ -148,7 +157,9 @@ class LoadGenerator:
             payload = {
                 "accountOriginId": account_id,
                 "pixKeyDestination": to_account.pix_key,
-                "amount": amount
+                "amount": amount,
+                "password": from_account.password,
+                "description": "dogbank-load:legacy"
             }
 
             response = self.session.post(
@@ -169,15 +180,25 @@ class LoadGenerator:
     def select_scenario(self) -> str:
         """Seleciona um cenário baseado nas probabilidades"""
         rand = random.random()
-        
-        if rand < PROB_NORMAL:
-            return 'normal'
-        elif rand < PROB_NORMAL + PROB_ERROR_100:
-            return 'error_100'
-        elif rand < PROB_NORMAL + PROB_ERROR_100 + PROB_COAF:
-            return 'coaf'
-        else:
-            return 'insufficient'
+        cumulative = 0
+
+        scenarios = [
+            ('normal', PROB_NORMAL),
+            ('error_100', PROB_ERROR_100),
+            ('coaf', PROB_COAF),
+            ('insufficient', PROB_INSUFFICIENT),
+            ('db_lock', PROB_DB_LOCK),
+            ('slow_query', PROB_SLOW_QUERY),
+            ('deadlock', PROB_DEADLOCK),
+            ('db_wait', PROB_DB_WAIT),
+        ]
+
+        for scenario, prob in scenarios:
+            cumulative += prob
+            if rand < cumulative:
+                return scenario
+
+        return 'normal'  # default
     
     def generate_transaction(self):
         """Gera uma transação baseada no cenário selecionado"""
@@ -241,21 +262,85 @@ class LoadGenerator:
             else:
                 logger.warning(f"   ❌ Erro: {result.get('error') or result.get('status_code')}")
         
-        else:  # insufficient
+        elif scenario == 'insufficient':
             # Transação com saldo insuficiente
             amount = 999999.99  # Valor muito alto
-            
+
             from_account = random.choice(ACCOUNTS[:8])  # Contas com saldo normal
             to_account = random.choice([a for a in ACCOUNTS if a != from_account])
-            
+
             logger.info(f"💸 [{scenario.upper()}] {from_account.name} -> {to_account.name}: R$ {amount:.2f} (SALDO INSUFICIENTE)")
             result = self.make_pix(from_account, to_account, amount)
-            
+
             self.stats['insufficient'] += 1
             if not result['success']:
                 logger.info(f"   ⚠️ Erro esperado (saldo insuficiente)")
             else:
                 logger.warning(f"   ❓ Transação deveria ter falhado!")
+
+        elif scenario == 'db_lock':
+            # Transação que causa DB lock
+            amount = 7777.77
+
+            from_account = random.choice(ACCOUNTS[:8])
+            to_account = random.choice([a for a in ACCOUNTS if a != from_account])
+
+            logger.info(f"🔒 [{scenario.upper()}] {from_account.name} -> {to_account.name}: R$ {amount:.2f} (TRIGGER DB LOCK)")
+            result = self.make_pix(from_account, to_account, amount)
+
+            self.stats['db_lock'] += 1
+            if result['success']:
+                logger.info(f"   🔒 Lock será criado pelo DB Chaos Generator")
+            else:
+                logger.warning(f"   ❌ Erro: {result.get('status_code')}")
+
+        elif scenario == 'slow_query':
+            # Transação que causa slow query
+            amount = 8888.88
+
+            from_account = random.choice(ACCOUNTS[:8])
+            to_account = random.choice([a for a in ACCOUNTS if a != from_account])
+
+            logger.info(f"🐌 [{scenario.upper()}] {from_account.name} -> {to_account.name}: R$ {amount:.2f} (TRIGGER SLOW QUERY)")
+            result = self.make_pix(from_account, to_account, amount)
+
+            self.stats['slow_query'] += 1
+            if result['success']:
+                logger.info(f"   🐌 Slow query será executada pelo DB Chaos Generator")
+            else:
+                logger.warning(f"   ❌ Erro: {result.get('status_code')}")
+
+        elif scenario == 'deadlock':
+            # Transação que causa deadlock
+            amount = 9999.99
+
+            from_account = random.choice(ACCOUNTS[:8])
+            to_account = random.choice([a for a in ACCOUNTS if a != from_account])
+
+            logger.info(f"💀 [{scenario.upper()}] {from_account.name} -> {to_account.name}: R$ {amount:.2f} (TRIGGER DEADLOCK)")
+            result = self.make_pix(from_account, to_account, amount)
+
+            self.stats['deadlock'] += 1
+            if result['success']:
+                logger.info(f"   💀 Deadlock será criado pelo DB Chaos Generator")
+            else:
+                logger.warning(f"   ❌ Erro: {result.get('status_code')}")
+
+        else:  # db_wait
+            # Transação que causa waiting query
+            amount = 6666.66
+
+            from_account = random.choice(ACCOUNTS[:8])
+            to_account = random.choice([a for a in ACCOUNTS if a != from_account])
+
+            logger.info(f"⏰ [{scenario.upper()}] {from_account.name} -> {to_account.name}: R$ {amount:.2f} (TRIGGER DB WAIT)")
+            result = self.make_pix(from_account, to_account, amount)
+
+            self.stats['db_wait'] += 1
+            if result['success']:
+                logger.info(f"   ⏰ Waiting query será criada pelo DB Chaos Generator")
+            else:
+                logger.warning(f"   ❌ Erro: {result.get('status_code')}")
     
     def print_stats(self):
         """Imprime estatísticas"""
@@ -266,6 +351,10 @@ class LoadGenerator:
         logger.info(f"   🚨 Erro R$ 100: {self.stats['error_100']}")
         logger.info(f"   🏛️ COAF: {self.stats['coaf']}")
         logger.info(f"   💸 Saldo insuficiente: {self.stats['insufficient']}")
+        logger.info(f"   🔒 DB Lock (R$ 7777.77): {self.stats['db_lock']}")
+        logger.info(f"   🐌 Slow Query (R$ 8888.88): {self.stats['slow_query']}")
+        logger.info(f"   💀 Deadlock (R$ 9999.99): {self.stats['deadlock']}")
+        logger.info(f"   ⏰ DB Wait (R$ 6666.66): {self.stats['db_wait']}")
         logger.info(f"   ❌ Outros erros: {self.stats['other_errors']}")
         logger.info("=" * 60)
     

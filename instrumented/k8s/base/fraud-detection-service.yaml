@@ -95,11 +95,11 @@ spec:
             - name: DD_RUNTIME_METRICS_ENABLED
               value: "true"
             # =================================================================
-            # Datadog Data Streams Monitoring - RabbitMQ visibility
+            # Datadog Data Streams Monitoring - Kafka visibility
             # =================================================================
             - name: DD_DATA_STREAMS_ENABLED
               value: "true"
-            - name: DD_TRACE_RABBITMQ_ENABLED
+            - name: DD_TRACE_KAFKA_ENABLED
               value: "true"
             - name: DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED
               value: "true"

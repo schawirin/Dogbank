@@ -7,7 +7,9 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
@@ -30,9 +32,15 @@ public class SpiExternalService {
     
     @Value("${spi.api.url:http://spi-mock-service:8090}")
     private String spiApiUrl;
+
+    @Value("${spi.fallback.approve:false}")
+    private boolean approveFallback;
     
     public SpiExternalService() {
-        this.restTemplate = new RestTemplate();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(3000);
+        factory.setReadTimeout(4000); // SPI mock dorme 5s para R$100 → timeout real
+        this.restTemplate = new RestTemplate(factory);
     }
     
     /**
@@ -83,10 +91,28 @@ public class SpiExternalService {
             log.warn("⚠️ [SPI] Resposta inesperada do SPI");
             return new SpiValidationResult(false, null, "Resposta inesperada do SPI", "SPI-UNEXPECTED");
             
+        } catch (ResourceAccessException e) {
+            if (e.getCause() instanceof java.net.SocketTimeoutException) {
+                log.error("⏱️ [SPI] SocketTimeoutException: SPI do Banco Central nao respondeu no prazo (4s): {}", e.getMessage(), e);
+                return new SpiValidationResult(false, null,
+                    "SPI indisponivel: timeout na conexao com o Banco Central",
+                    "SPI-TIMEOUT");
+            }
+            log.error("❌ [SPI] Erro de conexao com SPI: {}", e.getMessage(), e);
+            if (approveFallback) {
+                return simulateLocalValidation(pixKey, amount);
+            }
+            return new SpiValidationResult(false, null,
+                "SPI indisponivel: " + e.getMessage(),
+                "SPI-COMMUNICATION-ERROR");
         } catch (Exception e) {
-            log.error("❌ [SPI] Erro ao comunicar com SPI: {}", e.getMessage());
-            // Em caso de falha na comunicação, simula uma resposta local
-            return simulateLocalValidation(pixKey, amount);
+            log.error("❌ [SPI] Erro inesperado ao comunicar com SPI: {}", e.getMessage(), e);
+            if (approveFallback) {
+                return simulateLocalValidation(pixKey, amount);
+            }
+            return new SpiValidationResult(false, null,
+                "SPI indisponivel ou rejeitou a transacao: " + e.getMessage(),
+                "SPI-COMMUNICATION-ERROR");
         }
     }
     

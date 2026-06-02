@@ -14,13 +14,14 @@ RUN pip install --no-cache-dir requests psycopg2-binary
 
 # Copy scripts
 COPY load_generator.py .
+COPY pix_cron.py .
 COPY security_attacker.py .
 COPY chatbot_tester.py .
 COPY db_chaos_generator.py .
 COPY entrypoint.sh .
 
 # Make executable
-RUN chmod +x load_generator.py security_attacker.py chatbot_tester.py db_chaos_generator.py entrypoint.sh
+RUN chmod +x load_generator.py pix_cron.py security_attacker.py chatbot_tester.py db_chaos_generator.py entrypoint.sh
 
 # =============================================================================
 # Environment variables - Load Generator

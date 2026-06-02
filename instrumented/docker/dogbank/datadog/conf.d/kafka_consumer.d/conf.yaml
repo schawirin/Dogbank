@@ -1,0 +1,48 @@
+## Kafka Consumer Check — habilita Kafka admin page (preview) no DSM
+## Requer Datadog Agent >= 7.78.0
+## https://docs.datadoghq.com/integrations/kafka/
+
+init_config:
+  max_partition_contexts: 10000
+
+instances:
+  - kafka_connect_str: kafka:29092
+    tags:
+      - kafka_cluster_name:dogbank-kafka
+      - env:dogbank
+    # Habilita o Kafka admin page (preview) no Data Streams Monitoring
+    enable_cluster_monitoring: true
+    # Consumer groups + topics para monitoramento de lag
+    consumer_groups:
+      pix-worker-group:
+        pix-transactions:
+          - 0
+          - 1
+          - 2
+      fraud-detection-group:
+        pix-transactions:
+          - 0
+          - 1
+          - 2
+      cache-sync-service:
+        banking.accounts:
+          - 0
+          - 1
+          - 2
+        banking.transactions:
+          - 0
+          - 1
+          - 2
+        account-events:
+          - 0
+          - 1
+          - 2
+      notification-service-group:
+        notification-dispatch:
+          - 0
+          - 1
+          - 2
+        pix-notifications:
+          - 0
+          - 1
+          - 2

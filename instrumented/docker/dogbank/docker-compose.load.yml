@@ -1,0 +1,27 @@
+services:
+  load-generator:
+    profiles: !reset []
+    build:
+      context: ./load-generator
+      dockerfile: Dockerfile
+    environment:
+      RUN_MODE: pix_cron
+      STARTUP_DELAY: "10"
+      DOGBANK_LOAD_RUN_ID: "${DOGBANK_LOAD_RUN_ID:-local-demo}"
+      MIN_INTERVAL: "${DOGBANK_LOAD_MIN_INTERVAL:-2}"
+      MAX_INTERVAL: "${DOGBANK_LOAD_MAX_INTERVAL:-6}"
+      MAX_TRANSACTIONS: "${DOGBANK_LOAD_MAX_TRANSACTIONS:-0}"
+      BURST_COUNT: "${DOGBANK_LOAD_BURST_COUNT:-50}"
+      BURST_INTERVAL: "${DOGBANK_LOAD_BURST_INTERVAL:-0.35}"
+      REQUEST_TIMEOUT: "45"
+      AUTH_SERVICE_URL: http://auth-service:8088
+      TRANSACTION_SERVICE_URL: http://transaction-service:8084
+      ACCOUNT_SERVICE_URL: http://account-service:8089
+      CHATBOT_SERVICE_URL: http://chatbot-service:8083
+      NGINX_URL: http://nginx:80
+      PROB_SUCCESS: "0.50"
+      PROB_INVALID_PIX_KEY: "0.15"
+      PROB_INSUFFICIENT_BALANCE: "0.12"
+      PROB_SELF_TRANSFER: "0.09"
+      PROB_BC_TIMEOUT: "0.08"
+      PROB_LIMIT_EXCEEDED: "0.06"

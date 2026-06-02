@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Lock, ChevronRight, Shield, Zap } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import dogbankLogo from '../assets/images/dogbank-logo.png';
+import Logo from '../components/common/dogbank-logo';
 
 /**
  * Página de login (CPF) - Design moderno com visual premium
@@ -72,7 +72,7 @@ const LoginPage = () => {
         <div className={`relative z-10 text-white max-w-lg transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
           {/* Logo */}
           <div className="flex items-center gap-4 mb-12">
-            <img src={dogbankLogo} alt="DogBank" className="h-16 w-auto" />
+            <Logo className="text-white" textClassName="text-4xl" iconClassName="w-9 h-9" />
           </div>
 
           <h1 className="text-5xl font-bold mb-6 leading-tight">
@@ -121,7 +121,7 @@ const LoginPage = () => {
 
           {/* Logo mobile */}
           <div className="lg:hidden flex justify-center mb-8">
-            <img src={dogbankLogo} alt="DogBank" className="h-12 w-auto" />
+            <Logo className="text-purple-600" textClassName="text-3xl" iconClassName="w-7 h-7" />
           </div>
 
           {/* Heading */}

@@ -1,0 +1,32 @@
+logs:
+  - type: file
+    path: /var/log/dogbank/transaction-service.log
+    source: java
+    service: transaction-service
+    tags:
+      - env:dogbank
+      - version:1.0.0
+
+  - type: file
+    path: /var/log/dogbank/bancocentral-service.log
+    source: java
+    service: bancocentral-service
+    tags:
+      - env:dogbank
+      - version:1.0.0
+
+  - type: file
+    path: /var/log/dogbank/auth-service.log
+    source: java
+    service: auth-service
+    tags:
+      - env:dogbank
+      - version:1.0.0
+
+  - type: file
+    path: /var/log/dogbank/account-service.log
+    source: java
+    service: account-service
+    tags:
+      - env:dogbank
+      - version:1.0.0

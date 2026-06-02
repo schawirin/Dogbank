@@ -77,7 +77,7 @@ class CacheSyncService:
             }
 
             self.consumer = Consumer(conf)
-            self.consumer.subscribe(['banking.accounts', 'banking.transactions'])
+            self.consumer.subscribe(['banking.accounts', 'banking.transactions', 'account-events'])
 
             logger.info(f"✅ Connected to Kafka with confluent-kafka: {KAFKA_BOOTSTRAP_SERVERS}")
             logger.info(f"📋 Subscribed to topics: banking.accounts, banking.transactions")

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <property name="service" value="${DD_SERVICE:-pix-worker}"/>
+    <property name="env" value="${DD_ENV:-dogbank}"/>
+    <property name="version" value="${DD_VERSION:-1.0.0}"/>
+    <property name="jsonPattern" value="{&quot;timestamp&quot;:&quot;%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ}&quot;,&quot;level&quot;:&quot;%level&quot;,&quot;logger&quot;:&quot;%logger{40}&quot;,&quot;thread&quot;:&quot;%thread&quot;,&quot;message&quot;:&quot;%replace(%msg){'[\r\n\&quot;]',' '}&quot;,&quot;dd.trace_id&quot;:&quot;%X{dd.trace_id}&quot;,&quot;dd.span_id&quot;:&quot;%X{dd.span_id}&quot;,&quot;service&quot;:&quot;${service}&quot;,&quot;env&quot;:&quot;${env}&quot;,&quot;version&quot;:&quot;${version}&quot;}%n"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${jsonPattern}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>/var/log/dogbank/${service}.log</file>
+        <encoder>
+            <pattern>${jsonPattern}</pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>/var/log/dogbank/${service}-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>3</maxHistory>
+            <totalSizeCap>100MB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>

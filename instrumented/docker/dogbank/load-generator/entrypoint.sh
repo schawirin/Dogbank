@@ -5,11 +5,13 @@
 # Executa o load generator, security attacker e/ou chatbot tester
 #
 # Modos disponiveis:
-#   - load:     Apenas transacoes PIX
-#   - security: Apenas ataques de seguranca (ASM/IAST)
-#   - chatbot:  Apenas testes de chatbot (LLM Observability)
-#   - both:     Load + Security (padrao)
-#   - all:      Load + Security + Chatbot
+#   - pix_cron:  Cenários README de PIX em loop para demos RUM/APM
+#   - load:      Apenas transacoes PIX
+#   - security:  Apenas ataques de seguranca (ASM/IAST)
+#   - chatbot:   Apenas testes de chatbot (LLM Observability)
+#   - db_chaos:  Apenas DB Chaos Generator (DBM demo)
+#   - both:      Load + Security
+#   - all:       PIX Cron + Load + Security + Chatbot + DB Chaos (padrao)
 # =============================================================================
 
 set -e
@@ -23,6 +25,10 @@ MODE=${RUN_MODE:-"both"}
 echo "Modo: $MODE"
 
 case $MODE in
+    "pix_cron"|"readme")
+        echo "Executando PIX Cron com cenarios do README..."
+        python -u pix_cron.py
+        ;;
     "load")
         echo "Executando apenas Load Generator..."
         python -u load_generator.py
@@ -34,6 +40,10 @@ case $MODE in
     "chatbot")
         echo "Executando apenas Chatbot Tester..."
         python -u chatbot_tester.py
+        ;;
+    "db_chaos")
+        echo "Executando apenas DB Chaos Generator..."
+        python -u db_chaos_generator.py
         ;;
     "both")
         echo "Executando Load Generator e Security Attacker em paralelo..."
@@ -50,7 +60,13 @@ case $MODE in
         wait $LOAD_PID $SECURITY_PID
         ;;
     "all")
-        echo "Executando Load Generator, Security Attacker e Chatbot Tester..."
+        echo "Executando PIX Cron, Load Generator, Security Attacker, Chatbot Tester e DB Chaos..."
+
+        python -u pix_cron.py &
+        PIX_CRON_PID=$!
+        echo "PIX Cron iniciado (PID: $PIX_CRON_PID)"
+
+        sleep 5
 
         # Inicia Load Generator
         python -u load_generator.py &
@@ -73,12 +89,20 @@ case $MODE in
         CHATBOT_PID=$!
         echo "Chatbot Tester iniciado (PID: $CHATBOT_PID)"
 
+        # Aguarda antes de iniciar DB Chaos Generator
+        sleep 15
+
+        # Inicia DB Chaos Generator
+        python -u db_chaos_generator.py &
+        DB_CHAOS_PID=$!
+        echo "DB Chaos Generator iniciado (PID: $DB_CHAOS_PID)"
+
         # Aguarda todos os processos
-        wait $LOAD_PID $SECURITY_PID $CHATBOT_PID
+        wait $PIX_CRON_PID $LOAD_PID $SECURITY_PID $CHATBOT_PID $DB_CHAOS_PID
         ;;
     *)
         echo "Modo desconhecido: $MODE"
-        echo "Use: load, security, chatbot, both, ou all"
+        echo "Use: load, security, chatbot, db_chaos, both, ou all"
         exit 1
         ;;
 esac
