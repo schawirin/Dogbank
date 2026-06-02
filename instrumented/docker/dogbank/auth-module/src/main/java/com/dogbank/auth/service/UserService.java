@@ -218,11 +218,15 @@ public class UserService {
 
             User user = userOpt.get();
             String storedPassword = user.getSenha();
-            boolean encodedPassword = storedPassword != null
-                    && (storedPassword.startsWith("$2a$") || storedPassword.startsWith("$2b$") || storedPassword.startsWith("$2y$"));
-            boolean isValid = encodedPassword
-                    ? passwordEncoder.matches(rawPassword, storedPassword)
-                    : rawPassword.equals(storedPassword);
+            // Try plain text first (most common in demo), then bcrypt as fallback
+            boolean isValid = rawPassword.equals(storedPassword);
+            if (!isValid && storedPassword != null) {
+                try {
+                    isValid = passwordEncoder.matches(rawPassword, storedPassword);
+                } catch (Exception ignored) {
+                    // storedPassword is not a valid bcrypt hash - keep isValid=false
+                }
+            }
             
             if (isValid) {
                 logData.put("status", "success");
