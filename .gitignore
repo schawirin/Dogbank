@@ -39,3 +39,4 @@ Thumbs.db
 # Tool artifacts (not project code)
 .playwright-cli/
 finops-output/
+instrumented/docker/dogbank/data-observability-poc/
