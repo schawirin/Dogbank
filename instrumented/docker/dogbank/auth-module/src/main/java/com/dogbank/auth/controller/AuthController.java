@@ -8,20 +8,26 @@ import com.dogbank.auth.service.AuthEventPublisher;
 import com.dogbank.auth.service.RateLimitService;
 import datadog.trace.api.EventTracker;
 import datadog.trace.api.GlobalTracer;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 @CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+
+    private static final Logger logger = LogManager.getLogger(AuthController.class);
 
     private final UserRepository userRepository;
     private final RateLimitService rateLimitService;
@@ -29,6 +35,9 @@ public class AuthController {
 
     @Value("${dogbank.admin.block-token:changeme-block-token}")
     private String adminBlockToken;
+
+    @Value("${dogbank.demo.log4shell.enabled:false}")
+    private boolean log4shellDemoEnabled;
 
     public AuthController(UserRepository userRepository,
                           RateLimitService rateLimitService,
@@ -106,6 +115,47 @@ public class AuthController {
         resp.setAccountId(user.getId());
 
         return ResponseEntity.ok(resp);
+    }
+
+    @PostMapping("/lab/log4shell")
+    public ResponseEntity<?> log4shellLab(
+            @RequestHeader(value = "X-Api-Version", required = false) String apiVersion,
+            @RequestHeader(value = "User-Agent", required = false) String userAgent,
+            @RequestHeader(value = "X-EvilDog-Run", required = false) String evilDogRun,
+            HttpServletRequest servletRequest) {
+        if (!log4shellDemoEnabled) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "lab endpoint disabled"));
+        }
+
+        String payload = firstNonBlank(apiVersion, userAgent, servletRequest.getHeader("Referer"), "no-payload");
+        String runId = evilDogRun == null || evilDogRun.isBlank()
+                ? "log4shell-" + UUID.randomUUID()
+                : evilDogRun;
+
+        Map<String, String> meta = new HashMap<>();
+        meta.put("runId", runId);
+        meta.put("endpoint", "/api/auth/lab/log4shell");
+        meta.put("clientIp", servletRequest.getRemoteAddr());
+        meta.put("userAgent", userAgent == null ? "" : userAgent);
+        GlobalTracer.getEventTracker().trackCustomEvent("dogbank.log4shell.demo.payload_logged", meta);
+
+        // DogBank lab only: intentionally logs untrusted input with vulnerable Log4j.
+        logger.error("dogbank-log4shell-lab runId=" + runId + " payload=" + payload);
+
+        return ResponseEntity.ok(Map.of(
+                "status", "payload_logged",
+                "runId", runId,
+                "endpoint", "/api/auth/lab/log4shell"));
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "";
     }
 
     // =====================================================================

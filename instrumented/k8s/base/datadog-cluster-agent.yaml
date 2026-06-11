@@ -113,15 +113,24 @@ metadata:
   namespace: dogbank
   labels:
     app: datadog-cluster-agent
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: dogbank
+    app.kubernetes.io/part-of: dogbank
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: datadog-cluster-agent
+      app.kubernetes.io/managed-by: kustomize
+      app.kubernetes.io/name: dogbank
+      app.kubernetes.io/part-of: dogbank
   template:
     metadata:
       labels:
         app: datadog-cluster-agent
+        app.kubernetes.io/managed-by: kustomize
+        app.kubernetes.io/name: dogbank
+        app.kubernetes.io/part-of: dogbank
     spec:
       serviceAccountName: datadog-cluster-agent
       containers:
@@ -147,6 +156,8 @@ spec:
                   key: DD_APP_KEY
             - name: DD_SITE
               value: "datadoghq.com"
+            - name: DD_REMOTE_CONFIGURATION_ENABLED
+              value: "true"
             - name: DD_CLUSTER_AGENT_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -177,18 +188,6 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
-          livenessProbe:
-            httpGet:
-              path: /live
-              port: 5555
-            initialDelaySeconds: 15
-            periodSeconds: 15
-          readinessProbe:
-            httpGet:
-              path: /ready
-              port: 5555
-            initialDelaySeconds: 15
-            periodSeconds: 15
 
 ---
 apiVersion: v1

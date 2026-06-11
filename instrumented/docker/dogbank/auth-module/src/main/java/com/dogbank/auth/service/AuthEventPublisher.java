@@ -1,7 +1,7 @@
 package com.dogbank.auth.service;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -11,11 +11,15 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
-@Slf4j
 public class AuthEventPublisher {
 
+    private static final Logger log = LogManager.getLogger(AuthEventPublisher.class);
+
     private final KafkaTemplate<String, Object> kafkaTemplate;
+
+    public AuthEventPublisher(KafkaTemplate<String, Object> kafkaTemplate) {
+        this.kafkaTemplate = kafkaTemplate;
+    }
 
     @Value("${kafka.topics.auth-events:auth-events}")
     private String authEventsTopic;

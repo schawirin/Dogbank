@@ -11,9 +11,11 @@
   <packaging>jar</packaging>
 
   <properties>
-    <java.version>21</java.version>
+    <java.version>11</java.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <spring.boot.version>2.7.18</spring.boot.version>
+    <!-- DogBank lab only: intentionally vulnerable Log4j for CVE-2021-44228 demo. -->
+    <log4j2.version>2.14.1</log4j2.version>
     <maven.compiler.release>${java.version}</maven.compiler.release>
   </properties>
 
@@ -25,6 +27,27 @@
         <version>${spring.boot.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <!-- DogBank lab only: override Spring Boot's safe Log4j version for CVE-2021-44228 demo. -->
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-api</artifactId>
+        <version>${log4j2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-core</artifactId>
+        <version>${log4j2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-slf4j-impl</artifactId>
+        <version>${log4j2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-jul</artifactId>
+        <version>${log4j2.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

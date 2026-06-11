@@ -1,7 +1,7 @@
 package com.dogbank.auth.service;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -15,14 +15,18 @@ import java.util.concurrent.TimeUnit;
  * Block key: rate_limit:blocked:{cpf} -> set when max attempts exceeded
  */
 @Service
-@RequiredArgsConstructor
-@Slf4j
 public class RateLimitService {
+
+    private static final Logger log = LogManager.getLogger(RateLimitService.class);
 
     private static final int MAX_ATTEMPTS_PER_MINUTE = 5;
     private static final int BLOCK_DURATION_MINUTES  = 15;
 
     private final StringRedisTemplate redisTemplate;
+
+    public RateLimitService(StringRedisTemplate redisTemplate) {
+        this.redisTemplate = redisTemplate;
+    }
 
     public boolean isBlocked(String cpf) {
         return Boolean.TRUE.equals(redisTemplate.hasKey("rate_limit:blocked:" + cpf));
