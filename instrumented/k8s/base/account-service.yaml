@@ -126,6 +126,21 @@ spec:
                 configMapKeyRef:
                   name: dogbank-config
                   key: DD_IAST_ENABLED
+            - name: DD_REMOTE_CONFIGURATION_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: dogbank-config
+                  key: DD_REMOTE_CONFIGURATION_ENABLED
+            - name: DD_TRACE_CLIENT_IP_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: dogbank-config
+                  key: DD_TRACE_CLIENT_IP_ENABLED
+            - name: DD_TRACE_CLIENT_IP_HEADER
+              valueFrom:
+                configMapKeyRef:
+                  name: dogbank-config
+                  key: DD_TRACE_CLIENT_IP_HEADER
           resources:
             requests:
               memory: "256Mi"

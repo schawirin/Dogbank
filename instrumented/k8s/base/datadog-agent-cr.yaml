@@ -7,6 +7,9 @@ spec:
   global:
     clusterName: "dogbank-eks"
     site: "datadoghq.com"
+    env:
+      - name: DD_REMOTE_CONFIGURATION_ENABLED
+        value: "true"
     credentials:
       apiSecret:
         secretName: "datadog-secret"

