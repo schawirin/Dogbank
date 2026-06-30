@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Zap, FileText, CreditCard, User, ArrowRight, Shield } from 'lucide-react';
+import { Home, Zap, FileText, TrendingUp, User, ArrowRight, Shield } from 'lucide-react';
 
 const DogBankLogo = ({ className = '' }) => (
   <div className={`flex items-center gap-1.5 ${className}`}>
@@ -15,7 +15,7 @@ const menuItems = [
   { label: 'Início', icon: Home, path: '/dashboard' },
   { label: 'PIX', icon: Zap, path: '/dashboard/pix' },
   { label: 'Extrato', icon: FileText, path: '/dashboard/extrato' },
-  { label: 'Cartões', icon: CreditCard, path: '/dashboard/cartoes' },
+  { label: 'Investimentos', icon: TrendingUp, path: '/dashboard/investimentos' },
   { label: 'Perfil', icon: User, path: '/dashboard/perfil' },
 ];
 

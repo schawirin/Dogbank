@@ -12,6 +12,7 @@ import PasswordPage from './pages/PasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import ExtractPage from './pages/ExtractPage';
 import CardsPage from './pages/CardsPage';
+import InvestmentsPage from './pages/InvestmentsPage';
 import PixTransferPage from './pages/PixTransferPage';
 import PixConfirmPage from './pages/PixConfirmPage';
 import PixReceiptPage from './pages/PixReceiptPage';
@@ -71,6 +72,7 @@ const AppContent = () => {
         <Route path="/dashboard" element={<MainLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="extrato" element={<ExtractPage />} />
+          <Route path="investimentos" element={<InvestmentsPage />} />
           <Route path="cartoes" element={<CardsPage />} />
           <Route path="perfil" element={<ProfilePage />} />
 
@@ -88,6 +90,7 @@ const AppContent = () => {
         <Route path="/pix/confirm" element={<Navigate to="/dashboard/pix/confirm" replace />} />
         <Route path="/pix/receipt" element={<Navigate to="/dashboard/pix/receipt" replace />} />
         <Route path="/cartoes" element={<Navigate to="/dashboard/cartoes" replace />} />
+        <Route path="/investimentos" element={<Navigate to="/dashboard/investimentos" replace />} />
         <Route path="/extrato" element={<Navigate to="/dashboard/extrato" replace />} />
         <Route path="/perfil" element={<Navigate to="/dashboard/perfil" replace />} />
         <Route path="/profile" element={<Navigate to="/dashboard/perfil" replace />} />

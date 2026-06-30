@@ -119,6 +119,46 @@ private struct DogBankTransaction {
     }
 }
 
+private struct DogBankInvestmentProduct {
+    let code: String
+    let name: String
+    let description: String
+    let riskLevel: String
+    let annualRate: Double?
+    let dailyRate: Double?
+    let referencePrice: Double?
+    let quoteSource: String
+    let updatedAt: Date?
+    let tags: [String]
+}
+
+private struct DogBankInvestmentPosition {
+    let positionID: String
+    let accountID: Int
+    let productCode: String
+    let productName: String
+    let status: String
+    let principalAmount: Double
+    let currentValue: Double
+    let expectedValue: Double
+    let driftAmount: Double
+    let driftPercent: Double
+    let units: Double
+    let annualRate: Double?
+    let referencePrice: Double?
+    let contractedBy: String
+    let contractedAt: Date?
+    let lastSyncedAt: Date?
+    let nextSyncAt: Date?
+    let auditCorrelationID: String
+    let syncReason: String
+    let message: String
+
+    var isDrifted: Bool {
+        status.uppercased() == "DRIFT" || abs(driftAmount) >= 1
+    }
+}
+
 final class DogBankURLSessionDelegate: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate {}
 
 private enum DogBankAPIError: LocalizedError {
@@ -155,7 +195,9 @@ private enum DogBankDemoError: LocalizedError {
 private final class DogBankAPI {
     static let shared = DogBankAPI()
 
-    private let baseURL = URL(string: "https://lab.dogbank.dog")!
+    private static let defaultBaseURL = URL(string: "http://127.0.0.1:8080")!
+
+    private let baseURL: URL
     private let decoder = JSONDecoder()
     private let session = URLSession(
         configuration: .default,
@@ -163,7 +205,14 @@ private final class DogBankAPI {
         delegateQueue: nil
     )
 
-    private init() {}
+    private init() {
+        let configuredBaseURL = dogbankLaunchArgumentValue("--dogbank-base-url")
+            ?? ProcessInfo.processInfo.environment["DOGBANK_MOBILE_BASE_URL"]
+            ?? Self.defaultBaseURL.absoluteString
+
+        baseURL = URL(string: configuredBaseURL.trimmingCharacters(in: .whitespacesAndNewlines))
+            ?? Self.defaultBaseURL
+    }
 
     func login(cpf: String, password: String) async throws -> DogBankSession {
         let json = try await request(
@@ -215,6 +264,63 @@ private final class DogBankAPI {
         .sorted { lhs, rhs in
             (lhs.completedAt ?? .distantPast) > (rhs.completedAt ?? .distantPast)
         }
+    }
+
+    func fetchInvestmentProducts() async throws -> [DogBankInvestmentProduct] {
+        let json = try await request(path: "/api/investments/products", method: "GET")
+        guard let items = json as? [[String: Any]] else {
+            return []
+        }
+
+        return items.map { product in
+            DogBankInvestmentProduct(
+                code: string(product, "code") ?? "",
+                name: string(product, "name") ?? "Investimento",
+                description: string(product, "description") ?? "",
+                riskLevel: string(product, "riskLevel") ?? "Medio",
+                annualRate: double(product, "annualRate"),
+                dailyRate: double(product, "dailyRate"),
+                referencePrice: double(product, "referencePrice"),
+                quoteSource: string(product, "quoteSource") ?? "dogbank-feed",
+                updatedAt: date(product, "updatedAt"),
+                tags: product["tags"] as? [String] ?? []
+            )
+        }
+    }
+
+    func fetchInvestments(accountID: Int) async throws -> [DogBankInvestmentPosition] {
+        let json = try await request(path: "/api/investments/account/\(accountID)", method: "GET")
+        guard let items = json as? [[String: Any]] else {
+            return []
+        }
+
+        return items.map(position(from:))
+    }
+
+    func subscribeInvestment(session: DogBankSession, productCode: String, amount: Double) async throws -> DogBankInvestmentPosition {
+        let json = try await request(
+            path: "/api/investments/subscribe",
+            method: "POST",
+            body: [
+                "accountId": session.accountID,
+                "cpf": session.cpf,
+                "userName": session.name,
+                "productCode": productCode,
+                "amount": amount,
+                "requestedBy": "dogbank-ios-native"
+            ],
+            timeout: 15
+        )
+        return position(from: try dictionary(json))
+    }
+
+    func syncInvestment(positionID: String) async throws -> DogBankInvestmentPosition {
+        let json = try await request(
+            path: "/api/investments/sync/\(positionID)",
+            method: "POST",
+            timeout: 15
+        )
+        return position(from: try dictionary(json))
     }
 
     func validatePixKey(_ pixKey: String) async throws -> DogBankPixValidation {
@@ -327,6 +433,31 @@ private final class DogBankAPI {
         }
 
         return try JSONSerialization.jsonObject(with: data)
+    }
+
+    private func position(from dict: [String: Any]) -> DogBankInvestmentPosition {
+        DogBankInvestmentPosition(
+            positionID: string(dict, "positionId") ?? "",
+            accountID: int(dict, "accountId") ?? 0,
+            productCode: string(dict, "productCode") ?? "",
+            productName: string(dict, "productName") ?? "Investimento",
+            status: string(dict, "status") ?? "UNKNOWN",
+            principalAmount: double(dict, "principalAmount") ?? 0,
+            currentValue: double(dict, "currentValue") ?? 0,
+            expectedValue: double(dict, "expectedValue") ?? 0,
+            driftAmount: double(dict, "driftAmount") ?? 0,
+            driftPercent: double(dict, "driftPercent") ?? 0,
+            units: double(dict, "units") ?? 0,
+            annualRate: double(dict, "annualRate"),
+            referencePrice: double(dict, "referencePrice"),
+            contractedBy: string(dict, "contractedBy") ?? "mobile-app",
+            contractedAt: date(dict, "contractedAt"),
+            lastSyncedAt: date(dict, "lastSyncedAt"),
+            nextSyncAt: date(dict, "nextSyncAt"),
+            auditCorrelationID: string(dict, "auditCorrelationId") ?? "",
+            syncReason: string(dict, "syncReason") ?? "",
+            message: string(dict, "message") ?? ""
+        )
     }
 
     private func dataTask(for request: URLRequest) async throws -> (Data, URLResponse) {
@@ -1616,12 +1747,13 @@ private final class DogBankTabBarController: UITabBarController, UITabBarControl
         let dashboard = DashboardViewController(session: session, api: api)
         dashboard.onPixTapped = { [weak self] in self?.selectedIndex = 1 }
         dashboard.onHistoryTapped = { [weak self] in self?.selectedIndex = 2 }
+        dashboard.onInvestmentsTapped = { [weak self] in self?.selectedIndex = 3 }
 
         viewControllers = [
             tab(dashboard, title: "Inicio", icon: "house.fill"),
             tab(PixViewController(session: session, api: api), title: "PIX", icon: "bolt.fill"),
             tab(HistoryViewController(session: session, api: api), title: "Extrato", icon: "list.bullet.rectangle"),
-            tab(CardsViewController(session: session), title: "Cartoes", icon: "creditcard.fill"),
+            tab(InvestmentsViewController(session: session, api: api), title: "Invest", icon: "chart.line.uptrend.xyaxis"),
             tab(ProfileViewController(session: session, api: api), title: "Perfil", icon: "person.crop.circle")
         ]
     }
@@ -1742,6 +1874,7 @@ private final class DogBankTabBarController: UITabBarController, UITabBarControl
 private final class DashboardViewController: UIViewController {
     var onPixTapped: (() -> Void)?
     var onHistoryTapped: (() -> Void)?
+    var onInvestmentsTapped: (() -> Void)?
 
     private let session: DogBankSession
     private let api: DogBankAPI
@@ -1799,7 +1932,7 @@ private final class DashboardViewController: UIViewController {
         let quickGrid = UIStackView(arrangedSubviews: [
             quickAction(title: "PIX", icon: "bolt.fill", color: DogBankTheme.purple, selector: #selector(pixTapped)),
             quickAction(title: "Extrato", icon: "doc.text.fill", color: DogBankTheme.blue, selector: #selector(historyTapped)),
-            quickAction(title: "Cartoes", icon: "creditcard.fill", color: DogBankTheme.green, selector: #selector(cardsTapped))
+            quickAction(title: "Invest", icon: "chart.line.uptrend.xyaxis", color: DogBankTheme.green, selector: #selector(investmentsTapped))
         ])
         quickGrid.axis = .horizontal
         quickGrid.spacing = 10
@@ -1874,8 +2007,8 @@ private final class DashboardViewController: UIViewController {
         onHistoryTapped?()
     }
 
-    @objc private func cardsTapped() {
-        tabBarController?.selectedIndex = 3
+    @objc private func investmentsTapped() {
+        onInvestmentsTapped?()
     }
 }
 
@@ -2751,6 +2884,477 @@ private final class HistoryViewController: UIViewController {
                     self.statusLabel.text = error.localizedDescription
                 }
             }
+        }
+    }
+}
+
+private final class InvestmentsViewController: UIViewController {
+    private let session: DogBankSession
+    private let api: DogBankAPI
+    private let productsStack = UIStackView()
+    private let positionsStack = UIStackView()
+    private let portfolioValueLabel = label("R$ --", style: .title1, color: .white, weight: .bold)
+    private let portfolioDriftLabel = label("Calculando drift...", style: .subheadline, color: UIColor.white.withAlphaComponent(0.84), lines: 0)
+    private let statusLabel = label("", style: .footnote, color: DogBankTheme.muted, lines: 0)
+    private var products: [DogBankInvestmentProduct] = []
+    private var positions: [DogBankInvestmentPosition] = []
+    private var isRefreshing = false
+
+    init(session: DogBankSession, api: DogBankAPI) {
+        self.session = session
+        self.api = api
+        super.init(nibName: nil, bundle: nil)
+        title = "Invest"
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = DogBankTheme.background
+        configureLayout()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        refresh()
+    }
+
+    private func configureLayout() {
+        let (_, stack) = makeScrollStack(in: view)
+        stack.addArrangedSubview(label("Investimentos", style: .largeTitle, weight: .bold))
+        stack.addArrangedSubview(label("Contratacoes, auditoria e sincronizacao de posicoes em tempo real.", style: .body, color: DogBankTheme.muted, lines: 0))
+        stack.addArrangedSubview(makePortfolioHeader())
+
+        productsStack.axis = .vertical
+        productsStack.spacing = 12
+        positionsStack.axis = .vertical
+        positionsStack.spacing = 12
+
+        stack.addArrangedSubview(card([
+            label("Produtos para demo", style: .headline, weight: .semibold),
+            productsStack
+        ]))
+        stack.addArrangedSubview(card([
+            label("Carteira e drift", style: .headline, weight: .semibold),
+            positionsStack,
+            statusLabel
+        ]))
+    }
+
+    private func makePortfolioHeader() -> UIView {
+        let icon = UIImageView(image: UIImage(systemName: "chart.line.uptrend.xyaxis"))
+        icon.tintColor = .white
+        icon.contentMode = .center
+        icon.backgroundColor = UIColor.white.withAlphaComponent(0.18)
+        icon.layer.cornerRadius = 24
+        icon.translatesAutoresizingMaskIntoConstraints = false
+
+        let textStack = UIStackView(arrangedSubviews: [
+            label("Valor esperado da carteira", style: .caption1, color: UIColor.white.withAlphaComponent(0.82), weight: .semibold),
+            portfolioValueLabel,
+            portfolioDriftLabel
+        ])
+        textStack.axis = .vertical
+        textStack.spacing = 5
+
+        let row = UIStackView(arrangedSubviews: [textStack, icon])
+        row.axis = .horizontal
+        row.alignment = .center
+        row.distribution = .equalSpacing
+        row.spacing = 14
+        row.translatesAutoresizingMaskIntoConstraints = false
+
+        let header = UIView()
+        header.backgroundColor = DogBankTheme.blue
+        header.layer.cornerRadius = 20
+        header.addSubview(row)
+
+        NSLayoutConstraint.activate([
+            icon.widthAnchor.constraint(equalToConstant: 48),
+            icon.heightAnchor.constraint(equalToConstant: 48),
+            row.topAnchor.constraint(equalTo: header.topAnchor, constant: 20),
+            row.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: 18),
+            row.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -18),
+            row.bottomAnchor.constraint(equalTo: header.bottomAnchor, constant: -20)
+        ])
+
+        return header
+    }
+
+    private func refresh() {
+        guard !isRefreshing else {
+            return
+        }
+
+        isRefreshing = true
+        statusLabel.textColor = DogBankTheme.purple
+        statusLabel.text = "Carregando investimentos..."
+
+        Task {
+            do {
+                async let fetchedProducts = api.fetchInvestmentProducts()
+                async let fetchedPositions = api.fetchInvestments(accountID: session.accountID)
+                let (products, positions) = try await (fetchedProducts, fetchedPositions)
+
+                dogbankTrack("dogbank.native.investments.loaded", attributes: [
+                    "account_id": session.accountID,
+                    "product_count": products.count,
+                    "position_count": positions.count,
+                    "drifted_count": positions.filter(\.isDrifted).count
+                ])
+
+                await MainActor.run {
+                    self.products = products
+                    self.positions = positions
+                    self.renderProducts()
+                    self.renderPositions()
+                    self.statusLabel.textColor = DogBankTheme.muted
+                    self.statusLabel.text = positions.isEmpty ? "Nenhum investimento encontrado." : ""
+                    self.isRefreshing = false
+                }
+            } catch {
+                dogbankError(error, attributes: ["flow": "investments_load"])
+                await MainActor.run {
+                    self.statusLabel.textColor = DogBankTheme.red
+                    self.statusLabel.text = error.localizedDescription
+                    self.isRefreshing = false
+                }
+            }
+        }
+    }
+
+    private func renderProducts() {
+        clear(productsStack)
+        guard !products.isEmpty else {
+            productsStack.addArrangedSubview(label("Produtos indisponiveis no momento.", style: .subheadline, color: DogBankTheme.muted, lines: 0))
+            return
+        }
+
+        for product in products {
+            productsStack.addArrangedSubview(productCard(product))
+        }
+    }
+
+    private func renderPositions() {
+        clear(positionsStack)
+        renderPortfolioSummary()
+
+        guard !positions.isEmpty else {
+            positionsStack.addArrangedSubview(label("A carteira aparecera aqui apos uma contratacao.", style: .subheadline, color: DogBankTheme.muted, lines: 0))
+            return
+        }
+
+        for position in positions {
+            positionsStack.addArrangedSubview(positionCard(position))
+        }
+    }
+
+    private func renderPortfolioSummary() {
+        let expectedTotal = positions.reduce(0) { $0 + $1.expectedValue }
+        let driftTotal = positions.reduce(0) { $0 + $1.driftAmount }
+        let driftedCount = positions.filter(\.isDrifted).count
+        portfolioValueLabel.text = money(expectedTotal)
+        if driftedCount == 0 {
+            portfolioDriftLabel.text = "Todas as posicoes sincronizadas."
+        } else {
+            portfolioDriftLabel.text = "Drift de \(money(abs(driftTotal))) em \(driftedCount) posicao\(driftedCount == 1 ? "" : "es")."
+        }
+    }
+
+    private func productCard(_ product: DogBankInvestmentProduct) -> UIView {
+        let iconName = product.code == "BTC" ? "bitcoinsign.circle.fill" : "percent"
+        let tint = product.code == "BTC" ? DogBankTheme.amber : DogBankTheme.green
+
+        let icon = UIImageView(image: UIImage(systemName: iconName))
+        icon.tintColor = tint
+        icon.contentMode = .center
+        icon.backgroundColor = tint.withAlphaComponent(0.14)
+        icon.layer.cornerRadius = 20
+        icon.translatesAutoresizingMaskIntoConstraints = false
+
+        let title = label(product.name, style: .headline, weight: .bold, lines: 1)
+        let description = label(product.description, style: .caption1, color: DogBankTheme.muted, lines: 0)
+        let meta = label(productMeta(product), style: .caption1, color: tint, weight: .semibold, lines: 0)
+        let textStack = UIStackView(arrangedSubviews: [title, description, meta])
+        textStack.axis = .vertical
+        textStack.spacing = 4
+        textStack.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        let top = UIStackView(arrangedSubviews: [icon, textStack])
+        top.axis = .horizontal
+        top.alignment = .center
+        top.spacing = 12
+
+        let apply = DogBankButton(title: product.code == "BTC" ? "Aplicar R$ 50 mil" : "Aplicar R$ 1 mi", systemImage: "plus.circle.fill", filled: false)
+        apply.accessibilityIdentifier = product.code
+        apply.addTarget(self, action: #selector(applyTapped(_:)), for: .touchUpInside)
+
+        let stack = UIStackView(arrangedSubviews: [top, apply])
+        stack.axis = .vertical
+        stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        let view = UIView()
+        view.backgroundColor = UIColor(red: 0.97, green: 0.98, blue: 1.00, alpha: 1)
+        view.layer.cornerRadius = 14
+        view.addSubview(stack)
+
+        NSLayoutConstraint.activate([
+            icon.widthAnchor.constraint(equalToConstant: 40),
+            icon.heightAnchor.constraint(equalToConstant: 40),
+            stack.topAnchor.constraint(equalTo: view.topAnchor, constant: 14),
+            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 14),
+            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -14),
+            stack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -14)
+        ])
+
+        return view
+    }
+
+    private func positionCard(_ position: DogBankInvestmentPosition) -> UIView {
+        let tint = color(for: position)
+        let icon = UIImageView(image: UIImage(systemName: position.productCode == "BTC" ? "bitcoinsign.circle" : "banknote"))
+        icon.tintColor = tint
+        icon.contentMode = .center
+        icon.backgroundColor = tint.withAlphaComponent(0.14)
+        icon.layer.cornerRadius = 19
+        icon.translatesAutoresizingMaskIntoConstraints = false
+
+        let title = label(position.productName, style: .headline, weight: .bold, lines: 1)
+        let subtitle = label("Contrato \(position.positionID) | \(position.contractedBy)", style: .caption1, color: DogBankTheme.muted, lines: 1)
+        subtitle.adjustsFontSizeToFitWidth = true
+        subtitle.minimumScaleFactor = 0.78
+
+        let texts = UIStackView(arrangedSubviews: [title, subtitle])
+        texts.axis = .vertical
+        texts.spacing = 3
+        texts.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        let header = UIStackView(arrangedSubviews: [icon, texts, statusPill(position.status, tint: tint)])
+        header.axis = .horizontal
+        header.alignment = .center
+        header.spacing = 12
+
+        var rows: [UIView] = [
+            header,
+            investmentMetricRow(title: "Aplicado", value: money(position.principalAmount), tint: DogBankTheme.purple),
+            investmentMetricRow(title: "Valor contabilizado", value: money(position.currentValue), tint: DogBankTheme.blue),
+            investmentMetricRow(title: "Valor esperado", value: money(position.expectedValue), tint: DogBankTheme.green),
+            investmentMetricRow(title: "Drift", value: "\(money(abs(position.driftAmount))) | \(String(format: "%.2f", abs(position.driftPercent)))%", tint: tint),
+            investmentMetricRow(title: "Ultimo sync", value: dateText(position.lastSyncedAt), tint: DogBankTheme.muted),
+            InfoRowView(icon: "doc.text.magnifyingglass", title: "Audit ID", value: position.auditCorrelationID, tint: DogBankTheme.amber)
+        ]
+
+        if !position.message.isEmpty {
+            rows.append(label(position.message, style: .footnote, color: DogBankTheme.muted, lines: 0))
+        }
+
+        if position.isDrifted {
+            let sync = DogBankButton(title: "Sincronizar posicao", systemImage: "arrow.triangle.2.circlepath", filled: false)
+            sync.accessibilityIdentifier = position.positionID
+            sync.addTarget(self, action: #selector(syncTapped(_:)), for: .touchUpInside)
+            rows.append(sync)
+        }
+
+        let stack = UIStackView(arrangedSubviews: rows)
+        stack.axis = .vertical
+        stack.spacing = 10
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        let view = UIView()
+        view.backgroundColor = UIColor(red: 0.97, green: 0.98, blue: 1.00, alpha: 1)
+        view.layer.cornerRadius = 14
+        view.addSubview(stack)
+
+        NSLayoutConstraint.activate([
+            icon.widthAnchor.constraint(equalToConstant: 38),
+            icon.heightAnchor.constraint(equalToConstant: 38),
+            stack.topAnchor.constraint(equalTo: view.topAnchor, constant: 14),
+            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 14),
+            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -14),
+            stack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -14)
+        ])
+
+        return view
+    }
+
+    private func investmentMetricRow(title: String, value: String, tint: UIColor) -> UIView {
+        let titleLabel = label(title, style: .caption1, color: DogBankTheme.muted, weight: .semibold, lines: 1)
+        let valueLabel = label(value, style: .subheadline, color: tint, weight: .bold, lines: 1)
+        valueLabel.textAlignment = .right
+        valueLabel.adjustsFontSizeToFitWidth = true
+        valueLabel.minimumScaleFactor = 0.76
+
+        let row = UIStackView(arrangedSubviews: [titleLabel, valueLabel])
+        row.axis = .horizontal
+        row.alignment = .center
+        row.spacing = 12
+        return row
+    }
+
+    private func statusPill(_ text: String, tint: UIColor) -> UIView {
+        let pillLabel = label(text == "SYNCED" ? "OK" : "DRIFT", style: .caption1, color: tint, weight: .bold, lines: 1)
+        pillLabel.textAlignment = .center
+        pillLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let view = UIView()
+        view.backgroundColor = tint.withAlphaComponent(0.14)
+        view.layer.cornerRadius = 13
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(pillLabel)
+
+        NSLayoutConstraint.activate([
+            pillLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 6),
+            pillLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
+            pillLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
+            pillLabel.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -6)
+        ])
+
+        return view
+    }
+
+    @objc private func applyTapped(_ sender: UIButton) {
+        guard let productCode = sender.accessibilityIdentifier else {
+            return
+        }
+
+        let amount = productCode == "BTC" ? 50_000.0 : 1_000_000.0
+        sender.isEnabled = false
+        statusLabel.textColor = DogBankTheme.purple
+        statusLabel.text = "Contratando \(productCode == "BTC" ? "Bitcoin" : "100% CDI")..."
+
+        dogbankTrack("dogbank.native.investments.subscription.started", attributes: [
+            "account_id": session.accountID,
+            "product_code": productCode,
+            "amount": amount
+        ])
+
+        Task {
+            do {
+                let position = try await api.subscribeInvestment(session: session, productCode: productCode, amount: amount)
+                dogbankTrack("dogbank.native.investments.subscription.completed", attributes: [
+                    "position_id": position.positionID,
+                    "product_code": position.productCode,
+                    "amount": position.principalAmount,
+                    "status": position.status
+                ])
+                await MainActor.run {
+                    self.positions.insert(position, at: 0)
+                    self.renderPositions()
+                    self.statusLabel.textColor = position.isDrifted ? DogBankTheme.amber : DogBankTheme.green
+                    self.statusLabel.text = position.isDrifted ? "Investimento contratado com drift para investigar." : "Investimento contratado e sincronizado."
+                    sender.isEnabled = true
+                }
+            } catch {
+                dogbankError(error, attributes: [
+                    "flow": "investment_subscription",
+                    "product_code": productCode,
+                    "amount": amount
+                ])
+                dogbankTrack("dogbank.native.investments.subscription.failed", attributes: [
+                    "product_code": productCode,
+                    "error": error.localizedDescription
+                ])
+                await MainActor.run {
+                    self.statusLabel.textColor = DogBankTheme.red
+                    self.statusLabel.text = error.localizedDescription
+                    sender.isEnabled = true
+                }
+            }
+        }
+    }
+
+    @objc private func syncTapped(_ sender: UIButton) {
+        guard let positionID = sender.accessibilityIdentifier else {
+            return
+        }
+
+        sender.isEnabled = false
+        statusLabel.textColor = DogBankTheme.purple
+        statusLabel.text = "Sincronizando \(positionID)..."
+
+        dogbankTrack("dogbank.native.investments.sync.started", attributes: [
+            "position_id": positionID,
+            "account_id": session.accountID
+        ])
+
+        Task {
+            do {
+                let updated = try await api.syncInvestment(positionID: positionID)
+                dogbankTrack("dogbank.native.investments.sync.completed", attributes: [
+                    "position_id": updated.positionID,
+                    "product_code": updated.productCode,
+                    "status": updated.status,
+                    "drift_amount": updated.driftAmount
+                ])
+                await MainActor.run {
+                    self.upsertPosition(updated)
+                    self.statusLabel.textColor = DogBankTheme.green
+                    self.statusLabel.text = "Posicao sincronizada com sucesso."
+                    sender.isEnabled = true
+                }
+            } catch {
+                dogbankError(error, attributes: [
+                    "flow": "investment_sync",
+                    "position_id": positionID
+                ])
+                dogbankTrack("dogbank.native.investments.sync.failed", attributes: [
+                    "position_id": positionID,
+                    "error": error.localizedDescription
+                ])
+                await MainActor.run {
+                    self.statusLabel.textColor = DogBankTheme.red
+                    self.statusLabel.text = "\(error.localizedDescription) Tente novamente para simular a recuperacao."
+                    sender.isEnabled = true
+                }
+            }
+        }
+    }
+
+    private func upsertPosition(_ position: DogBankInvestmentPosition) {
+        if let index = positions.firstIndex(where: { $0.positionID == position.positionID }) {
+            positions[index] = position
+        } else {
+            positions.insert(position, at: 0)
+        }
+        renderPositions()
+    }
+
+    private func productMeta(_ product: DogBankInvestmentProduct) -> String {
+        if product.code == "BTC" {
+            return "Cotacao \(money(product.referencePrice ?? 0)) | risco \(product.riskLevel)"
+        }
+        return "CDI \(percent(product.annualRate)) a.a. | risco \(product.riskLevel)"
+    }
+
+    private func percent(_ value: Double?) -> String {
+        guard let value else {
+            return "--"
+        }
+        return "\(String(format: "%.2f", value * 100))%"
+    }
+
+    private func dateText(_ date: Date?) -> String {
+        guard let date else {
+            return "--"
+        }
+        return dateFormatter.string(from: date)
+    }
+
+    private func color(for position: DogBankInvestmentPosition) -> UIColor {
+        if !position.isDrifted {
+            return DogBankTheme.green
+        }
+        return abs(position.driftAmount) > 10_000 ? DogBankTheme.red : DogBankTheme.amber
+    }
+
+    private func clear(_ stack: UIStackView) {
+        stack.arrangedSubviews.forEach { view in
+            stack.removeArrangedSubview(view)
+            view.removeFromSuperview()
         }
     }
 }

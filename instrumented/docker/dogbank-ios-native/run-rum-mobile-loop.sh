@@ -6,6 +6,7 @@ INTERVAL_SECONDS="${DOGBANK_RUM_INTERVAL_SECONDS:-45}"
 JOURNEY_SECONDS="${DOGBANK_RUM_JOURNEY_SECONDS:-28}"
 ITERATIONS="${DOGBANK_RUM_ITERATIONS:-0}"
 SIMULATOR_NAME="${DOGBANK_IOS_SIMULATOR:-iPhone 17 Pro}"
+MOBILE_BASE_URL="${DOGBANK_MOBILE_BASE_URL:-http://127.0.0.1:8080}"
 # SPI failure ratio: 1 in N sessions is a failure (default: 1 in 3)
 SPI_FAILURE_EVERY="${DOGBANK_SPI_FAILURE_EVERY:-3}"
 DEFAULT_USERS="12345678915:123456,98765432101:123456,45678912302:123456,78912345603:123456,32165498704:123456,65498732105:123456,15975385206:123456,66666666666:123456"
@@ -30,7 +31,7 @@ if ! xcrun simctl list devices booted | grep -q '(Booted)'; then
 fi
 
 echo "Starting DogBank native RUM loop"
-echo "bundle_id=${BUNDLE_ID} interval_seconds=${INTERVAL_SECONDS} journey_seconds=${JOURNEY_SECONDS} iterations=${ITERATIONS} users=${#DEMO_USERS[@]} spi_failure_every=${SPI_FAILURE_EVERY}"
+echo "bundle_id=${BUNDLE_ID} base_url=${MOBILE_BASE_URL} interval_seconds=${INTERVAL_SECONDS} journey_seconds=${JOURNEY_SECONDS} iterations=${ITERATIONS} users=${#DEMO_USERS[@]} spi_failure_every=${SPI_FAILURE_EVERY}"
 
 while true; do
   COUNT=$((COUNT + 1))
@@ -64,6 +65,7 @@ while true; do
     --dogbank-auto-login \
     --dogbank-demo-journey \
     ${EXTRA_ARGS} \
+    "--dogbank-base-url=${MOBILE_BASE_URL}" \
     "--dogbank-cpf=${USER_CPF}" \
     "--dogbank-password=${USER_PASSWORD}" || true
 

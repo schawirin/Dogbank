@@ -9,6 +9,21 @@ It calls the DogBank backend directly through `URLSession`:
 http://127.0.0.1:8080/api/...
 ```
 
+Override the backend when needed:
+
+```bash
+xcrun simctl launch booted com.dogbank.mobile.demo \
+  --dogbank-base-url=https://lab.dogbank.dog
+```
+
+For the Genial/EKS demo, use the deployed backend:
+
+```bash
+xcrun simctl launch booted com.dogbank.mobile.demo \
+  --dogbank-auto-login \
+  --dogbank-base-url=https://lab.dogbank.dog
+```
+
 Run the Podman stack first:
 
 ```bash
@@ -27,7 +42,10 @@ Select an iPhone simulator and press Run in Xcode.
 To generate RUM/Product Analytics demo traffic from the native app, use:
 
 ```bash
-xcrun simctl launch booted com.dogbank.mobile.demo --dogbank-auto-login --dogbank-demo-journey
+xcrun simctl launch booted com.dogbank.mobile.demo \
+  --dogbank-auto-login \
+  --dogbank-demo-journey \
+  --dogbank-base-url=http://127.0.0.1:8080
 ```
 
 That path performs a native login, opens the PIX tab, sends one successful PIX, validates one invalid PIX key as an expected error, then returns to the dashboard.
@@ -48,10 +66,12 @@ To keep generating native RUM sessions during the demo:
 DOGBANK_RUM_INTERVAL_SECONDS=45 ./run-rum-mobile-loop.sh
 ```
 
-The loop rotates through the README demo users and explicitly ends each RUM session before launching the next user. Override the users with:
+The loop rotates through the README demo users and explicitly ends each RUM session before launching the next user. It defaults to `DOGBANK_MOBILE_BASE_URL=http://127.0.0.1:8080`. Override the users or backend with:
 
 ```bash
-DOGBANK_RUM_USERS="12345678915:123456,98765432101:123456" ./run-rum-mobile-loop.sh
+DOGBANK_RUM_USERS="12345678915:123456,98765432101:123456" \
+DOGBANK_MOBILE_BASE_URL="https://lab.dogbank.dog" \
+./run-rum-mobile-loop.sh
 ```
 
 Demo login:

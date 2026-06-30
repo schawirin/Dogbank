@@ -23,12 +23,12 @@ const QuickActions = () => {
         >
           Extrato
         </Button>
-        <Button 
+        <Button
           variant="secondary"
-          onClick={() => navigate('/cartoes')}
+          onClick={() => navigate('/investimentos')}
           className="flex-1"
         >
-          Cartões
+          Investimentos
         </Button>
         <Button 
           variant="secondary"

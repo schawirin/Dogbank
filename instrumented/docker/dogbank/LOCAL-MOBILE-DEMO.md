@@ -30,6 +30,9 @@ DOGBANK_RUM_INTERVAL_SECONDS=45
 DOGBANK_RUM_JOURNEY_SECONDS=28
 DOGBANK_RUM_ITERATIONS=0
 DOGBANK_RUM_USERS=12345678915:123456,98765432101:123456,45678912302:123456
+DOGBANK_MOBILE_BASE_URL=http://127.0.0.1:8080
+DOGBANK_IOS_DERIVED_DATA_PATH=/tmp/dogbank-ios-derived
+DOGBANK_COMPOSE_BUILD=1
 DOGBANK_LOAD_BURST_COUNT=80
 DOGBANK_LOAD_MIN_INTERVAL=1
 DOGBANK_LOAD_MAX_INTERVAL=3
@@ -43,6 +46,13 @@ Compose-only start without the iOS host loop:
 ```bash
 cd instrumented/docker/dogbank
 DOGBANK_START_IOS_RUM_LOOP=0 ./run-local-mobile-demo.sh
+```
+
+If the Podman VM is low on disk and the DogBank images already exist, skip rebuilds:
+
+```bash
+cd instrumented/docker/dogbank
+DOGBANK_COMPOSE_BUILD=0 DOGBANK_START_IOS_RUM_LOOP=0 ./run-local-mobile-demo.sh
 ```
 
 Manual Compose command:

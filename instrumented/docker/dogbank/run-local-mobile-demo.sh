@@ -5,6 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IOS_DIR="${SCRIPT_DIR}/../dogbank-ios-native"
 SIMULATOR_NAME="${DOGBANK_IOS_SIMULATOR:-iPhone 17 Pro}"
 RUM_INTERVAL_SECONDS="${DOGBANK_RUM_INTERVAL_SECONDS:-45}"
+MOBILE_BASE_URL="${DOGBANK_MOBILE_BASE_URL:-http://127.0.0.1:8080}"
+IOS_DERIVED_DATA_PATH="${DOGBANK_IOS_DERIVED_DATA_PATH:-${TMPDIR:-/tmp}/dogbank-ios-derived}"
+COMPOSE_BUILD="${DOGBANK_COMPOSE_BUILD:-1}"
 
 export DOGBANK_LOAD_RUN_ID="${DOGBANK_LOAD_RUN_ID:-local-demo}"
 export DOGBANK_LOAD_BURST_COUNT="${DOGBANK_LOAD_BURST_COUNT:-80}"
@@ -15,11 +18,20 @@ export DOGBANK_LOAD_MAX_INTERVAL="${DOGBANK_LOAD_MAX_INTERVAL:-3}"
 cd "${SCRIPT_DIR}"
 
 echo "Starting DogBank local demo stack with Podman Compose"
+echo "Mobile backend URL: ${MOBILE_BASE_URL}"
+compose_up_args=(up -d)
+if [[ "${COMPOSE_BUILD}" != "0" ]]; then
+  compose_up_args+=(--build)
+else
+  echo "Skipping Compose image builds because DOGBANK_COMPOSE_BUILD=0"
+  compose_up_args+=(--no-build)
+fi
+
 podman-compose \
   -f docker-compose.full.yml \
   -f docker-compose.local-demo.yml \
   --profile local-demo \
-  up -d --build
+  "${compose_up_args[@]}"
 
 echo "Refreshing nginx upstreams"
 podman restart dogbank-nginx >/dev/null || true
@@ -72,16 +84,13 @@ if [[ "${DOGBANK_BUILD_IOS_APP:-1}" != "0" ]]; then
     -project "${IOS_DIR}/DogBankMobile.xcodeproj" \
     -scheme DogBankMobile \
     -destination "platform=iOS Simulator,name=${SIMULATOR_NAME}" \
+    -derivedDataPath "${IOS_DERIVED_DATA_PATH}" \
     build
 
-  app_path="$(find "${HOME}/Library/Developer/Xcode/DerivedData" \
-    -path '*Build/Products/Debug-iphonesimulator/DogBank Mobile.app' \
-    -type d \
-    -maxdepth 6 \
-    | tail -1)"
+  app_path="${IOS_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/DogBank Mobile.app"
 
-  if [[ -z "${app_path}" ]]; then
-    echo "Could not find built DogBank Mobile.app in DerivedData." >&2
+  if [[ ! -d "${app_path}" ]]; then
+    echo "Could not find built DogBank Mobile.app at ${app_path}." >&2
     exit 1
   fi
 
@@ -91,4 +100,6 @@ fi
 
 echo "Starting native iOS RUM loop on the macOS host"
 cd "${IOS_DIR}"
-DOGBANK_RUM_INTERVAL_SECONDS="${RUM_INTERVAL_SECONDS}" ./run-rum-mobile-loop.sh
+DOGBANK_RUM_INTERVAL_SECONDS="${RUM_INTERVAL_SECONDS}" \
+DOGBANK_MOBILE_BASE_URL="${MOBILE_BASE_URL}" \
+./run-rum-mobile-loop.sh

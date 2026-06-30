@@ -21,9 +21,17 @@ data:
   ACCOUNT_SERVICE_URL: "http://account-service:8089"
   TRANSACTION_SERVICE_URL: "http://transaction-service:8084"
   BANCOCENTRAL_API_URL: "http://bancocentral-service:8085/api/bancocentral"
+  INVESTMENT_SERVICE_URL: "http://investment-service:8091"
   NOTIFICATION_SERVICE_URL: "http://notification-service:8086"
   INTEGRATION_SERVICE_URL: "http://integration-service:8090"
   SPI_API_URL: "http://spi-mock-service:8090"
+
+  # Investment demo rates and drift thresholds
+  INVESTMENT_CDI_ANNUAL_RATE: "0.1065"
+  INVESTMENT_CDI_DAILY_RATE: "0.00042262"
+  INVESTMENT_BTC_PRICE_BRL: "342500.00"
+  INVESTMENT_DRIFT_THRESHOLD_PERCENT: "0.50"
+  DOGBANK_LOG_DIR: "/var/log/dogbank"
 
   # Redis
   REDIS_HOST: "redis"

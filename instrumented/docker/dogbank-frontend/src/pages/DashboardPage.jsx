@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import accountService from '../services/accountService';
 import pixService from '../services/pixService';
 import Alert from '../components/common/Alert';
-import { Zap, FileText, ArrowRight, Activity, CreditCard, ChevronRight } from 'lucide-react';
+import { Zap, FileText, ArrowRight, Activity, TrendingUp, ChevronRight, AlertTriangle } from 'lucide-react';
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -168,33 +168,21 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* Credit Card */}
+        {/* Investments */}
         <div
-          onClick={() => navigate('/dashboard/cartoes')}
-          className="w-full md:w-80 h-48 rounded-3xl card-gradient shadow-xl shadow-purple-600/20 p-6 flex flex-col justify-between text-white animate-slide-up stagger-2 transform hover:-translate-y-2 transition-transform duration-300 cursor-pointer"
+          onClick={() => navigate('/dashboard/investimentos')}
+          className="w-full md:w-80 h-48 rounded-3xl bg-slate-900 shadow-xl shadow-slate-900/15 p-6 flex flex-col justify-between text-white animate-slide-up stagger-2 transform hover:-translate-y-2 transition-transform duration-300 cursor-pointer"
         >
           <div className="flex justify-between items-start">
-            <span className="font-bold text-lg tracking-wider opacity-90">DogBank</span>
-            <span className="text-xs font-medium uppercase tracking-wider opacity-80">Mastercard</span>
+            <span className="font-bold text-lg tracking-wider opacity-90">Invest</span>
+            <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5" />
+            </div>
           </div>
           <div>
-            <div className="w-9 h-6 rounded bg-yellow-300/80 mb-3" />
-            <div className="flex gap-2 mb-2">
-              <span className="text-lg tracking-[0.2em] font-mono text-white/90">••••</span>
-              <span className="text-lg tracking-[0.2em] font-mono text-white/90">••••</span>
-              <span className="text-lg tracking-[0.2em] font-mono text-white/90">••••</span>
-              <span className="text-lg tracking-[0.2em] font-mono text-white/90">1234</span>
-            </div>
-            <div className="flex justify-between items-end text-[10px] font-medium opacity-80 uppercase tracking-wider">
-              <div>
-                <div>Portador</div>
-                <div className="text-xs not-italic">{(user?.nome || 'CLIENTE').toUpperCase()}</div>
-              </div>
-              <div className="text-right">
-                <div>Válido</div>
-                <div className="text-xs">12/28</div>
-              </div>
-            </div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/60 mb-2">Carteira demo</p>
+            <p className="text-2xl font-extrabold mb-2">CDI 100% e Bitcoin</p>
+            <p className="text-xs text-white/70">Contratação, auditoria e drift de sincronização.</p>
           </div>
         </div>
       </div>
@@ -226,35 +214,35 @@ const DashboardPage = () => {
           )}
         </div>
 
-        {/* Invoice / Card Summary */}
+        {/* Investment Summary */}
         <div className="glass-panel rounded-3xl p-6 md:p-8 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-                <CreditCard className="w-5 h-5 text-white" />
+                <AlertTriangle className="w-5 h-5 text-white" />
               </div>
-              <h3 className="text-lg font-bold text-slate-800">Resumo da fatura</h3>
+              <h3 className="text-lg font-bold text-slate-800">Drift de carteira</h3>
             </div>
 
             <div className="mb-6">
-              <p className="text-sm text-slate-500 mb-1">Fatura atual</p>
-              <p className="text-3xl font-bold text-red-500">R$ 1.750,00</p>
+              <p className="text-sm text-slate-500 mb-1">Cenário ativo</p>
+              <p className="text-3xl font-bold text-amber-500">Sync pendente</p>
               <div className="w-full bg-slate-100 rounded-full h-1.5 mt-3 overflow-hidden">
-                <div className="bg-red-500 h-1.5 rounded-full" style={{ width: '45%' }} />
+                <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: '62%' }} />
               </div>
             </div>
 
             <div>
-              <p className="text-sm text-slate-500 mb-1">Limite disponível</p>
-              <p className="text-xl font-bold text-green-500">R$ 3.250,00</p>
+              <p className="text-sm text-slate-500 mb-1">Produtos</p>
+              <p className="text-xl font-bold text-slate-800">CDI 100% / BTC</p>
             </div>
           </div>
 
           <button
-            onClick={() => navigate('/dashboard/cartoes')}
+            onClick={() => navigate('/dashboard/investimentos')}
             className="w-full mt-8 bg-purple-100 text-purple-700 hover:bg-purple-200 py-3 rounded-xl font-semibold transition-colors"
           >
-            Pagar fatura
+            Ver investimentos
           </button>
         </div>
       </div>

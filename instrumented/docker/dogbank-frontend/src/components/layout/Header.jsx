@@ -10,6 +10,7 @@ const routeTitleMap = {
   '/dashboard/pix/confirm': 'PIX • Confirmar',
   '/dashboard/pix/receipt': 'PIX • Comprovante',
   '/dashboard/extrato': 'Extrato',
+  '/dashboard/investimentos': 'Investimentos',
   '/dashboard/cartoes': 'Cartões',
   '/dashboard/perfil': 'Perfil',
 };

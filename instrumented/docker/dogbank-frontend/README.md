@@ -42,12 +42,21 @@ yarn install
 3. **Configure as variáveis de ambiente**
 - Crie um arquivo `.env` na raiz do projeto:
 ```
+REACT_APP_API_BASE_URL=
 REACT_APP_AUTH_API_URL=http://localhost:8088
 REACT_APP_ACCOUNT_API_URL=http://localhost:8082
 REACT_APP_TRANSACTION_API_URL=http://localhost:8083
 REACT_APP_INTEGRATION_API_URL=http://localhost:8084
 REACT_APP_NOTIFICATION_API_URL=http://localhost:8085
 ```
+
+Para testar o frontend local usando o backend publicado no EKS:
+
+```bash
+REACT_APP_PROXY_TARGET=https://lab.dogbank.dog npm start
+```
+
+Para testar localmente contra o gateway Podman em `127.0.0.1:8080`, basta usar `npm start`.
 
 4. **Inicie o servidor de desenvolvimento**
 

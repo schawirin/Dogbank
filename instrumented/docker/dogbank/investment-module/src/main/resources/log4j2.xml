@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="ConsoleAppender" target="SYSTEM_OUT">
+            <PatternLayout pattern="{&quot;timestamp&quot;:&quot;%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ}&quot;,&quot;level&quot;:&quot;%p&quot;,&quot;logger&quot;:&quot;%c&quot;,&quot;thread&quot;:&quot;%t&quot;,&quot;message&quot;:&quot;%enc{%m}{JSON}&quot;,&quot;dd.trace_id&quot;:&quot;%X{dd.trace_id}&quot;,&quot;dd.span_id&quot;:&quot;%X{dd.span_id}&quot;,&quot;service&quot;:&quot;${env:DD_SERVICE:-investment-service}&quot;,&quot;env&quot;:&quot;${env:DD_ENV:-dogbank}&quot;,&quot;version&quot;:&quot;${env:DD_VERSION:-1.0.0}&quot;}%n"/>
+        </Console>
+        <RollingFile name="FileAppender"
+                     fileName="${env:DOGBANK_LOG_DIR:-/tmp/dogbank-logs}/${env:DD_SERVICE:-investment-service}.log"
+                     filePattern="${env:DOGBANK_LOG_DIR:-/tmp/dogbank-logs}/${env:DD_SERVICE:-investment-service}-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="{&quot;timestamp&quot;:&quot;%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ}&quot;,&quot;level&quot;:&quot;%p&quot;,&quot;logger&quot;:&quot;%c&quot;,&quot;thread&quot;:&quot;%t&quot;,&quot;message&quot;:&quot;%enc{%m}{JSON}&quot;,&quot;dd.trace_id&quot;:&quot;%X{dd.trace_id}&quot;,&quot;dd.span_id&quot;:&quot;%X{dd.span_id}&quot;,&quot;service&quot;:&quot;${env:DD_SERVICE:-investment-service}&quot;,&quot;env&quot;:&quot;${env:DD_ENV:-dogbank}&quot;,&quot;version&quot;:&quot;${env:DD_VERSION:-1.0.0}&quot;}%n"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="10 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="3"/>
+        </RollingFile>
+    </Appenders>
+
+    <Loggers>
+        <Root level="info">
+            <AppenderRef ref="ConsoleAppender"/>
+            <AppenderRef ref="FileAppender"/>
+        </Root>
+
+        <Logger name="com.dogbank" level="info" additivity="false">
+            <AppenderRef ref="ConsoleAppender"/>
+            <AppenderRef ref="FileAppender"/>
+        </Logger>
+
+        <Logger name="org.springframework.web" level="info"/>
+        <Logger name="org.springframework.security" level="warn"/>
+        <Logger name="org.apache.catalina" level="warn"/>
+        <Logger name="org.apache.tomcat" level="warn"/>
+    </Loggers>
+</Configuration>

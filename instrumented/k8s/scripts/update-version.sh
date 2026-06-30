@@ -33,6 +33,7 @@ SERVICES=(
     "account-service"
     "auth-service"
     "bancocentral-service"
+    "investment-service"
     "transaction-service"
     "fraud-detection-service"
     "pix-worker"

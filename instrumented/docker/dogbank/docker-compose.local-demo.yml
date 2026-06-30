@@ -44,6 +44,9 @@ services:
   transaction-service:
     depends_on: !reset []
 
+  investment-service:
+    depends_on: !reset []
+
   chatbot-service:
     depends_on: !reset []
 
@@ -80,6 +83,7 @@ services:
       AUTH_SERVICE_URL: http://auth-service:8088
       TRANSACTION_SERVICE_URL: http://transaction-service:8084
       ACCOUNT_SERVICE_URL: http://account-service:8089
+      INVESTMENT_SERVICE_URL: http://investment-service:8091
       CHATBOT_SERVICE_URL: http://chatbot-service:8083
       NGINX_URL: http://nginx:80
       PROB_SUCCESS: "0.35"

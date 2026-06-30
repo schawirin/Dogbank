@@ -74,6 +74,13 @@ spec:
             name: bancocentral-service
             port:
               number: 8085
+      - path: /api/investments
+        pathType: Prefix
+        backend:
+          service:
+            name: investment-service
+            port:
+              number: 8091
       - path: /api/chatbot
         pathType: Prefix
         backend:

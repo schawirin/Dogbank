@@ -42,6 +42,10 @@ data:
         upstream bancocentral-service {
             server bancocentral-service:8085;
         }
+
+        upstream investment-service {
+            server investment-service:8091;
+        }
         
         upstream frontend {
             server frontend:80;
@@ -110,6 +114,19 @@ data:
             # Banco Central Service API
             location /api/bancocentral/ {
                 proxy_pass http://bancocentral-service/api/bancocentral/;
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_connect_timeout 60s;
+                proxy_send_timeout 60s;
+                proxy_read_timeout 60s;
+            }
+
+            # Investment Service API
+            location /api/investments/ {
+                proxy_pass http://investment-service/api/investments/;
                 proxy_http_version 1.1;
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;

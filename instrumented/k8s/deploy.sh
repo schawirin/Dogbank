@@ -67,6 +67,7 @@ build_images() {
     echo "  docker build -t dogbank/account-service:latest ./account-module"
     echo "  docker build -t dogbank/transaction-service:latest ./transaction-module"
     echo "  docker build -t dogbank/bancocentral-service:latest ./bancocentral-module"
+    echo "  docker build -t dogbank/investment-service:latest ./investment-module"
     echo "  docker build -t dogbank/notification-service:latest ./notification-module"
     echo "  docker build -t dogbank/frontend:latest ../dogbank-frontend"
 }
@@ -93,6 +94,7 @@ deploy() {
     kubectl wait --for=condition=available --timeout=180s deployment/account-service -n $NAMESPACE || true
     kubectl wait --for=condition=available --timeout=180s deployment/transaction-service -n $NAMESPACE || true
     kubectl wait --for=condition=available --timeout=180s deployment/bancocentral-service -n $NAMESPACE || true
+    kubectl wait --for=condition=available --timeout=180s deployment/investment-service -n $NAMESPACE || true
     kubectl wait --for=condition=available --timeout=180s deployment/notification-service -n $NAMESPACE || true
     
     # Wait for frontend
