@@ -71,8 +71,8 @@ spec:
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: dogbank-secrets
-                  key: SPRING_DATASOURCE_PASSWORD
+                  name: postgres-secrets
+                  key: POSTGRES_PASSWORD
             - name: INVESTMENT_REGISTRY_URL
               valueFrom:
                 configMapKeyRef:
