@@ -25,6 +25,7 @@ resources:
   - account-service.yaml
   - transaction-service.yaml
   - bancocentral-service.yaml
+  - investment-registry-mock.yaml
   - investment-service.yaml
   - notification-service.yaml
   - chatbot-service.yaml

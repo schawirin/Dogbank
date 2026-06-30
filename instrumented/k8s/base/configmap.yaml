@@ -22,6 +22,7 @@ data:
   TRANSACTION_SERVICE_URL: "http://transaction-service:8084"
   BANCOCENTRAL_API_URL: "http://bancocentral-service:8085/api/bancocentral"
   INVESTMENT_SERVICE_URL: "http://investment-service:8091"
+  INVESTMENT_REGISTRY_URL: "http://investment-registry-mock:8092"
   NOTIFICATION_SERVICE_URL: "http://notification-service:8086"
   INTEGRATION_SERVICE_URL: "http://integration-service:8090"
   SPI_API_URL: "http://spi-mock-service:8090"

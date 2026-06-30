@@ -30,6 +30,10 @@ jobs:
             context: ./instrumented/docker/dogbank
             dockerfile: ./instrumented/docker/dogbank/investment-module/Dockerfile
             image: schawirin/dogbank-investment-service
+          - name: investment-registry-mock
+            context: ./instrumented/docker/dogbank
+            dockerfile: ./instrumented/docker/dogbank/investment-registry-mock/Dockerfile
+            image: schawirin/dogbank-investment-registry-mock
           - name: fraud-detection
             context: ./instrumented/docker/dogbank
             dockerfile: ./instrumented/docker/dogbank/fraud-detection-module/Dockerfile
@@ -169,6 +173,7 @@ jobs:
           kubectl rollout restart deployment/account-service -n dogbank || true
           kubectl rollout restart deployment/transaction-service -n dogbank || true
           kubectl rollout restart deployment/bancocentral-service -n dogbank || true
+          kubectl rollout restart deployment/investment-registry-mock -n dogbank || true
           kubectl rollout restart deployment/investment-service -n dogbank || true
           kubectl rollout restart deployment/fraud-detection-service -n dogbank || true
           kubectl rollout restart deployment/pix-worker -n dogbank || true
@@ -192,6 +197,7 @@ jobs:
           kubectl rollout status deployment/account-service -n dogbank --timeout=5m || true
           kubectl rollout status deployment/transaction-service -n dogbank --timeout=5m || true
           kubectl rollout status deployment/bancocentral-service -n dogbank --timeout=5m || true
+          kubectl rollout status deployment/investment-registry-mock -n dogbank --timeout=5m || true
           kubectl rollout status deployment/investment-service -n dogbank --timeout=5m || true
           kubectl rollout status deployment/fraud-detection-service -n dogbank --timeout=5m || true
           kubectl rollout status deployment/pix-worker -n dogbank --timeout=5m || true

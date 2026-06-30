@@ -87,6 +87,15 @@ const authService = {
     return val ? Number(val) : null;
   },
 
+  async validatePassword(cpf, password) {
+    const { data } = await authApi.post('/validate-password', {
+      cpf: cpf?.trim(),
+      password
+    });
+
+    return data;
+  },
+
   /**
    * Valida uma chave PIX via Banco Central e busca dados do usuário
    *

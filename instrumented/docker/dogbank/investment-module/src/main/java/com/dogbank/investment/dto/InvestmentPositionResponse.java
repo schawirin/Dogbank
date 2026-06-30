@@ -23,4 +23,8 @@ public class InvestmentPositionResponse {
     public String auditCorrelationId;
     public String syncReason;
     public String message;
+    public String registryId;
+    public String registryProtocol;
+    public String registryVenue;
+    public String registryStatus;
 }

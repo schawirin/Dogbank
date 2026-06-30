@@ -58,6 +58,26 @@ spec:
               value: "investment-service"
             - name: SERVER_PORT
               value: "8091"
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: dogbank-config
+                  key: db-url
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: dogbank-config
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: SPRING_DATASOURCE_PASSWORD
+            - name: INVESTMENT_REGISTRY_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: dogbank-config
+                  key: INVESTMENT_REGISTRY_URL
             - name: INVESTMENT_CDI_ANNUAL_RATE
               valueFrom:
                 configMapKeyRef:

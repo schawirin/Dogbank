@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import accountService from '../services/accountService';
 import pixService from '../services/pixService';
 import Alert from '../components/common/Alert';
-import { Zap, FileText, ArrowRight, Activity, TrendingUp, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Zap, FileText, ArrowRight, Activity, TrendingUp, ChevronRight, Landmark } from 'lucide-react';
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -182,7 +182,7 @@ const DashboardPage = () => {
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-white/60 mb-2">Carteira demo</p>
             <p className="text-2xl font-extrabold mb-2">CDI 100% e Bitcoin</p>
-            <p className="text-xs text-white/70">Contratação, auditoria e drift de sincronização.</p>
+            <p className="text-xs text-white/70">Carteira com renda fixa e ativos digitais.</p>
           </div>
         </div>
       </div>
@@ -219,22 +219,22 @@ const DashboardPage = () => {
           <div>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-white" />
+                <Landmark className="w-5 h-5 text-white" />
               </div>
-              <h3 className="text-lg font-bold text-slate-800">Drift de carteira</h3>
+              <h3 className="text-lg font-bold text-slate-800">Carteira de investimentos</h3>
             </div>
 
             <div className="mb-6">
-              <p className="text-sm text-slate-500 mb-1">Cenário ativo</p>
-              <p className="text-3xl font-bold text-amber-500">Sync pendente</p>
+              <p className="text-sm text-slate-500 mb-1">Produtos ativos</p>
+              <p className="text-3xl font-bold text-slate-900">CDI 100% e Bitcoin</p>
               <div className="w-full bg-slate-100 rounded-full h-1.5 mt-3 overflow-hidden">
-                <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: '62%' }} />
+                <div className="bg-purple-600 h-1.5 rounded-full" style={{ width: '72%' }} />
               </div>
             </div>
 
             <div>
-              <p className="text-sm text-slate-500 mb-1">Produtos</p>
-              <p className="text-xl font-bold text-slate-800">CDI 100% / BTC</p>
+              <p className="text-sm text-slate-500 mb-1">Resumo</p>
+              <p className="text-xl font-bold text-slate-800">Aportes e rendimento diário</p>
             </div>
           </div>
 

@@ -1,14 +1,65 @@
 // src/pages/PixTransferPage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import accountService from '../services/accountService';
 import pixService from '../services/pixService';
-import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Alert from '../components/common/Alert';
 import PixStepIndicator from '../components/pix/PixStepIndicator';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, UserRound } from 'lucide-react';
+
+const PIX_RECIPIENT_LIMIT = 6;
+
+const DEFAULT_RECIPIENTS = [
+  {
+    name: 'Pedro Silva',
+    pixKey: 'pedro.silva@dogbank.com',
+    bank: 'Banco do Brasil',
+    defaultAmount: 50,
+  },
+  {
+    name: 'Eliane Oliveira',
+    pixKey: 'eliane.oliveira@dogbank.com',
+    bank: 'Bradesco',
+    defaultAmount: 82.86,
+  },
+  {
+    name: 'Renato Almeida',
+    pixKey: 'renato.almeida@dogbank.com',
+    bank: 'DOG BANK',
+    defaultAmount: 100,
+  },
+];
+
+const parseCurrencyInput = (value) => parseFloat(String(value).replace(/\./g, '').replace(',', '.'));
+
+const formatAmountInput = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '';
+  return numeric % 1 === 0
+    ? String(numeric)
+    : numeric.toFixed(2).replace('.', ',');
+};
+
+const loadSavedRecipients = (storageKey) => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveRecipient = (storageKey, recipient) => {
+  const current = loadSavedRecipients(storageKey);
+  const next = [
+    recipient,
+    ...current.filter((item) => item.pixKey !== recipient.pixKey),
+  ].slice(0, PIX_RECIPIENT_LIMIT);
+  localStorage.setItem(storageKey, JSON.stringify(next));
+  return next;
+};
 
 const PixTransferPage = () => {
   const { user } = useAuth();
@@ -23,12 +74,37 @@ const PixTransferPage = () => {
   const [pixKeyError, setPixKeyError] = useState('');
   const [amountError, setAmountError] = useState('');
   const [generalError, setGeneralError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [validatingKey, setValidatingKey] = useState(false);
 
   // dados auxiliares
   const [accountData, setAccountData] = useState(null);
   const [recipientInfo, setRecipientInfo] = useState(null);
+  const [savedRecipients, setSavedRecipients] = useState([]);
+  const availableBalance = accountData?.saldo ?? accountData?.balance ?? 0;
+
+  const recipientMemoryKey = useMemo(() => {
+    const cpf = user?.cpf || localStorage.getItem('cpf') || 'global';
+    return `dogbank_pix_recipients_${cpf}`;
+  }, [user]);
+
+  const recommendedRecipients = useMemo(() => {
+    const currentPixKey = user?.chavePix || localStorage.getItem('chavePix') || '';
+    const byKey = new Map();
+
+    [...savedRecipients, ...DEFAULT_RECIPIENTS].forEach((recipient) => {
+      if (!recipient?.pixKey || recipient.pixKey === currentPixKey) return;
+      if (!byKey.has(recipient.pixKey)) {
+        byKey.set(recipient.pixKey, recipient);
+      }
+    });
+
+    return Array.from(byKey.values()).slice(0, PIX_RECIPIENT_LIMIT);
+  }, [savedRecipients, user]);
+
+  useEffect(() => {
+    setSavedRecipients(loadSavedRecipients(recipientMemoryKey));
+  }, [recipientMemoryKey]);
 
   /* ------------ EFFECT: carregar saldo ------------ */
   useEffect(() => {
@@ -52,12 +128,12 @@ const PixTransferPage = () => {
 
   /* ------------ VALIDADORES ------------ */
   const validateAmount = () => {
-    const numeric = parseFloat(amount.replace(/\./g, '').replace(',', '.'));
+    const numeric = parseCurrencyInput(amount);
     if (!amount.trim() || Number.isNaN(numeric) || numeric <= 0) {
       setAmountError('Digite um valor válido e maior que zero');
       return false;
     }
-    if (accountData && numeric > accountData.saldo) {
+    if (accountData && numeric > availableBalance) {
       setAmountError('Saldo insuficiente');
       return false;
     }
@@ -112,12 +188,21 @@ const PixTransferPage = () => {
     const keyOk = await validatePixKey();
     if (!amountOk || !keyOk) return;
 
-    const numericAmount = parseFloat(amount.replace(/\./g, '').replace(',', '.'));
+    const numericAmount = parseCurrencyInput(amount);
+    const normalizedPixKey = pixKey.trim();
+    const remembered = saveRecipient(recipientMemoryKey, {
+      name: recipientInfo?.nome || normalizedPixKey,
+      pixKey: normalizedPixKey,
+      bank: recipientInfo?.banco || '',
+      defaultAmount: numericAmount,
+      lastUsedAt: new Date().toISOString(),
+    });
+    setSavedRecipients(remembered);
 
     // ✅ CORREÇÃO: Usar rota relativa para funcionar dentro do MainLayout
     navigate('/dashboard/pix/confirm', {
       state: {
-        pixKey,
+        pixKey: normalizedPixKey,
         amount: numericAmount.toFixed(2),
         description: description.trim(),
         receiverName: recipientInfo?.nome || '',
@@ -130,6 +215,19 @@ const PixTransferPage = () => {
   const handleQuickAmount = (value) => {
     setAmount(value.toString());
     setAmountError('');
+  };
+
+  const handleRecipientSuggestion = (recipient) => {
+    setPixKey(recipient.pixKey);
+    setRecipientInfo({
+      nome: recipient.name,
+      banco: recipient.bank || '',
+    });
+    if (recipient.defaultAmount) {
+      setAmount(formatAmountInput(recipient.defaultAmount));
+      setAmountError('');
+    }
+    setPixKeyError('');
   };
 
   /* ------------ UTILS ------------ */
@@ -177,7 +275,7 @@ const PixTransferPage = () => {
             <div>
               <p className="text-purple-100 text-sm font-medium">Saldo disponível</p>
               <p className="text-2xl font-bold">
-                {formatCurrency(accountData.saldo)}
+                {formatCurrency(availableBalance)}
               </p>
             </div>
             <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
@@ -195,6 +293,30 @@ const PixTransferPage = () => {
           <label className="block text-lg font-semibold text-neutral-900 mb-3">
             Para quem você quer enviar?
           </label>
+          {recommendedRecipients.length > 0 && (
+            <div className="mb-4">
+              <p className="text-sm font-medium text-neutral-700 mb-3">Recomendações</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {recommendedRecipients.map((recipient) => (
+                  <button
+                    key={recipient.pixKey}
+                    type="button"
+                    onClick={() => handleRecipientSuggestion(recipient)}
+                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left hover:border-purple-200 hover:bg-purple-50/60 transition-colors"
+                    disabled={loading || validatingKey}
+                  >
+                    <span className="w-10 h-10 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center flex-shrink-0">
+                      <UserRound className="w-5 h-5" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-bold text-slate-900 truncate">{recipient.name}</span>
+                      <span className="block text-xs text-slate-500 truncate">{recipient.bank || recipient.pixKey}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="relative">
             <input
               type="text"

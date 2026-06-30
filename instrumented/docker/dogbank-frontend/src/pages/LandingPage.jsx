@@ -1,22 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ChevronRight, Shield, Zap, Lock, CreditCard, Smartphone, TrendingUp, Star, ArrowRight } from 'lucide-react';
-
-const DogBankLogo = ({ className = "", size = "md" }) => {
-  const sizes = {
-    sm: { text: 'text-lg', icon: 'w-5 h-5' },
-    md: { text: 'text-[26px]', icon: 'w-7 h-7' },
-  };
-  const s = sizes[size] || sizes.md;
-  return (
-    <div className={`flex items-center gap-1.5 ${className}`}>
-      <span className={`${s.text} font-bold tracking-tight leading-none`}>DogBank</span>
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className={`${s.icon} fill-current mb-1`}>
-        <path d="M226.5 92.9c14.3 7.3 22.8 23 21 38.6l-5.1 44.5c-2.4 20.8-22 35-42.5 31.6l-44.4-7.4c-15.5-2.6-26.6-16.7-25-32.5l5.1-50.6C137.9 94 159.2 81.3 178.6 85l47.9 7.9zm134.4 7.9l47.9-7.9c19.4-3.2 40.7 9.5 43 32.1l5.1 50.6c1.6 15.8-9.5 29.9-25 32.5l-44.4 7.4c-20.5 3.4-40.1-10.8-42.5-31.6l-5.1-44.5c-1.8-15.6 6.7-31.3 21-38.6zM256 272c-29.4 0-56-17.6-69.5-44.1l-14-27.5c-8.9-17.6-29.5-25.1-47.5-16.6l-37.3 17.6c-21.6 10.2-35.3 32.2-34.5 56.1l2.4 72c1.7 51.5 44 92.5 95.6 92.5h108.8c51.6 0 93.9-41 95.6-92.5l2.4-72c.8-23.9-12.9-45.9-34.5-56.1l-37.3-17.6c-18-8.5-38.6-1-47.5 16.6l-14 27.5c-13.5 26.5-40.1 44.1-69.5 44.1zM97.1 230c-15.5 2.6-31.1-6.1-36.4-21l-18-50.7C37.3 143.2 45.4 126 60.5 119.7l43.2-18c14.6-6.1 31.5 1 36.8 15.9l16.1 45.5c4.9 13.9-2.4 29.4-16.3 34.3l-43.2 12.6zm317.8 0l-43.2-12.6c-13.9-4.9-21.2-20.4-16.3-34.3l16.1-45.5c5.3-14.9 22.2-22 36.8-15.9l43.2 18c15.1 6.3 23.2 23.5 17.8 38.6l-18 50.7c-5.3 14.9-20.9 23.6-36.4 21z" />
-      </svg>
-    </div>
-  );
-};
+import Logo from '../components/common/dogbank-logo';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -57,33 +42,11 @@ export default function LandingPage() {
       {/* Animated Grid Pattern */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.03)_1px,transparent_1px)] bg-[size:60px_60px] [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_70%)]" />
 
-      {/* Floating Orbs */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse-slow" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-violet-600/20 rounded-full blur-3xl animate-pulse-slow animation-delay-2000" />
-        <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-indigo-500/15 rounded-full blur-3xl animate-pulse-slow animation-delay-4000" />
-      </div>
-
-      {/* Floating Particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className="floating-particle"
-            style={{
-              left: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 10}s`,
-              animationDuration: `${15 + Math.random() * 20}s`,
-            }}
-          />
-        ))}
-      </div>
-
       {/* Navigation */}
       <nav className={`relative z-20 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
         <div className="container mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
-            <DogBankLogo className="text-white" />
+            <Logo className="text-white" textClassName="text-[26px]" iconClassName="w-7 h-7" />
             <div className="hidden md:flex items-center gap-8">
               <a href="#features" className="text-white/70 hover:text-white transition-colors">Recursos</a>
               <a href="#security" className="text-white/70 hover:text-white transition-colors">Segurança</a>
@@ -109,22 +72,18 @@ export default function LandingPage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
               </span>
-              <span className="text-purple-300 text-sm font-medium">PIX Instantâneo 24h</span>
+              <span className="text-purple-300 text-sm font-medium">PIX, CDI 100% e Bitcoin em uma demo observável</span>
             </div>
 
             {/* Main Heading */}
             <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold mb-8 leading-tight">
-              <span className="text-white">Seu banco</span>
-              <br />
-              <span className="bg-gradient-to-r from-purple-400 via-violet-400 to-indigo-400 bg-clip-text text-transparent">
-                do futuro
-              </span>
+              <span className="text-white">DogBank</span>
             </h1>
 
             {/* Subheading */}
             <p className="text-xl md:text-2xl text-white/60 mb-12 max-w-2xl mx-auto leading-relaxed">
-              Transferências PIX instantâneas, seguras e sem complicação.
-              Experiência bancária reimaginada para a era digital.
+              Uma experiência bancária para demonstrar jornadas reais de PIX,
+              carteira de investimentos e observabilidade ponta a ponta.
             </p>
 
             {/* CTAs */}
@@ -147,16 +106,16 @@ export default function LandingPage() {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-8 mt-20 max-w-3xl mx-auto">
               <div className="text-center">
-                <div className="text-3xl md:text-4xl font-bold text-white mb-2">500K+</div>
-                <div className="text-white/50 text-sm">Usuários ativos</div>
+                <div className="text-3xl md:text-4xl font-bold text-white mb-2">PIX</div>
+                <div className="text-white/50 text-sm">Fluxo transacional</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl md:text-4xl font-bold text-white mb-2">R$ 2B+</div>
-                <div className="text-white/50 text-sm">Transacionados</div>
+                <div className="text-3xl md:text-4xl font-bold text-white mb-2">CDI</div>
+                <div className="text-white/50 text-sm">Renda fixa</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl md:text-4xl font-bold text-white mb-2">99.9%</div>
-                <div className="text-white/50 text-sm">Uptime</div>
+                <div className="text-3xl md:text-4xl font-bold text-white mb-2">BTC</div>
+                <div className="text-white/50 text-sm">Cotação de mercado</div>
               </div>
             </div>
           </div>
@@ -255,7 +214,7 @@ export default function LandingPage() {
                 </div>
                 <h3 className="text-xl font-semibold text-white mb-3">Zero Tarifas</h3>
                 <p className="text-white/60 leading-relaxed">
-                  Conta digital gratuita. Sem taxas escondidas, sem surpresas.
+                  Conta digital de demonstração para navegar, testar e observar o produto.
                 </p>
               </div>
             </div>
@@ -274,16 +233,16 @@ export default function LandingPage() {
                 ))}
               </div>
               <blockquote className="text-2xl md:text-3xl text-white font-medium mb-6 leading-relaxed">
-                "O DogBank revolucionou a forma como eu gerencio meu dinheiro. 
-                PIX instantâneo e uma interface incrível!"
+                "Com o DogBank, a demo mostra a jornada do cliente e a investigação
+                operacional no mesmo cenário."
               </blockquote>
               <div className="flex items-center justify-center gap-4">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center text-white font-bold">
                   R
                 </div>
                 <div className="text-left">
-                  <div className="text-white font-semibold">Renato Silva</div>
-                  <div className="text-white/50 text-sm">Cliente desde 2024</div>
+                  <div className="text-white font-semibold">Equipe DogBank</div>
+                  <div className="text-white/50 text-sm">Demo de observabilidade</div>
                 </div>
               </div>
             </div>
@@ -305,13 +264,13 @@ export default function LandingPage() {
                   Pronto para começar?
                 </h2>
                 <p className="text-white/60 text-lg mb-8 max-w-xl mx-auto">
-                  Abra sua conta em menos de 5 minutos e descubra uma nova forma de cuidar do seu dinheiro.
+                  Entre com um usuário de demonstração e percorra PIX, carteira e investimentos.
                 </p>
                 <button
                   onClick={handleLoginClick}
                   className="group inline-flex items-center justify-center px-10 py-5 bg-white text-purple-600 rounded-2xl font-bold text-lg hover:bg-white/90 transition-all duration-300 hover:scale-105 hover:shadow-[0_0_40px_rgba(255,255,255,0.3)]"
                 >
-                  Criar conta grátis
+                  Acessar demo
                   <ChevronRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
@@ -325,13 +284,13 @@ export default function LandingPage() {
         <div className="container mx-auto px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <DogBankLogo className="text-white/80" size="sm" />
-              <span className="text-white/60 text-sm">© 2025 DogBank. Todos os direitos reservados.</span>
+              <Logo className="text-white/80" textClassName="text-lg" iconClassName="w-5 h-5" />
+              <span className="text-white/60 text-sm">© 2026 DogBank. Ambiente de demonstração.</span>
             </div>
             <div className="flex items-center gap-6">
-              <a href="#" className="text-white/50 hover:text-white text-sm transition-colors">Termos</a>
-              <a href="#" className="text-white/50 hover:text-white text-sm transition-colors">Privacidade</a>
-              <a href="#" className="text-white/50 hover:text-white text-sm transition-colors">Contato</a>
+              <span className="text-white/50 text-sm">Termos</span>
+              <span className="text-white/50 text-sm">Privacidade</span>
+              <span className="text-white/50 text-sm">Contato</span>
             </div>
           </div>
         </div>

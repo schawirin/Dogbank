@@ -4,10 +4,12 @@ import com.dogbank.investment.dto.InvestmentPositionResponse;
 import com.dogbank.investment.dto.InvestmentProductResponse;
 import com.dogbank.investment.dto.InvestmentSubscriptionRequest;
 import com.dogbank.investment.service.InvestmentService;
+import com.dogbank.investment.service.InvestmentService.RegistryFailureException;
 import com.dogbank.investment.service.InvestmentService.SyncFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -41,6 +43,15 @@ public class InvestmentController {
     @PostMapping("/subscribe")
     public ResponseEntity<InvestmentPositionResponse> subscribe(@RequestBody InvestmentSubscriptionRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(investmentService.subscribe(request));
+    }
+
+    @ExceptionHandler(RegistryFailureException.class)
+    public ResponseEntity<Map<String, Object>> handleRegistryFailure(RegistryFailureException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", "FAILED");
+        body.put("errorCode", ex.errorCode);
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(body);
     }
 
     @PostMapping("/sync/{positionId}")

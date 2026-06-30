@@ -1,21 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Activity,
-  AlertTriangle,
   Bitcoin,
   CheckCircle2,
   Clock3,
+  Landmark,
   Percent,
   PlusCircle,
   RefreshCw,
-  Search,
   TrendingUp,
   Wallet,
 } from 'lucide-react';
 import { datadogRum } from '@datadog/browser-rum';
 import { useAuth } from '../hooks/useAuth';
 import accountService from '../services/accountService';
+import authService from '../services/authService';
 import investmentService from '../services/investmentService';
 import Alert from '../components/common/Alert';
 import Button from '../components/common/Button';
@@ -54,42 +53,12 @@ const productIcon = (code) => {
   return Percent;
 };
 
-const statusTone = (position) => {
-  if (position.status === 'SYNCED') {
-    return {
-      label: 'OK',
-      bg: 'bg-emerald-50',
-      text: 'text-emerald-700',
-      border: 'border-emerald-100',
-      icon: CheckCircle2,
-    };
-  }
-
-  const drift = Math.abs(numeric(position.driftAmount));
-  if (drift > 10000) {
-    return {
-      label: 'DRIFT',
-      bg: 'bg-rose-50',
-      text: 'text-rose-700',
-      border: 'border-rose-100',
-      icon: AlertTriangle,
-    };
-  }
-
-  return {
-    label: 'DRIFT',
-    bg: 'bg-amber-50',
-    text: 'text-amber-700',
-    border: 'border-amber-100',
-    icon: AlertTriangle,
-  };
-};
+const yieldFor = (position) => numeric(position.currentValue) - numeric(position.principalAmount);
 
 const StatCard = ({ icon: Icon, label, value, helper, tone = 'purple' }) => {
   const colors = {
     purple: 'bg-violet-50 text-violet-700',
     green: 'bg-emerald-50 text-emerald-700',
-    amber: 'bg-amber-50 text-amber-700',
     blue: 'bg-sky-50 text-sky-700',
   };
 
@@ -132,14 +101,16 @@ const ProductCard = ({ product, amount, disabled, onAmountChange, onSubscribe })
 
       <div className="grid grid-cols-2 gap-3 my-5">
         <div className="rounded-xl bg-slate-50 p-3">
-          <p className="text-xs text-slate-500 mb-1">{isBitcoin ? 'Cotação' : 'Taxa anual'}</p>
+          <p className="text-xs text-slate-500 mb-1">{isBitcoin ? 'Cotação atual' : 'Taxa anual'}</p>
           <p className="text-sm font-bold text-slate-900">
             {isBitcoin ? formatCurrency(numeric(product.referencePrice)) : formatPercent(product.annualRate)}
           </p>
         </div>
         <div className="rounded-xl bg-slate-50 p-3">
-          <p className="text-xs text-slate-500 mb-1">Fonte</p>
-          <p className="text-sm font-bold text-slate-900 truncate">{product.quoteSource || 'DogBank'}</p>
+          <p className="text-xs text-slate-500 mb-1">Categoria</p>
+          <p className="text-sm font-bold text-slate-900 truncate">
+            {isBitcoin ? 'Ativo digital' : 'Renda fixa'}
+          </p>
         </div>
       </div>
 
@@ -178,71 +149,122 @@ const MetricRow = ({ label, value, valueClassName = 'text-slate-900' }) => (
 );
 
 const PositionCard = ({ position, syncing, onSync }) => {
-  const tone = statusTone(position);
-  const StatusIcon = tone.icon;
-  const isDrifted = position.status !== 'SYNCED';
+  const accumulatedYield = yieldFor(position);
+  const protocol = position.registryProtocol || position.auditCorrelationId || '--';
 
   return (
-    <Card className={`border ${tone.border}`} bodyClassName="space-y-4">
+    <Card bodyClassName="space-y-4">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <h3 className="text-lg font-bold text-slate-900">{position.productName}</h3>
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${tone.bg} ${tone.text}`}>
-              <StatusIcon className="w-3.5 h-3.5" />
-              {tone.label}
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Ativo
             </span>
           </div>
-          <p className="text-xs text-slate-500 font-mono break-all">{position.positionId}</p>
+          <p className="text-xs text-slate-500">Contrato {position.positionId}</p>
         </div>
-        {isDrifted && (
-          <Button
-            size="sm"
-            variant="secondary"
-            loading={syncing}
-            disabled={syncing}
-            icon={<RefreshCw className="w-4 h-4" />}
-            onClick={() => onSync(position)}
-          >
-            Sincronizar
-          </Button>
-        )}
+        <Button
+          size="sm"
+          variant="secondary"
+          loading={syncing}
+          disabled={syncing}
+          icon={<RefreshCw className="w-4 h-4" />}
+          onClick={() => onSync(position)}
+        >
+          Atualizar valor
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
         <div>
-          <MetricRow label="Aplicado" value={formatCurrency(numeric(position.principalAmount))} />
-          <MetricRow label="Valor contabilizado" value={formatCurrency(numeric(position.currentValue))} />
-          <MetricRow label="Valor esperado" value={formatCurrency(numeric(position.expectedValue))} valueClassName="text-emerald-700" />
+          <MetricRow label="Valor aplicado" value={formatCurrency(numeric(position.principalAmount))} />
+          <MetricRow label="Saldo atual" value={formatCurrency(numeric(position.currentValue))} />
+          <MetricRow
+            label="Rendimento acumulado"
+            value={formatCurrency(accumulatedYield)}
+            valueClassName={accumulatedYield >= 0 ? 'text-emerald-700' : 'text-slate-900'}
+          />
         </div>
         <div>
-          <MetricRow
-            label="Drift"
-            value={`${formatCurrency(Math.abs(numeric(position.driftAmount)))} | ${Math.abs(numeric(position.driftPercent)).toFixed(2)}%`}
-            valueClassName={isDrifted ? tone.text : 'text-emerald-700'}
-          />
-          <MetricRow label="Último sync" value={formatDateTime(position.lastSyncedAt)} />
+          <MetricRow label="Última atualização" value={formatDateTime(position.lastSyncedAt)} />
           <MetricRow label="Contratado por" value={position.contractedBy || '--'} />
+          <MetricRow label="Protocolo" value={protocol} />
         </div>
       </div>
-
-      <div className="rounded-xl bg-slate-50 px-4 py-3">
-        <div className="flex items-start gap-3">
-          <Search className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-slate-500">Audit ID</p>
-            <p className="text-xs font-mono text-slate-800 break-all">{position.auditCorrelationId || '--'}</p>
-            {position.syncReason && (
-              <p className="text-xs text-slate-500 mt-2">Motivo: {position.syncReason}</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {position.message && (
-        <p className="text-sm text-slate-500">{position.message}</p>
-      )}
     </Card>
+  );
+};
+
+const PasswordModal = ({
+  product,
+  amount,
+  password,
+  error,
+  loading,
+  onClose,
+  onPasswordChange,
+  onConfirm,
+}) => {
+  if (!product) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-slate-900/45 backdrop-blur-sm" onClick={loading ? undefined : onClose} />
+      <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl shadow-slate-900/20">
+        <div className="mb-5">
+          <p className="text-sm font-semibold text-violet-700 mb-2">Confirmação de segurança</p>
+          <h2 className="text-xl font-bold text-slate-900">Confirmar aplicação</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Digite a senha da conta para aplicar {formatCurrency(Number(amount || 0))} em {product.name}.
+          </p>
+        </div>
+
+        <form onSubmit={onConfirm} className="space-y-4">
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-500">Senha da conta</span>
+            <input
+              autoFocus
+              type="password"
+              inputMode="numeric"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => onPasswordChange(event.target.value)}
+              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-lg font-bold tracking-normal text-slate-900 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-100"
+              placeholder="Digite sua senha"
+              disabled={loading}
+            />
+          </label>
+
+          {error && (
+            <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {error}
+            </div>
+          )}
+
+          <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
+            <Button
+              type="button"
+              variant="secondary"
+              fullWidth
+              disabled={loading}
+              onClick={onClose}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              fullWidth
+              loading={loading}
+              disabled={loading}
+            >
+              Confirmar aplicação
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 };
 
@@ -258,7 +280,10 @@ const InvestmentsPage = () => {
   const [notice, setNotice] = useState('');
   const [subscribingCode, setSubscribingCode] = useState('');
   const [syncingId, setSyncingId] = useState('');
-  const [syncingAll, setSyncingAll] = useState(false);
+  const [pendingProduct, setPendingProduct] = useState(null);
+  const [investmentPassword, setInvestmentPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [validatingPassword, setValidatingPassword] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -319,7 +344,7 @@ const InvestmentsPage = () => {
         account_id: account.id,
         product_count: fetchedProducts.length,
         position_count: fetchedPositions.length,
-        drifted_count: fetchedPositions.filter((position) => position.status !== 'SYNCED').length,
+        technical_divergence_count: fetchedPositions.filter((position) => position.status !== 'SYNCED').length,
       });
     } catch (err) {
       console.error('Erro ao carregar investimentos:', err);
@@ -338,16 +363,30 @@ const InvestmentsPage = () => {
   }, [user]);
 
   const summary = useMemo(() => {
-    const expectedTotal = positions.reduce((total, position) => total + numeric(position.expectedValue), 0);
-    const bookedTotal = positions.reduce((total, position) => total + numeric(position.currentValue), 0);
-    const driftTotal = positions.reduce((total, position) => total + numeric(position.driftAmount), 0);
-    const driftedCount = positions.filter((position) => position.status !== 'SYNCED').length;
+    const appliedTotal = positions.reduce((total, position) => total + numeric(position.principalAmount), 0);
+    const currentTotal = positions.reduce((total, position) => total + numeric(position.currentValue), 0);
+    const yieldTotal = currentTotal - appliedTotal;
 
-    return { expectedTotal, bookedTotal, driftTotal, driftedCount };
+    return { appliedTotal, currentTotal, yieldTotal };
   }, [positions]);
 
   const handleAmountChange = (productCode, value) => {
     setAmounts((current) => ({ ...current, [productCode]: value }));
+  };
+
+  const closePasswordModal = () => {
+    if (validatingPassword || subscribingCode) return;
+    setPendingProduct(null);
+    setInvestmentPassword('');
+    setPasswordError('');
+  };
+
+  const requestSubscription = (product) => {
+    setError('');
+    setNotice('');
+    setPasswordError('');
+    setInvestmentPassword('');
+    setPendingProduct(product);
   };
 
   const upsertPosition = (updatedPosition) => {
@@ -360,7 +399,7 @@ const InvestmentsPage = () => {
     });
   };
 
-  const handleSubscribe = async (product) => {
+  const executeSubscription = async (product) => {
     const amount = Number(amounts[product.code] || defaultAmountFor(product.code));
     if (!Number.isFinite(amount) || amount <= 0) {
       setError('Informe um valor de aporte válido.');
@@ -387,15 +426,16 @@ const InvestmentsPage = () => {
       });
 
       upsertPosition(position);
-      setNotice(position.status === 'SYNCED'
-        ? 'Investimento contratado e sincronizado.'
-        : 'Investimento contratado com drift para investigação.');
+      setNotice('Aplicação contratada com sucesso.');
+      setPendingProduct(null);
+      setInvestmentPassword('');
+      setPasswordError('');
 
       datadogRum.addAction('dogbank.web.investments.subscription.completed', {
         account_id: accountData.id,
         product_code: product.code,
         position_id: position.positionId,
-        status: position.status,
+        backend_status: position.status,
         amount,
       });
     } catch (err) {
@@ -411,12 +451,65 @@ const InvestmentsPage = () => {
     }
   };
 
+  const handlePasswordConfirm = async (event) => {
+    event.preventDefault();
+
+    if (!pendingProduct) return;
+
+    const cpf = accountData?.cpf || user?.cpf || localStorage.getItem('cpf');
+    if (!cpf) {
+      setPasswordError('Não foi possível identificar a sessão da conta.');
+      return;
+    }
+
+    if (!investmentPassword.trim()) {
+      setPasswordError('Digite a senha da conta.');
+      return;
+    }
+
+    try {
+      setValidatingPassword(true);
+      setPasswordError('');
+
+      datadogRum.addAction('dogbank.web.investments.password_validation.started', {
+        account_id: accountData?.id,
+        product_code: pendingProduct.code,
+      });
+
+      const result = await authService.validatePassword(cpf, investmentPassword);
+      if (!result?.valid) {
+        setPasswordError(result?.message || 'Senha incorreta.');
+        datadogRum.addAction('dogbank.web.investments.password_validation.failed', {
+          account_id: accountData?.id,
+          product_code: pendingProduct.code,
+        });
+        return;
+      }
+
+      datadogRum.addAction('dogbank.web.investments.password_validation.completed', {
+        account_id: accountData?.id,
+        product_code: pendingProduct.code,
+      });
+
+      await executeSubscription(pendingProduct);
+    } catch (err) {
+      console.error('Erro ao validar senha do investimento:', err);
+      setPasswordError(err.response?.data?.message || 'Não foi possível validar a senha agora.');
+      datadogRum.addError(err, {
+        flow: 'web_investment_password_validation',
+        product_code: pendingProduct.code,
+      });
+    } finally {
+      setValidatingPassword(false);
+    }
+  };
+
   const handleSync = async (position) => {
     try {
       setError('');
       setNotice('');
       setSyncingId(position.positionId);
-      datadogRum.addAction('dogbank.web.investments.sync.started', {
+      datadogRum.addAction('dogbank.web.investments.refresh.started', {
         account_id: accountData?.id,
         position_id: position.positionId,
         product_code: position.productCode,
@@ -424,52 +517,23 @@ const InvestmentsPage = () => {
 
       const updated = await investmentService.syncPosition(position.positionId);
       upsertPosition(updated);
-      setNotice('Posição sincronizada com sucesso.');
+      setNotice('Valor da aplicação atualizado.');
 
-      datadogRum.addAction('dogbank.web.investments.sync.completed', {
+      datadogRum.addAction('dogbank.web.investments.refresh.completed', {
         position_id: updated.positionId,
         product_code: updated.productCode,
-        status: updated.status,
-        drift_amount: updated.driftAmount,
+        backend_status: updated.status,
       });
     } catch (err) {
-      console.error('Erro ao sincronizar investimento:', err);
-      const message = err.response?.data?.message || err.message || 'Não foi possível sincronizar a posição.';
-      setError(`${message} Tente novamente para simular a recuperação.`);
+      console.error('Erro ao atualizar investimento:', err);
+      setError('Estamos atualizando essa aplicação. Tente novamente em instantes.');
       datadogRum.addError(err, {
-        flow: 'web_investment_sync',
+        flow: 'web_investment_refresh',
         position_id: position.positionId,
         product_code: position.productCode,
       });
     } finally {
       setSyncingId('');
-    }
-  };
-
-  const handleRunSync = async () => {
-    try {
-      setError('');
-      setNotice('');
-      setSyncingAll(true);
-      datadogRum.addAction('dogbank.web.investments.sync_all.started', {
-        account_id: accountData?.id,
-        position_count: positions.length,
-      });
-
-      const updatedPositions = await investmentService.runSync();
-      setPositions(updatedPositions);
-      setNotice('Rotina de sync executada.');
-      datadogRum.addAction('dogbank.web.investments.sync_all.completed', {
-        account_id: accountData?.id,
-        position_count: updatedPositions.length,
-        drifted_count: updatedPositions.filter((position) => position.status !== 'SYNCED').length,
-      });
-    } catch (err) {
-      console.error('Erro ao executar sync:', err);
-      setError(err.response?.data?.message || err.message || 'Não foi possível executar a rotina de sync.');
-      datadogRum.addError(err, { flow: 'web_investment_sync_all' });
-    } finally {
-      setSyncingAll(false);
     }
   };
 
@@ -490,28 +554,17 @@ const InvestmentsPage = () => {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Investimentos</h1>
           <p className="text-sm text-slate-500">
-            CDI 100%, Bitcoin, auditoria de contratação e sincronização de carteira.
+            Acompanhe seus aportes em CDI 100% e Bitcoin.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<RefreshCw className="w-4 h-4" />}
-            onClick={loadInvestments}
-          >
-            Atualizar
-          </Button>
-          <Button
-            size="sm"
-            loading={syncingAll}
-            disabled={syncingAll || positions.length === 0}
-            icon={<Activity className="w-4 h-4" />}
-            onClick={handleRunSync}
-          >
-            Rodar sync
-          </Button>
-        </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<RefreshCw className="w-4 h-4" />}
+          onClick={loadInvestments}
+        >
+          Atualizar
+        </Button>
       </div>
 
       {error && <Alert type="error" message={error} onClose={() => setError('')} />}
@@ -520,14 +573,12 @@ const InvestmentsPage = () => {
       <section className="rounded-3xl bg-slate-900 text-white p-6 md:p-8 shadow-lg shadow-slate-900/10 overflow-hidden relative">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <p className="text-sm font-semibold text-white/70 mb-2">Valor esperado da carteira</p>
-            <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">
-              {formatCurrency(summary.expectedTotal)}
+            <p className="text-sm font-semibold text-white/70 mb-2">Patrimônio em investimentos</p>
+            <h2 className="text-4xl md:text-5xl font-extrabold tracking-normal">
+              {formatCurrency(summary.currentTotal)}
             </h2>
             <p className="text-sm text-white/70 mt-3">
-              {summary.driftedCount === 0
-                ? 'Todas as posições estão sincronizadas.'
-                : `Drift de ${formatCurrency(Math.abs(summary.driftTotal))} em ${summary.driftedCount} ${positionLabel(summary.driftedCount)}.`}
+              {positions.length} {positionLabel(positions.length)} na conta {accountData?.id || '--'}.
             </p>
           </div>
           <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center">
@@ -538,31 +589,31 @@ const InvestmentsPage = () => {
 
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard
-          icon={Wallet}
-          label="Valor contabilizado"
-          value={formatCurrency(summary.bookedTotal)}
-          helper={`Conta ${accountData?.id || '--'}`}
+          icon={Landmark}
+          label="Total aplicado"
+          value={formatCurrency(summary.appliedTotal)}
+          helper="Soma dos aportes"
           tone="blue"
         />
         <StatCard
-          icon={AlertTriangle}
-          label="Posições com drift"
-          value={summary.driftedCount}
-          helper={summary.driftedCount > 0 ? 'Investigar em APM e logs' : 'Sem divergência ativa'}
-          tone={summary.driftedCount > 0 ? 'amber' : 'green'}
+          icon={Wallet}
+          label="Saldo atual"
+          value={formatCurrency(summary.currentTotal)}
+          helper="Valor contabilizado na carteira"
+          tone="purple"
         />
         <StatCard
           icon={Clock3}
-          label="Última atualização"
-          value={formatDateTime(new Date().toISOString())}
-          helper="Dados do investment-service"
-          tone="purple"
+          label="Rendimento"
+          value={formatCurrency(summary.yieldTotal)}
+          helper="Variação acumulada"
+          tone={summary.yieldTotal >= 0 ? 'green' : 'blue'}
         />
       </section>
 
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-slate-900">Produtos para demo</h2>
+          <h2 className="text-lg font-bold text-slate-900">Produtos disponíveis</h2>
         </div>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
           {products.map((product) => (
@@ -572,7 +623,7 @@ const InvestmentsPage = () => {
               amount={amounts[product.code] || defaultAmountFor(product.code)}
               disabled={subscribingCode === product.code}
               onAmountChange={handleAmountChange}
-              onSubscribe={handleSubscribe}
+              onSubscribe={requestSubscription}
             />
           ))}
         </div>
@@ -580,7 +631,7 @@ const InvestmentsPage = () => {
 
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-slate-900">Carteira e drift</h2>
+          <h2 className="text-lg font-bold text-slate-900">Minha carteira</h2>
           <span className="text-xs font-semibold text-slate-500 bg-white px-3 py-1.5 rounded-full border border-slate-200">
             {positions.length} {positionLabel(positions.length)}
           </span>
@@ -592,7 +643,7 @@ const InvestmentsPage = () => {
               <TrendingUp className="w-6 h-6" />
             </div>
             <h3 className="font-bold text-slate-900 mb-1">Nenhum investimento encontrado</h3>
-            <p className="text-sm text-slate-500">A carteira aparecerá aqui após uma contratação.</p>
+            <p className="text-sm text-slate-500">A carteira aparecerá aqui após uma aplicação.</p>
           </Card>
         ) : (
           <div className="space-y-4">
@@ -607,6 +658,17 @@ const InvestmentsPage = () => {
           </div>
         )}
       </section>
+
+      <PasswordModal
+        product={pendingProduct}
+        amount={pendingProduct ? amounts[pendingProduct.code] || defaultAmountFor(pendingProduct.code) : 0}
+        password={investmentPassword}
+        error={passwordError}
+        loading={validatingPassword || Boolean(subscribingCode)}
+        onClose={closePasswordModal}
+        onPasswordChange={setInvestmentPassword}
+        onConfirm={handlePasswordConfirm}
+      />
     </div>
   );
 };

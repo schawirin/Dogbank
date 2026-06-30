@@ -1,0 +1,110 @@
+# =============================================================================
+# Investment Registry Mock - Simulates B3/Matera investment registration API
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: investment-registry-mock
+  namespace: dogbank
+  labels:
+    app: investment-registry-mock
+    tags.datadoghq.com/env: dogbank
+    tags.datadoghq.com/service: b3-investment-registry
+    tags.datadoghq.com/version: "1.0.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: investment-registry-mock
+  template:
+    metadata:
+      labels:
+        app: investment-registry-mock
+        tags.datadoghq.com/env: dogbank
+        tags.datadoghq.com/service: b3-investment-registry
+        tags.datadoghq.com/version: "1.0.0"
+      annotations:
+        admission.datadoghq.com/java-lib.version: "latest"
+        admission.datadoghq.com/js-lib.config.v1: '{"disabled":true}'
+        admission.datadoghq.com/python-lib.config.v1: '{"disabled":true}'
+        ad.datadoghq.com/investment-registry-mock.logs: '[{"source":"java","service":"b3-investment-registry"}]'
+    spec:
+      containers:
+        - name: investment-registry-mock
+          image: schawirin/dogbank-investment-registry-mock:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8092
+              name: http
+          env:
+            - name: SERVER_PORT
+              value: "8092"
+            - name: DD_AGENT_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: DD_TRACE_AGENT_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: dogbank-config
+                  key: DD_TRACE_AGENT_PORT
+            - name: DD_ENV
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/env']
+            - name: DD_SERVICE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/service']
+            - name: DD_VERSION
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['tags.datadoghq.com/version']
+            - name: DD_LOGS_INJECTION
+              value: "true"
+            - name: DD_TRACE_SAMPLE_RATE
+              value: "1"
+            - name: DD_DATA_STREAMS_ENABLED
+              value: "true"
+            - name: DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED
+              value: "true"
+          resources:
+            requests:
+              memory: "192Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /api/investment-registry/health
+              port: 8092
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/investment-registry/health
+              port: 8092
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: investment-registry-mock
+  namespace: dogbank
+  labels:
+    app: investment-registry-mock
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8092
+      targetPort: 8092
+      protocol: TCP
+      name: http
+  selector:
+    app: investment-registry-mock

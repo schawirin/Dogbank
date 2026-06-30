@@ -46,6 +46,12 @@ services:
   transaction-service:
     depends_on: !reset []
 
+  investment-service:
+    depends_on: !reset []
+
+  investment-registry-mock:
+    depends_on: !reset []
+
   chatbot-service:
     depends_on: !reset []
 
