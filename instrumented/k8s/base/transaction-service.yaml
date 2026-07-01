@@ -73,6 +73,18 @@ spec:
                   name: dogbank-secrets
                   key: SPRING_DATASOURCE_PASSWORD
             # Redis
+            # Spring also reads REDIS_* directly; keep these explicit to avoid
+            # Kubernetes service envs like REDIS_PORT=tcp://... overriding it.
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: dogbank-config
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: dogbank-config
+                  key: REDIS_PORT
             - name: SPRING_DATA_REDIS_HOST
               valueFrom:
                 configMapKeyRef:
