@@ -107,6 +107,18 @@ export const clearProductUser = () => {
   postNative('clearUser', {});
 };
 
+export const stopProductSession = () => {
+  try {
+    if (typeof datadogRum.stopSession === 'function') {
+      datadogRum.stopSession();
+    }
+  } catch (error) {
+    console.warn('[ProductAnalytics] stopSession failed:', error);
+  }
+
+  postNative('stopSession', {});
+};
+
 export const trackProductAction = (name, attributes = {}) => {
   const sanitized = sanitizeAttributes(attributes);
 

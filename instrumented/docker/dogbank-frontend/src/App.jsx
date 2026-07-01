@@ -20,41 +20,6 @@ import NotFoundPage from './pages/NotFoundPage';
 import ProfilePage from './pages/ProfilePage';
 import Chatbot from './components/Chatbot';
 
-import { datadogRum } from '@datadog/browser-rum';
-
-datadogRum.init({
-    applicationId: '75c8178b-be55-4aa4-a023-47d3efa27538',
-    clientToken: 'pub9db46832ed6a466e3a1ab28915ad67cd',
-    // `site` refers to the Datadog site parameter of your organization
-    // see https://docs.datadoghq.com/getting_started/site/
-    site: 'datadoghq.com',
-    service: 'dogbank-frontend',
-    env: 'dogbank',
-    // Specify a version number to identify the deployed version of your application in Datadog
-    version: '1.0.0',
-    sessionSampleRate: 100,
-    sessionReplaySampleRate: 100,
-    defaultPrivacyLevel: 'allow',
-    // Forward console logs to Datadog
-    forwardConsoleLogs: ['log', 'info', 'warn', 'error'],
-    forwardErrorsToLogs: true,
-    // Track user interactions
-    trackUserInteractions: true,
-    trackResources: true,
-    trackLongTasks: true,
-    // Connect RUM with APM traces
-    allowedTracingUrls: [
-        { match: /^http:\/\/localhost:8080\/api\//, propagatorTypes: ['tracecontext', 'datadog'] },
-        { match: /^http:\/\/127\.0\.0\.1:8080\/api\//, propagatorTypes: ['tracecontext', 'datadog'] },
-        { match: /\/api\//, propagatorTypes: ['tracecontext', 'datadog'] },
-    ],
-    // Enable tracing
-    traceSampleRate: 100,
-});
-
-// Start session replay recording
-datadogRum.startSessionReplayRecording();
-
 const AppContent = () => {
   const { user } = useContext(AuthContext);
 

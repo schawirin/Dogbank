@@ -74,9 +74,6 @@ public class TransactionService {
         ZonedDateTime startedAt = ZonedDateTime.now();
         BigDecimal saldoAntes = null;
         
-        // Registra início da transação PIX
-        pixMetrics.registrarPixIniciado(accountOriginId, pixKeyDestination, amount);
-        
         // Adiciona contexto ao MDC para logs estruturados
         MDC.put("chave_pix", pixKeyDestination);
         MDC.put("valor", amount.toString());
@@ -98,16 +95,44 @@ public class TransactionService {
             }
             
             saldoAntes = origin.getBalance();
+            UserModel userOrigin = origin.getUsuarioId() != null ? getUserById(origin.getUsuarioId()) : null;
+            String remetenteNome = firstNonBlank(userOrigin != null ? userOrigin.getNome() : null, "Cliente DogBank");
+            String remetenteCpf = userOrigin != null ? maskCpf(userOrigin.getCpf()) : "";
+            String remetenteChavePix = userOrigin != null ? maskCpf(userOrigin.getChavePix()) : "";
+            String remetenteBanco = firstNonBlank(origin.getBanco(), "DogBank");
+            String remetenteConta = firstNonBlank(origin.getAccountNumber(), origin.getId().toString());
+
             MDC.put("remetente_id", origin.getId().toString());
-            MDC.put("remetente_banco", origin.getBanco() != null ? origin.getBanco() : "DogBank");
+            MDC.put("remetente_nome", remetenteNome);
+            MDC.put("remetente_banco", remetenteBanco);
+            MDC.put("remetente_conta", remetenteConta);
+            if (!remetenteCpf.isBlank()) {
+                MDC.put("remetente_cpf", remetenteCpf);
+            }
+            if (!remetenteChavePix.isBlank()) {
+                MDC.put("remetente_chave_pix", remetenteChavePix);
+            }
             MDC.put("saldo_antes", saldoAntes.toString());
+
+            // Registra início da transação PIX com os dados do cliente de origem.
+            pixMetrics.registrarPixIniciado(
+                accountOriginId,
+                pixKeyDestination,
+                amount,
+                remetenteNome,
+                remetenteCpf,
+                remetenteBanco,
+                remetenteConta,
+                remetenteChavePix
+            );
             
             // Destino
             UserModel userDest = getUserByPixKey(pixKeyDestination);
             if (userDest == null) {
                 long durationMs = calcularDuracao(startedAt);
                 pixMetrics.registrarPixFalha(accountOriginId, pixKeyDestination, amount, 
-                    "CHAVE_PIX_NAO_ENCONTRADA", "Chave Pix de destino não encontrada", "VALIDACAO", durationMs);
+                    "CHAVE_PIX_NAO_ENCONTRADA", "Chave Pix de destino não encontrada", "VALIDACAO", durationMs,
+                    remetenteNome, remetenteCpf, remetenteBanco, remetenteConta, remetenteChavePix);
                 MDC.put("evento", "PIX_ERRO");
                 MDC.put("status_transacao", "ERRO_CHAVE_PIX_NAO_ENCONTRADA");
                 log.error("Chave Pix de destino não encontrada");
@@ -123,7 +148,8 @@ public class TransactionService {
             if (dest == null) {
                 long durationMs = calcularDuracao(startedAt);
                 pixMetrics.registrarPixFalha(accountOriginId, pixKeyDestination, amount, 
-                    "CONTA_DESTINO_NAO_ENCONTRADA", "Conta de destino não encontrada", "VALIDACAO", durationMs);
+                    "CONTA_DESTINO_NAO_ENCONTRADA", "Conta de destino não encontrada", "VALIDACAO", durationMs,
+                    remetenteNome, remetenteCpf, remetenteBanco, remetenteConta, remetenteChavePix);
                 MDC.put("evento", "PIX_ERRO");
                 MDC.put("status_transacao", "ERRO_CONTA_DESTINO_NAO_ENCONTRADA");
                 log.error("Conta de destino não encontrada");
@@ -133,7 +159,8 @@ public class TransactionService {
             if (origin.getId().equals(dest.getId())) {
                 long durationMs = calcularDuracao(startedAt);
                 pixMetrics.registrarPixFalha(accountOriginId, pixKeyDestination, amount,
-                    "TRANSFERENCIA_PARA_SI_MESMO", "Não é possível transferir para si mesmo", "VALIDACAO", durationMs);
+                    "TRANSFERENCIA_PARA_SI_MESMO", "Não é possível transferir para si mesmo", "VALIDACAO", durationMs,
+                    remetenteNome, remetenteCpf, remetenteBanco, remetenteConta, remetenteChavePix);
                 MDC.put("evento", "PIX_ERRO");
                 MDC.put("status_transacao", "ERRO_TRANSFERENCIA_PARA_SI_MESMO");
                 MDC.put("erro_codigo", "TRANSFERENCIA_PARA_SI_MESMO");
@@ -164,7 +191,8 @@ public class TransactionService {
                 long durationMs = calcularDuracao(startedAt);
                 pixMetrics.registrarPixFalha(accountOriginId, pixKeyDestination, amount, 
                     errorCode != null ? errorCode : "BC_REJEITADO", 
-                    error != null ? error : "Erro desconhecido", "BANCO_CENTRAL", durationMs);
+                    error != null ? error : "Erro desconhecido", "BANCO_CENTRAL", durationMs,
+                    remetenteNome, remetenteCpf, remetenteBanco, remetenteConta, remetenteChavePix);
                 MDC.put("evento", "PIX_ERRO");
                 MDC.put("status_transacao", "REJEITADO_BANCO_CENTRAL");
                 MDC.put("erro_codigo", errorCode != null ? errorCode : "DESCONHECIDO");
@@ -182,7 +210,8 @@ public class TransactionService {
                 long durationMs = calcularDuracao(startedAt);
                 pixMetrics.registrarSaldoInsuficiente(accountOriginId, origin.getBalance(), amount);
                 pixMetrics.registrarPixFalha(accountOriginId, pixKeyDestination, amount, 
-                    "SALDO_INSUFICIENTE", "Saldo insuficiente para realizar a transferência", "SALDO", durationMs);
+                    "SALDO_INSUFICIENTE", "Saldo insuficiente para realizar a transferência", "SALDO", durationMs,
+                    remetenteNome, remetenteCpf, remetenteBanco, remetenteConta, remetenteChavePix);
                 MDC.put("evento", "PIX_ERRO");
                 MDC.put("status_transacao", "ERRO_SALDO_INSUFICIENTE");
                 MDC.put("saldo_disponivel", origin.getBalance().toString());
@@ -209,10 +238,10 @@ public class TransactionService {
             tx.setPixKeyDestination(pixKeyDestination);
             tx.setReceiverName(userDest.getNome());
             tx.setReceiverBank(bancoDestino);
-            tx.setSenderName("Remetente");
-            tx.setSenderBankCode("DogBank");
+            tx.setSenderName(remetenteNome);
+            tx.setSenderBankCode(remetenteBanco);
             tx.setSenderAgency("");
-            tx.setSenderAccountNumber("");
+            tx.setSenderAccountNumber(remetenteConta);
             tx.setDescription("PIX para " + userDest.getNome());
             
             Transaction saved = transactionRepository.save(tx);
@@ -268,7 +297,12 @@ public class TransactionService {
                 bancoDestino,
                 saldoAntes,
                 saldoDepois,
-                durationMs
+                durationMs,
+                remetenteNome,
+                remetenteCpf,
+                remetenteBanco,
+                remetenteConta,
+                remetenteChavePix
             );
             
             MDC.put("evento", "PIX_CONCLUIDO");
@@ -293,8 +327,8 @@ public class TransactionService {
                     .status("COMPLETED")
                     .retryCount(0)
                     .correlationId(UUID.randomUUID().toString())
-                    .sourceUserName("Remetente")
-                    .sourceUserEmail("")
+                    .sourceUserName(remetenteNome)
+                    .sourceUserEmail(userOrigin != null && userOrigin.getEmail() != null ? userOrigin.getEmail() : "")
                     .destinationUserName(userDest.getNome())
                     .destinationUserEmail(userDest.getEmail() != null ? userDest.getEmail() : "")
                     .build();
@@ -498,6 +532,16 @@ public class TransactionService {
         }
         return "****";
     }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "";
+    }
     
     // ==================== Métodos de integração com outros serviços ====================
     
@@ -530,6 +574,17 @@ public class TransactionService {
             return response.getBody();
         } catch (Exception e) {
             log.error("Erro ao buscar usuário por chave PIX: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private UserModel getUserById(Long userId) {
+        try {
+            String url = authServiceUrl + "/api/users/" + userId;
+            ResponseEntity<UserModel> response = restTemplate.getForEntity(url, UserModel.class);
+            return response.getBody();
+        } catch (Exception e) {
+            log.error("Erro ao buscar usuário por ID: {}", e.getMessage());
             return null;
         }
     }

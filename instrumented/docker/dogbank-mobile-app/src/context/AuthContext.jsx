@@ -4,6 +4,7 @@ import authService from '../services/authService'; // ajuste o caminho conforme 
 import {
   clearProductUser,
   identifyProductUser,
+  stopProductSession,
   trackProductAction,
 } from '../utils/productAnalytics';
 
@@ -108,6 +109,7 @@ export const AuthProvider = ({ children }) => {
     trackProductAction('dogbank.logout', {
       logout_source: 'auth_context',
     });
+    stopProductSession();
   };
 
   // Permite atualizar parcialmente o objeto user (por exemplo, mudar nome ou CPF)

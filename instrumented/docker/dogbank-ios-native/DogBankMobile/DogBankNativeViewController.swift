@@ -1172,6 +1172,10 @@ final class DogBankNativeViewController: UIViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        if UserDefaults.standard.bool(forKey: "dogbank.skip_auto_login_once") {
+            UserDefaults.standard.removeObject(forKey: "dogbank.skip_auto_login_once")
+            return
+        }
         guard isAutoLoginEnabled, !didAutoLogin else {
             return
         }
@@ -3703,6 +3707,15 @@ private final class ProfileViewController: UIViewController {
     private let session: DogBankSession
     private let api: DogBankAPI
     private let accountStack = UIStackView()
+    private lazy var logoutButton: DogBankButton = {
+        let button = DogBankButton(title: "Sair", systemImage: "rectangle.portrait.and.arrow.right", filled: false)
+        var configuration = button.configuration
+        configuration?.baseForegroundColor = DogBankTheme.red
+        configuration?.baseBackgroundColor = DogBankTheme.red.withAlphaComponent(0.10)
+        button.configuration = configuration
+        button.addTarget(self, action: #selector(logoutTapped), for: .touchUpInside)
+        return button
+    }()
 
     init(session: DogBankSession, api: DogBankAPI) {
         self.session = session
@@ -3760,6 +3773,39 @@ private final class ProfileViewController: UIViewController {
         accountStack.spacing = 12
         stack.addArrangedSubview(purpleCard)
         stack.addArrangedSubview(card([accountStack]))
+        stack.addArrangedSubview(logoutButton)
+    }
+
+    @objc private func logoutTapped() {
+        logoutButton.isEnabled = false
+        dogbankTrack("dogbank.native.logout.tapped", attributes: [
+            "account_id": session.accountID,
+            "source": "profile"
+        ])
+        dogbankLogger?.info("dogbank.native.logout", attributes: [
+            "account_id": session.accountID,
+            "source": "profile"
+        ])
+
+        UserDefaults.standard.removeObject(forKey: "dogbank.last_demo_cpf")
+        UserDefaults.standard.set(true, forKey: "dogbank.skip_auto_login_once")
+        RUMMonitor.shared().stopSession()
+        Datadog.clearUserInfo()
+        Datadog.clearAccountInfo()
+
+        let login = DogBankNativeViewController()
+        login.modalPresentationStyle = .fullScreen
+
+        guard let window = view.window else {
+            present(login, animated: true)
+            return
+        }
+
+        UIView.transition(with: window, duration: 0.22, options: .transitionCrossDissolve) {
+            window.rootViewController = login
+        } completion: { _ in
+            window.makeKeyAndVisible()
+        }
     }
 
     private func refresh() {

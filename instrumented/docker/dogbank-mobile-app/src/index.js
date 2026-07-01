@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import './styles/tailwind.css';
 import './index.css';
+import './observability/datadog';
 import App from './App.jsx';
 import reportWebVitals from './reportWebVitals';
 

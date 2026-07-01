@@ -33,6 +33,19 @@ public class PixBusinessMetrics {
      * Registra o início de uma transferência PIX
      */
     public void registrarPixIniciado(Long contaOrigemId, String chavePix, BigDecimal valor) {
+        registrarPixIniciado(contaOrigemId, chavePix, valor, null, null, null, null, null);
+    }
+
+    public void registrarPixIniciado(
+            Long contaOrigemId,
+            String chavePix,
+            BigDecimal valor,
+            String remetenteNome,
+            String remetenteCpf,
+            String remetenteBanco,
+            String remetenteConta,
+            String remetenteChavePix
+    ) {
         try {
             MDC.put("evento", "pix.transferencia.iniciada");
             MDC.put("conta_origem_id", contaOrigemId.toString());
@@ -42,6 +55,7 @@ public class PixBusinessMetrics {
             MDC.put("tipo_chave", identificarTipoChave(chavePix));
             MDC.put("timestamp", ZonedDateTime.now().format(ISO_FORMATTER));
             MDC.put("faixa_valor", classificarFaixaValor(valor));
+            adicionarRemetenteMDC(remetenteNome, remetenteCpf, remetenteBanco, remetenteConta, remetenteChavePix);
             
             metricsLog.info("PIX_INICIADO valor={} chave={} tipo={}", 
                 formatarValor(valor), maskChavePix(chavePix), identificarTipoChave(chavePix));
@@ -65,6 +79,42 @@ public class PixBusinessMetrics {
             BigDecimal saldoDepois,
             long duracaoMs
     ) {
+        registrarPixSucesso(
+            transactionId,
+            contaOrigemId,
+            contaDestinoId,
+            chavePix,
+            valor,
+            nomeDestinatario,
+            bancoDestinatario,
+            saldoAntes,
+            saldoDepois,
+            duracaoMs,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+    }
+
+    public void registrarPixSucesso(
+            Long transactionId,
+            Long contaOrigemId,
+            Long contaDestinoId,
+            String chavePix,
+            BigDecimal valor,
+            String nomeDestinatario,
+            String bancoDestinatario,
+            BigDecimal saldoAntes,
+            BigDecimal saldoDepois,
+            long duracaoMs,
+            String remetenteNome,
+            String remetenteCpf,
+            String remetenteBanco,
+            String remetenteConta,
+            String remetenteChavePix
+    ) {
         try {
             MDC.put("evento", "pix.transferencia.sucesso");
             MDC.put("transaction_id", transactionId.toString());
@@ -85,6 +135,7 @@ public class PixBusinessMetrics {
             MDC.put("pix_falha", "false");
             MDC.put("faixa_valor", classificarFaixaValor(valor));
             MDC.put("faixa_duracao", classificarFaixaDuracao(duracaoMs));
+            adicionarRemetenteMDC(remetenteNome, remetenteCpf, remetenteBanco, remetenteConta, remetenteChavePix);
             
             metricsLog.info("PIX_SUCESSO id={} valor={} destino={} banco={} duracao={}ms", 
                 transactionId, formatarValor(valor), nomeDestinatario, bancoDestinatario, duracaoMs);
@@ -105,6 +156,36 @@ public class PixBusinessMetrics {
             String tipoErro,
             long duracaoMs
     ) {
+        registrarPixFalha(
+            contaOrigemId,
+            chavePix,
+            valor,
+            codigoErro,
+            mensagemErro,
+            tipoErro,
+            duracaoMs,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+    }
+
+    public void registrarPixFalha(
+            Long contaOrigemId,
+            String chavePix,
+            BigDecimal valor,
+            String codigoErro,
+            String mensagemErro,
+            String tipoErro,
+            long duracaoMs,
+            String remetenteNome,
+            String remetenteCpf,
+            String remetenteBanco,
+            String remetenteConta,
+            String remetenteChavePix
+    ) {
         try {
             MDC.put("evento", "pix.transferencia.falha");
             MDC.put("conta_origem_id", contaOrigemId.toString());
@@ -121,6 +202,7 @@ public class PixBusinessMetrics {
             MDC.put("pix_sucesso", "false");
             MDC.put("pix_falha", "true");
             MDC.put("faixa_valor", classificarFaixaValor(valor));
+            adicionarRemetenteMDC(remetenteNome, remetenteCpf, remetenteBanco, remetenteConta, remetenteChavePix);
             
             metricsLog.error("PIX_FALHA erro={} codigo={} valor={} chave={}", 
                 tipoErro, codigoErro, formatarValor(valor), maskChavePix(chavePix));
@@ -226,6 +308,26 @@ public class PixBusinessMetrics {
                 return chavePix.substring(0, 4) + "****" + chavePix.substring(chavePix.length() - 2);
             default:
                 return chavePix.substring(0, 4) + "****";
+        }
+    }
+
+    private void adicionarRemetenteMDC(
+            String nome,
+            String cpf,
+            String banco,
+            String conta,
+            String chavePix
+    ) {
+        putIfPresent("remetente_nome", nome);
+        putIfPresent("remetente_cpf", cpf);
+        putIfPresent("remetente_banco", banco);
+        putIfPresent("remetente_conta", conta);
+        putIfPresent("remetente_chave_pix", chavePix);
+    }
+
+    private void putIfPresent(String key, String value) {
+        if (value != null && !value.isBlank()) {
+            MDC.put(key, value);
         }
     }
     
