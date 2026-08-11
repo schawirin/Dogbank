@@ -88,3 +88,10 @@ spec:
             name: chatbot-service
             port:
               number: 8083
+      - path: /api/evildog
+        pathType: Prefix
+        backend:
+          service:
+            name: evildog-api
+            port:
+              number: 8092

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Zap, FileText, TrendingUp, User, ArrowRight, Shield } from 'lucide-react';
+import { Home, Zap, FileText, TrendingUp, User, ArrowRight, Shield, Skull } from 'lucide-react';
 import Logo from '../common/dogbank-logo';
 
 const menuItems = [
@@ -9,6 +9,7 @@ const menuItems = [
   { label: 'Extrato', icon: FileText, path: '/dashboard/extrato' },
   { label: 'Investimentos', icon: TrendingUp, path: '/dashboard/investimentos' },
   { label: 'Perfil', icon: User, path: '/dashboard/perfil' },
+  { label: 'EvilDog', icon: Skull, path: '/dashboard/evildog' },
 ];
 
 const Sidebar = () => {

@@ -34,7 +34,11 @@ resources:
   - fraud-detection-service.yaml
   - ollama.yaml
   - cache-sync-service.yaml
-  
+
+  # Red-team lab infra (Log4Shell exfiltration listener + attack orchestrator) — demo only
+  - evildog-callback.yaml
+  - evildog-api.yaml
+
   # Frontend
   - frontend.yaml
   - nginx.yaml

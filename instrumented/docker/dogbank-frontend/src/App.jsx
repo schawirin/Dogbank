@@ -18,6 +18,7 @@ import PixConfirmPage from './pages/PixConfirmPage';
 import PixReceiptPage from './pages/PixReceiptPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ProfilePage from './pages/ProfilePage';
+import EvilDogPage from './pages/EvilDogPage';
 import Chatbot from './components/Chatbot';
 
 const AppContent = () => {
@@ -40,6 +41,7 @@ const AppContent = () => {
           <Route path="investimentos" element={<InvestmentsPage />} />
           <Route path="cartoes" element={<CardsPage />} />
           <Route path="perfil" element={<ProfilePage />} />
+          <Route path="evildog" element={<EvilDogPage />} />
 
           {/* Fluxo PIX - rotas aninhadas dentro de /dashboard */}
           <Route path="pix" element={<PixTransferPage />} />
@@ -59,6 +61,7 @@ const AppContent = () => {
         <Route path="/extrato" element={<Navigate to="/dashboard/extrato" replace />} />
         <Route path="/perfil" element={<Navigate to="/dashboard/perfil" replace />} />
         <Route path="/profile" element={<Navigate to="/dashboard/perfil" replace />} />
+        <Route path="/evildog" element={<Navigate to="/dashboard/evildog" replace />} />
       </Routes>
     </>
   );

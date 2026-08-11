@@ -1,0 +1,66 @@
+/* =============================================================================
+   EvilDog tab — dark "attack console" theme (namespaced .evd-*)
+   Self-contained: the DogBank app has no dark theme layer, so this page paints
+   its own ground and animations. All selectors are prefixed to avoid leaking
+   into the light app (global CSS scope).
+   ============================================================================= */
+
+.evd-root {
+  --evd-bg: #0a0e14;
+  --evd-panel: #0f151d;
+  --evd-panel-2: #131b25;
+  --evd-line: #1e2733;
+  --evd-line-2: #2a3646;
+  --evd-ink: #e2e8f0;
+  --evd-muted: #64748b;
+  --evd-green: #22c55e;
+  --evd-red: #ef4444;
+  --evd-amber: #f59e0b;
+  --evd-orange: #fb923c;
+  --evd-cyan: #38bdf8;
+  color: var(--evd-ink);
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(34,197,94,0.06), transparent 60%),
+    radial-gradient(900px 500px at 0% 110%, rgba(239,68,68,0.06), transparent 60%),
+    var(--evd-bg);
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+}
+
+/* faint terminal grid */
+.evd-grid {
+  background-image:
+    linear-gradient(rgba(148,163,184,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148,163,184,0.05) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+
+.evd-blink { animation: evd-blink 1.05s steps(2, start) infinite; }
+@keyframes evd-blink { to { opacity: 0; } }
+
+.evd-node-active {
+  animation: evd-pulse 1.4s ease-in-out infinite;
+}
+@keyframes evd-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+  50% { box-shadow: 0 0 14px 1px currentColor; opacity: .85; }
+}
+
+.evd-scan {
+  position: absolute; left: 0; right: 0; height: 2px; top: 0;
+  background: linear-gradient(90deg, transparent, rgba(34,197,94,0.55), transparent);
+  animation: evd-scan 3.2s linear infinite;
+}
+@keyframes evd-scan { 0% { top: 0; } 100% { top: 100%; } }
+
+.evd-feed-enter { animation: evd-feed-in .25s ease-out; }
+@keyframes evd-feed-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* thin dark scrollbar inside the console */
+.evd-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.evd-scroll::-webkit-scrollbar-track { background: transparent; }
+.evd-scroll::-webkit-scrollbar-thumb { background: #22303f; border-radius: 8px; }
+.evd-scroll::-webkit-scrollbar-thumb:hover { background: #2f4053; }
+
+@media (prefers-reduced-motion: reduce) {
+  .evd-blink, .evd-node-active, .evd-scan, .evd-feed-enter { animation: none; }
+}

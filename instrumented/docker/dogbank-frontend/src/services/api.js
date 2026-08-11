@@ -132,6 +132,15 @@ export const investmentApi = axios.create({
   }
 });
 
+// EvilDog attack orchestrator (lab-only). SSE stream is consumed separately via EventSource.
+export const evildogApi = axios.create({
+  baseURL: apiPath('/api/evildog'),
+  timeout: 30000, // attacks (sqlmap-style exfil, brute force) can take a few seconds
+  headers: {
+    'Content-Type': 'application/json',
+  }
+});
+
 // DEBUG: Verificar configurações das instâncias
 console.log('🔧 Configurações das APIs:', {
   apiBaseUrl: API_BASE_URL || '(relative)',
@@ -148,7 +157,7 @@ console.log('🔧 Configurações das APIs:', {
 const sharedRequestInterceptor = api.interceptors.request.handlers[0];
 const sharedResponseInterceptor = api.interceptors.response.handlers[0];
 
-[authApi, accountApi, transactionApi, integrationApi, notificationApi, bancoCentralApi, investmentApi].forEach(instance => {
+[authApi, accountApi, transactionApi, integrationApi, notificationApi, bancoCentralApi, investmentApi, evildogApi].forEach(instance => {
   instance.interceptors.request.use(
     sharedRequestInterceptor.fulfilled,
     sharedRequestInterceptor.rejected

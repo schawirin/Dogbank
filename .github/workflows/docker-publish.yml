@@ -68,6 +68,15 @@ jobs:
             context: ./instrumented/docker/dogbank
             dockerfile: ./instrumented/docker/dogbank/notification-module/Dockerfile
             image: schawirin/dogbank-notification-service
+          # EvilDog lab (LAB ONLY): callback listener + attack orchestrator API
+          - name: evildog-callback
+            context: ./instrumented/docker/dogbank/evildog-callback
+            dockerfile: ./instrumented/docker/dogbank/evildog-callback/Dockerfile
+            image: schawirin/dogbank-evildog-callback
+          - name: evildog-api
+            context: ./instrumented/docker/dogbank/evildog-api
+            dockerfile: ./instrumented/docker/dogbank/evildog-api/Dockerfile
+            image: schawirin/dogbank-evildog-api
 
     steps:
       - uses: actions/checkout@v4
@@ -186,6 +195,10 @@ jobs:
 
           # Restart load-generator
           kubectl rollout restart deployment/load-generator -n dogbank || true
+
+          # Restart EvilDog lab services (pull rebuilt :latest images)
+          kubectl rollout restart deployment/evildog-callback -n dogbank || true
+          kubectl rollout restart deployment/evildog-api -n dogbank || true
 
           echo "✅ All deployments restarted"
 
