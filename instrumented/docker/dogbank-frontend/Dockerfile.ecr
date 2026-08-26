@@ -1,0 +1,8 @@
+# Minimal frontend image for the podman->ECR live deploy.
+# Serves the locally-compiled SPA (build/, includes the EvilDog tab) on nginx:80,
+# matching the CI Dockerfile's runtime. Base pulled from ECR Public (Docker Hub
+# is blocked from the podman VM). Temporary — CI's Docker Hub image is canonical.
+FROM public.ecr.aws/docker/library/nginx:stable-alpine
+COPY build /usr/share/nginx/html
+COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80

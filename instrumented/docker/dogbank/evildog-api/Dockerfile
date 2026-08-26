@@ -15,7 +15,8 @@ LABEL org.opencontainers.image.title="evildog-api" \
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
+# Ferramentas hacker REAIS usadas pelos estágios do pipeline (nmap = recon/scan, sqlmap = detect)
+RUN apt-get update && apt-get install -y --no-install-recommends curl nmap sqlmap \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

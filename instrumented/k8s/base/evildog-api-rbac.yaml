@@ -1,0 +1,45 @@
+# =============================================================================
+# EvilDog API — least-privilege RBAC for real escalate (ephemeral attacker Jobs)
+# -----------------------------------------------------------------------------
+# evildog-api needs to create/watch/delete short-lived batch/v1 Jobs (one per
+# escalation branch) and read their Pods to report phase transitions. It does
+# NOT need pods/exec, pods/attach, pods/log, secrets, configmaps, apps/*, or
+# any rbac.authorization.k8s.io/* permissions — keep this Role exactly this
+# narrow (deliberate least-privilege design, reviewed with the user).
+# =============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: evildog-api
+  namespace: dogbank
+  labels:
+    app: evildog-api
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: evildog-agent-orchestrator
+  namespace: dogbank
+  labels:
+    app: evildog-api
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: evildog-agent-orchestrator
+  namespace: dogbank
+subjects:
+  - kind: ServiceAccount
+    name: evildog-api
+    namespace: dogbank
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: evildog-agent-orchestrator
