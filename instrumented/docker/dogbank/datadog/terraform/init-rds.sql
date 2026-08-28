@@ -22,11 +22,14 @@ CREATE TABLE IF NOT EXISTS usuarios (
     email VARCHAR(100) UNIQUE,
     chave_pix VARCHAR(100) UNIQUE,
     blocked BOOLEAN NOT NULL DEFAULT false,
+    mfa BOOLEAN NOT NULL DEFAULT false,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Migration idempotente para clusters ja inicializados (sem 'blocked')
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS blocked BOOLEAN NOT NULL DEFAULT false;
+-- MFA: contas com MFA resistem ao ATO por senha direta (demo EvilDog)
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS mfa BOOLEAN NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS contas (
     id SERIAL PRIMARY KEY,
@@ -75,13 +78,26 @@ ON CONFLICT (cpf) DO NOTHING;
 -- Create accounts
 INSERT INTO contas (usuario_id, numero_conta, saldo, banco, user_name) VALUES
 ((SELECT id FROM usuarios WHERE cpf='12345678915'), '0001-9', 10000.00, 'DOG BANK', 'Vitoria Itadori'),
-((SELECT id FROM usuarios WHERE cpf='98765432101'), '0002-1', 15000.00, 'Banco do Brasil', 'Pedro Silva'),
-((SELECT id FROM usuarios WHERE cpf='45678912302'), '0003-2', 8500.00, 'Itaú', 'João Santos'),
-((SELECT id FROM usuarios WHERE cpf='78912345603'), '0004-3', 12000.00, 'Santander', 'Emiliano Costa'),
-((SELECT id FROM usuarios WHERE cpf='32165498704'), '0005-4', 9500.00, 'Bradesco', 'Eliane Oliveira'),
-((SELECT id FROM usuarios WHERE cpf='65498732105'), '0006-5', 20000.00, 'Nubank', 'Patrícia Souza'),
+((SELECT id FROM usuarios WHERE cpf='98765432101'), '0002-1', 15000.00, 'BearBank', 'Pedro Silva'),
+((SELECT id FROM usuarios WHERE cpf='45678912302'), '0003-2', 8500.00, 'CatBank', 'João Santos'),
+((SELECT id FROM usuarios WHERE cpf='78912345603'), '0004-3', 12000.00, 'BatBank', 'Emiliano Costa'),
+((SELECT id FROM usuarios WHERE cpf='32165498704'), '0005-4', 9500.00, 'FoxBank', 'Eliane Oliveira'),
+((SELECT id FROM usuarios WHERE cpf='65498732105'), '0006-5', 20000.00, 'WolfBank', 'Patrícia Souza'),
 ((SELECT id FROM usuarios WHERE cpf='15975385206'), '0007-6', 7500.00, 'DOG BANK', 'Renato Almeida'),
 ((SELECT id FROM usuarios WHERE cpf='66666666666'), '0008-7', 50000.00, 'DOG BANK', 'Usuário Teste')
+ON CONFLICT (numero_conta) DO NOTHING;
+
+-- MFA habilitado em parte das contas: pedro.silva, patrícia.souza, renato.almeida.
+-- As demais ficam "fáceis" (sem MFA) → o ATO por senha roubada só funciona nelas.
+UPDATE usuarios SET mfa = true WHERE cpf IN ('98765432101', '65498732105', '15975385206');
+
+-- EvilDog mule / conta-laranja (demo de salami slicing / money mule).
+-- Destino dos micro-PIX do robô do EvilDog; chave 'evildog@dogbank.com'.
+INSERT INTO usuarios (cpf, senha, nome, email, chave_pix) VALUES
+('11199988877', '123456', 'EvilDog Mule', 'evildog@dogbank.com', 'evildog@dogbank.com')
+ON CONFLICT (cpf) DO NOTHING;
+INSERT INTO contas (usuario_id, numero_conta, saldo, banco, user_name) VALUES
+((SELECT id FROM usuarios WHERE cpf='11199988877'), '9999-9', 0.00, 'DOG BANK', 'EvilDog Mule')
 ON CONFLICT (numero_conta) DO NOTHING;
 
 -- Create indexes for performance

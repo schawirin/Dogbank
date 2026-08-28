@@ -12,7 +12,7 @@ Este é o frontend do projeto DogBank, um sistema bancário moderno para simula�
 ## 🎨 Design
 
 O design do DogBank segue as seguintes características:
-- Inspirado no layout do C6 Bank
+- Inspirado no layout do BatBank
 - Cores da Datadog (tons de roxo como cor principal)
 - Interface limpa e moderna
 - Foco na experiência mobile-first

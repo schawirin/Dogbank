@@ -132,11 +132,11 @@ INSERT INTO usuarios (cpf, senha, nome, email, chave_pix) VALUES
 -- COAF: Transações >= R$ 50.000,00 devem ser reportadas
 INSERT INTO contas (usuario_id, numero_conta, saldo, banco, user_name) VALUES
 ((SELECT id FROM usuarios WHERE cpf='12345678915'), '0001-9', 10000.00, 'DOG BANK', 'Vitoria Itadori'),
-((SELECT id FROM usuarios WHERE cpf='98765432101'), '0002-1', 15000.00, 'Banco do Brasil', 'Pedro Silva'),
-((SELECT id FROM usuarios WHERE cpf='45678912302'), '0003-2', 8500.00, 'Itau', 'Joao Santos'),
-((SELECT id FROM usuarios WHERE cpf='78912345603'), '0004-3', 12000.00, 'Santander', 'Emiliano Costa'),
-((SELECT id FROM usuarios WHERE cpf='32165498704'), '0005-4', 9500.00, 'Bradesco', 'Eliane Oliveira'),
-((SELECT id FROM usuarios WHERE cpf='65498732105'), '0006-5', 20000.00, 'Nubank', 'Patricia Souza'),
+((SELECT id FROM usuarios WHERE cpf='98765432101'), '0002-1', 15000.00, 'BearBank', 'Pedro Silva'),
+((SELECT id FROM usuarios WHERE cpf='45678912302'), '0003-2', 8500.00, 'CatBank', 'Joao Santos'),
+((SELECT id FROM usuarios WHERE cpf='78912345603'), '0004-3', 12000.00, 'BatBank', 'Emiliano Costa'),
+((SELECT id FROM usuarios WHERE cpf='32165498704'), '0005-4', 9500.00, 'FoxBank', 'Eliane Oliveira'),
+((SELECT id FROM usuarios WHERE cpf='65498732105'), '0006-5', 20000.00, 'WolfBank', 'Patricia Souza'),
 ((SELECT id FROM usuarios WHERE cpf='15975385206'), '0007-6', 7500.00, 'DOG BANK', 'Renato Almeida'),
 ((SELECT id FROM usuarios WHERE cpf='66666666666'), '0008-7', 50000.00, 'DOG BANK', 'Usuario Teste'),
 -- Contas com saldo alto para testar COAF (>= R$ 100.000,00)
@@ -147,11 +147,11 @@ INSERT INTO contas (usuario_id, numero_conta, saldo, banco, user_name) VALUES
 -- VERIFICAR E ATUALIZAR SALDOS (garantia extra)
 -- =============================================================================
 UPDATE contas SET saldo = 10000.00, banco = 'DOG BANK', user_name = 'Vitoria Itadori' WHERE numero_conta = '0001-9';
-UPDATE contas SET saldo = 15000.00, banco = 'Banco do Brasil', user_name = 'Pedro Silva' WHERE numero_conta = '0002-1';
-UPDATE contas SET saldo = 8500.00, banco = 'Itau', user_name = 'Joao Santos' WHERE numero_conta = '0003-2';
-UPDATE contas SET saldo = 12000.00, banco = 'Santander', user_name = 'Emiliano Costa' WHERE numero_conta = '0004-3';
-UPDATE contas SET saldo = 9500.00, banco = 'Bradesco', user_name = 'Eliane Oliveira' WHERE numero_conta = '0005-4';
-UPDATE contas SET saldo = 20000.00, banco = 'Nubank', user_name = 'Patricia Souza' WHERE numero_conta = '0006-5';
+UPDATE contas SET saldo = 15000.00, banco = 'BearBank', user_name = 'Pedro Silva' WHERE numero_conta = '0002-1';
+UPDATE contas SET saldo = 8500.00, banco = 'CatBank', user_name = 'Joao Santos' WHERE numero_conta = '0003-2';
+UPDATE contas SET saldo = 12000.00, banco = 'BatBank', user_name = 'Emiliano Costa' WHERE numero_conta = '0004-3';
+UPDATE contas SET saldo = 9500.00, banco = 'FoxBank', user_name = 'Eliane Oliveira' WHERE numero_conta = '0005-4';
+UPDATE contas SET saldo = 20000.00, banco = 'WolfBank', user_name = 'Patricia Souza' WHERE numero_conta = '0006-5';
 UPDATE contas SET saldo = 7500.00, banco = 'DOG BANK', user_name = 'Renato Almeida' WHERE numero_conta = '0007-6';
 UPDATE contas SET saldo = 50000.00, banco = 'DOG BANK', user_name = 'Usuario Teste' WHERE numero_conta = '0008-7';
 -- Contas com saldo alto para testar COAF

@@ -137,11 +137,11 @@ data:
     -- Criar contas
     INSERT INTO contas (usuario_id, numero_conta, saldo, banco, user_name) VALUES
     ((SELECT id FROM usuarios WHERE cpf='12345678915'), '0001-9', 10000.00, 'DOG BANK', 'Vitoria Itadori'),
-    ((SELECT id FROM usuarios WHERE cpf='98765432101'), '0002-1', 15000.00, 'Banco do Brasil', 'Pedro Silva'),
-    ((SELECT id FROM usuarios WHERE cpf='45678912302'), '0003-2', 8500.00, 'Itaú', 'João Santos'),
-    ((SELECT id FROM usuarios WHERE cpf='78912345603'), '0004-3', 12000.00, 'Santander', 'Emiliano Costa'),
-    ((SELECT id FROM usuarios WHERE cpf='32165498704'), '0005-4', 9500.00, 'Bradesco', 'Eliane Oliveira'),
-    ((SELECT id FROM usuarios WHERE cpf='65498732105'), '0006-5', 20000.00, 'Nubank', 'Patrícia Souza'),
+    ((SELECT id FROM usuarios WHERE cpf='98765432101'), '0002-1', 15000.00, 'BearBank', 'Pedro Silva'),
+    ((SELECT id FROM usuarios WHERE cpf='45678912302'), '0003-2', 8500.00, 'CatBank', 'João Santos'),
+    ((SELECT id FROM usuarios WHERE cpf='78912345603'), '0004-3', 12000.00, 'BatBank', 'Emiliano Costa'),
+    ((SELECT id FROM usuarios WHERE cpf='32165498704'), '0005-4', 9500.00, 'FoxBank', 'Eliane Oliveira'),
+    ((SELECT id FROM usuarios WHERE cpf='65498732105'), '0006-5', 20000.00, 'WolfBank', 'Patrícia Souza'),
     ((SELECT id FROM usuarios WHERE cpf='15975385206'), '0007-6', 7500.00, 'DOG BANK', 'Renato Almeida'),
     ((SELECT id FROM usuarios WHERE cpf='66666666666'), '0008-7', 50000.00, 'DOG BANK', 'Usuário Teste');
     

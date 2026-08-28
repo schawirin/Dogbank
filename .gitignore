@@ -40,3 +40,7 @@ Thumbs.db
 .playwright-cli/
 finops-output/
 instrumented/docker/dogbank/data-observability-poc/
+
+# Python bytecode cache
+__pycache__/
+*.pyc

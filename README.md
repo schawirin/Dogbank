@@ -116,11 +116,11 @@ open http://localhost
 | # | Name | CPF | Password | Balance | Bank | PIX Key | Account |
 |---|------|-----|----------|---------|------|---------|---------|
 | 1 | Vitoria Itadori | 12345678915 | 123456 | R$ 10,000.00 | DOG BANK | vitoria.itadori@dogbank.com | 0001-9 |
-| 2 | Pedro Silva | 98765432101 | 123456 | R$ 15,000.00 | Banco do Brasil | pedro.silva@dogbank.com | 0002-1 |
-| 3 | João Santos | 45678912302 | 123456 | R$ 8,500.00 | Itaú | joao.santos@dogbank.com | 0003-2 |
-| 4 | Emiliano Costa | 78912345603 | 123456 | R$ 12,000.00 | Santander | emiliano.costa@dogbank.com | 0004-3 |
-| 5 | Eliane Oliveira | 32165498704 | 123456 | R$ 9,500.00 | Bradesco | eliane.oliveira@dogbank.com | 0005-4 |
-| 6 | Patrícia Souza | 65498732105 | 123456 | R$ 20,000.00 | Nubank | patricia.souza@dogbank.com | 0006-5 |
+| 2 | Pedro Silva | 98765432101 | 123456 | R$ 15,000.00 | BearBank | pedro.silva@dogbank.com | 0002-1 |
+| 3 | João Santos | 45678912302 | 123456 | R$ 8,500.00 | CatBank | joao.santos@dogbank.com | 0003-2 |
+| 4 | Emiliano Costa | 78912345603 | 123456 | R$ 12,000.00 | BatBank | emiliano.costa@dogbank.com | 0004-3 |
+| 5 | Eliane Oliveira | 32165498704 | 123456 | R$ 9,500.00 | FoxBank | eliane.oliveira@dogbank.com | 0005-4 |
+| 6 | Patrícia Souza | 65498732105 | 123456 | R$ 20,000.00 | WolfBank | patricia.souza@dogbank.com | 0006-5 |
 | 7 | Renato Almeida | 15975385206 | 123456 | R$ 7,500.00 | DOG BANK | renato.almeida@dogbank.com | 0007-6 |
 | 8 | Usuário Teste | 66666666666 | 123456 | R$ 50,000.00 | DOG BANK | teste@dogbank.com | 0008-7 |
 
@@ -238,7 +238,7 @@ http://localhost/api/transactions/validate-pix-key?pixKey=' OR '1'='1
       "email": "pedro.silva@dogbank.com",
       "cpf": "98765432101",
       "saldo": "R$ 15000.00",
-      "banco": "Banco do Brasil",
+      "banco": "BearBank",
       "chave_pix": "pedro.silva@dogbank.com"
     },
     // ... all 8 users with CPF and balances!
@@ -260,7 +260,7 @@ curl "http://localhost/api/transactions/validate-pix-key?pixKey=' OR email='pedr
   "valid": true,
   "nome": "Pedro Silva",
   "saldo": "R$ 15000.00",
-  "banco": "Banco do Brasil"
+  "banco": "BearBank"
 }
 ```
 

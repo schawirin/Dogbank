@@ -5,7 +5,7 @@ Brazilian clients so the SQL-injection `--dump` in the EBC masterclass lands har
 
 - CPFs use valid check digits (standard for test fixtures), generated from random
   bases — these are fabricated, not real people.
-- Names/banks/PIX keys look realistic (Nubank, Itau, Neon, ...) to sell the demo.
+- Names/banks/PIX keys look realistic (WolfBank, CatBank, BearBank, ...) to sell the demo.
 - Every user gets a matching `contas` row so the UNION-based SQLi
   (SELECT ... FROM usuarios u JOIN contas c ON u.id=c.usuario_id) returns them.
 
@@ -29,8 +29,8 @@ LAST = [
     "Araújo", "Fernandes", "Barbosa", "Rocha", "Dias", "Nascimento", "Moreira", "Cardoso",
 ]
 BANKS = [
-    "Nubank", "Itau", "Bradesco", "Santander", "Banco do Brasil", "Caixa",
-    "Banco Inter", "C6 Bank", "Neon", "PicPay", "DOG BANK",
+    "WolfBank", "CatBank", "FoxBank", "BatBank", "BearBank", "BearBank",
+    "CatBank", "BatBank", "BearBank", "CatBank", "DOG BANK",
 ]
 PIX_PROVIDERS = ["gmail.com", "hotmail.com", "outlook.com", "uol.com.br", "yahoo.com.br"]
 

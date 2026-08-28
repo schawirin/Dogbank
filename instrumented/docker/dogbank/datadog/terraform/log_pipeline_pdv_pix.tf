@@ -61,7 +61,7 @@ resource "datadog_logs_custom_pipeline" "pdv_pix" {
       }
 
       samples = [
-        "ERROR: [06/03/2026 13:42:33] [PDV=005][PIX][PAGAMENTO] Pagamento PIX REJEITADO pelo PSP txid=PIX202603061342336266005 endToEndId=E6070119000000000000000006266 rc=-22 erro=LIMITE_DIARIO_EXCEDIDO msg=Conta do pagador com restricao valor_cents=1111400 banco_pagador=Santander",
+        "ERROR: [06/03/2026 13:42:33] [PDV=005][PIX][PAGAMENTO] Pagamento PIX REJEITADO pelo PSP txid=PIX202603061342336266005 endToEndId=E6070119000000000000000006266 rc=-22 erro=LIMITE_DIARIO_EXCEDIDO msg=Conta do pagador com restricao valor_cents=1111400 banco_pagador=BatBank",
         "[06/03/2026 13:42:33] [PDV=003][PIX] Iniciando transacao PIX valor=7361 chave=cpf:666.555.444-33 txid=PIX202603061342336265003 nsu=891559",
         "[06/03/2026 13:42:33] [PDV=003][VENDA][FINALIZADA] COO=6227 valor_total_cents=3821100 forma_pagamento=PIX nsu=891554 cupom_fiscal=OK",
         "ERROR: [06/03/2026 16:52:07] [PDV=005][PIX][TRANSACAO] Transacao PIX BLOQUEADA txid=PIX202603061652076827005 motivo=ANTIFRAUDE rc=-99 valor_cents=7101600"

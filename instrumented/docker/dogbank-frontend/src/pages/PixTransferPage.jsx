@@ -15,13 +15,13 @@ const DEFAULT_RECIPIENTS = [
   {
     name: 'Pedro Silva',
     pixKey: 'pedro.silva@dogbank.com',
-    bank: 'Banco do Brasil',
+    bank: 'BearBank',
     defaultAmount: 50,
   },
   {
     name: 'Eliane Oliveira',
     pixKey: 'eliane.oliveira@dogbank.com',
-    bank: 'Bradesco',
+    bank: 'FoxBank',
     defaultAmount: 82.86,
   },
   {
