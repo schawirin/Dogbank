@@ -287,7 +287,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /proc/:/host/proc/:ro
       - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      # Comentado temporariamente: caminho específico do Docker Engine no Linux,
+      # não existe nesse formato na VM do podman (rootless) e quebra a criação
+      # do container com "permission denied". Reabilitar ao voltar pro Docker
+      # Desktop -- a coleta de logs via docker.sock continua funcionando sem isso.
+      # - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - ./datadog/conf.d/postgres.d/conf.yaml:/etc/datadog-agent/conf.d/postgres.d/conf.yaml:ro
       - ./datadog/conf.d/kafka.d/conf.yaml:/etc/datadog-agent/conf.d/kafka.d/conf.yaml:ro
       - ./datadog/conf.d/kafka_consumer.d/conf.yaml:/etc/datadog-agent/conf.d/kafka_consumer.d/conf.yaml:ro

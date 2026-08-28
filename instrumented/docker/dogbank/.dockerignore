@@ -1,0 +1,17 @@
+# Services with build.context: . in docker-compose.full.yml send this whole
+# directory as the build context -- without this file, that included the
+# unrelated datadog/terraform/.terraform provider cache (1.5G+ of binaries)
+# and every module's Maven target/ output, which was slow enough to break the
+# tar stream mid-transfer (observed as "io: read/write on closed pipe" and a
+# corrupted next build) when building over a podman machine socket.
+
+datadog/terraform/.terraform/
+datadog/terraform/*.tfstate
+datadog/terraform/*.tfstate.backup
+datadog/terraform/*.tfplan
+**/target/
+**/node_modules/
+**/.terraform/
+.git/
+*.log
+.env

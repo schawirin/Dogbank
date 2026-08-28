@@ -8,11 +8,11 @@ FROM maven:3.9-eclipse-temurin-21 AS builder
 
 WORKDIR /app
 
-# Context is parent dir (./instrumented/docker/dogbank), so reference subdir
-COPY pix-worker-module/pom.xml pom.xml
+# Build context is this module's own directory (see docker-compose.full.yml).
+COPY pom.xml pom.xml
 RUN mvn dependency:go-offline -B
 
-COPY pix-worker-module/src src
+COPY src src
 RUN mvn clean package -DskipTests
 
 # =============================================================================
