@@ -57,11 +57,20 @@ CREATE TABLE IF NOT EXISTS usuarios (
     email VARCHAR(100) UNIQUE,
     chave_pix VARCHAR(100) UNIQUE,
     blocked BOOLEAN NOT NULL DEFAULT FALSE,
+    mfa BOOLEAN NOT NULL DEFAULT FALSE,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Keep older persisted demo volumes compatible with the auth service.
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS blocked BOOLEAN NOT NULL DEFAULT FALSE;
+-- MFA: contas com MFA resistem ao ATO por senha direta (demo EvilDog). Só existia
+-- em instrumented/docker/dogbank/datadog/terraform/init-rds.sql (RDS), nunca tinha
+-- sido portado pro seed local -- SQLi do EvilDog quebrava com "column u.mfa does
+-- not exist" ao rodar via docker-compose.
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS mfa BOOLEAN NOT NULL DEFAULT FALSE;
+-- MFA habilitado em parte das contas: pedro.silva, patrícia.souza, renato.almeida.
+-- As demais ficam "fáceis" (sem MFA) → o ATO por senha roubada só funciona nelas.
+UPDATE usuarios SET mfa = true WHERE cpf IN ('98765432101', '65498732105', '15975385206');
 
 -- Tabela de contas
 CREATE TABLE IF NOT EXISTS contas (
