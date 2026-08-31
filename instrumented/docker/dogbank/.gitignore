@@ -4,3 +4,6 @@ target
 *.iml
 .idea
 .env
+
+# mkcert-generated local HTTPS cert/key -- private key, machine-specific
+nginx/certs/
