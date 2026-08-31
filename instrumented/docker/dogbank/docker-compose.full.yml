@@ -452,6 +452,12 @@ services:
       DD_APPSEC_ENABLED: "true"
       DD_IAST_ENABLED: "true"
       DD_APPSEC_RULES: "https://raw.githubusercontent.com/DataDog/appsec-event-rules/main/build/recommended.json"
+      # rotação de IP do EvilDog: o IP spoofado (X-Forwarded-For) vira o
+      # @network.client.ip da denylist -- só existia nos manifests k8s,
+      # nunca tinha sido portado pro compose local.
+      DD_REMOTE_CONFIGURATION_ENABLED: "true"
+      DD_TRACE_CLIENT_IP_ENABLED: "true"
+      DD_TRACE_CLIENT_IP_HEADER: "x-forwarded-for"
     volumes:
       - ./dd-java-agent.jar:/app/dd-java-agent.jar:ro
       - dogbank_logs:/var/log/dogbank
@@ -508,6 +514,12 @@ services:
       # Datadog ASM (Application Security) - Detecta ataques
       DD_APPSEC_ENABLED: "true"
       DD_IAST_ENABLED: "true"
+      # rotação de IP do EvilDog: o IP spoofado (X-Forwarded-For) vira o
+      # @network.client.ip da denylist -- só existia nos manifests k8s,
+      # nunca tinha sido portado pro compose local.
+      DD_REMOTE_CONFIGURATION_ENABLED: "true"
+      DD_TRACE_CLIENT_IP_ENABLED: "true"
+      DD_TRACE_CLIENT_IP_HEADER: "x-forwarded-for"
     volumes:
       - ./dd-java-agent.jar:/app/dd-java-agent.jar:ro
       - dogbank_logs:/var/log/dogbank
@@ -686,6 +698,12 @@ services:
       # Datadog ASM (Application Security) - Detecta ataques
       DD_APPSEC_ENABLED: "true"
       DD_IAST_ENABLED: "true"
+      # rotação de IP do EvilDog: o IP spoofado (X-Forwarded-For) vira o
+      # @network.client.ip da denylist -- só existia nos manifests k8s,
+      # nunca tinha sido portado pro compose local.
+      DD_REMOTE_CONFIGURATION_ENABLED: "true"
+      DD_TRACE_CLIENT_IP_ENABLED: "true"
+      DD_TRACE_CLIENT_IP_HEADER: "x-forwarded-for"
     volumes:
       - ./dd-java-agent.jar:/app/dd-java-agent.jar:ro
       - dogbank_logs:/var/log/dogbank
