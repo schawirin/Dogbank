@@ -203,6 +203,110 @@ scale_service_workflow = {
 }
 
 # =============================================================================
+# Workflow 4: Security signal -> contain the entire no-MFA segment
+# =============================================================================
+# This deliberately does not inspect usr.id. A SQLi signal has no trustworthy
+# user identity, and falling back to a fixed user silently contained the wrong
+# account. The scope of the security-demo response is the vulnerable no-MFA
+# segment, via an HTTP action connection configured to run through a Private
+# Action Runner. The connection injects X-Admin-Token from the runner's local
+# credential file; neither the token nor its template enters this payload.
+#
+# The connection itself is created outside this file because it owns the
+# X-Admin-Token secret. Set DOGBANK_HTTP_CONNECTION_ID to that connection ID;
+# no secret value is rendered, logged, or stored in this repository.
+
+
+def security_segment_containment_workflow(
+    connection_id, handle="dogbank-ato-segment-containment"
+):
+    """Return the versioned DogBank security workflow payload.
+
+    `connectionEnvs` and `connectionLabel` are required for a workflow step to
+    run through the configured HTTP action connection. The
+    response is intentionally persistent: the demo reset is the only place
+    that unblocks the segment.
+    """
+    return {
+        "data": {
+            "type": "workflows",
+            "attributes": {
+                "name": "[DogBank-Sec] ATO Segment Containment",
+                "description": (
+                    "Security Signal response: blocks every DogBank account without MFA. "
+                    "Uses the Private Action Runner HTTP connection; no user-id fallback "
+                    "and no automatic unblock timer."
+                ),
+                "tags": [
+                    "env:dogbank",
+                    "team:security",
+                    "automation:segment-containment",
+                    "attack:ato",
+                ],
+                "spec": {
+                    "handle": handle,
+                    "triggers": [
+                        {
+                            "startStepNames": ["Block_No_MFA"],
+                            "securityTrigger": {},
+                        },
+                        {
+                            # Keeps the security trigger as the production path,
+                            # while allowing deterministic API smoke tests.
+                            "startStepNames": ["Block_No_MFA"],
+                            "apiTrigger": {},
+                        }
+                    ],
+                    "connectionEnvs": [
+                        {
+                            "env": "default",
+                            "connections": [
+                                {
+                                    "connectionId": connection_id,
+                                    "label": "INTEGRATION_HTTP_DOGBANK",
+                                }
+                            ],
+                        }
+                    ],
+                    "steps": [
+                        {
+                            "name": "Block_No_MFA",
+                            "actionId": "com.datadoghq.http.request",
+                            "connectionLabel": "INTEGRATION_HTTP_DOGBANK",
+                            "parameters": [
+                                {"name": "verb", "value": "POST"},
+                                {
+                                    "name": "url",
+                                    "value": (
+                                        "http://auth-service:8088"
+                                        "/api/auth/admin/block-no-mfa"
+                                    ),
+                                },
+                                {
+                                    "name": "requestHeaders",
+                                    "value": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": ["application/json"],
+                                        }
+                                    ],
+                                },
+                                {
+                                    "name": "body",
+                                    "value": {
+                                        "reason": "Datadog security signal auto-remediation"
+                                    },
+                                },
+                            ],
+                            "display": {"bounds": {"x": 0, "y": 192}},
+                        }
+                    ],
+                },
+            },
+        }
+    }
+
+# =============================================================================
 # Main
 # =============================================================================
 
@@ -224,6 +328,22 @@ if __name__ == "__main__":
         ("Rollout Restart All", rollout_restart_workflow),
         ("Scale Service", scale_service_workflow)
     ]
+
+    # Opt in so the legacy infrastructure workflows remain usable without the
+    # security-demo connection. The security workflow is never created against
+    # the cloud runner by accident: the supplied connection owns its base URL,
+    # secret and connection configuration.
+    security_connection_id = os.getenv("DOGBANK_HTTP_CONNECTION_ID", "")
+    if security_connection_id:
+        workflows.append((
+            "ATO Segment Containment",
+            security_segment_containment_workflow(security_connection_id),
+        ))
+    else:
+        print(
+            "ℹ️  Security containment workflow not requested: set "
+            "DOGBANK_HTTP_CONNECTION_ID to provision it."
+        )
 
     created = []
     failed = []

@@ -271,6 +271,12 @@ services:
       # Logs
       DD_LOGS_ENABLED: "true"
       DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL: "true"
+      # Sem isto o agente prefere LER OS ARQUIVOS de log em /var/lib/docker/containers,
+      # que não existem na VM do podman -- as integrações ficavam descobertas mas em
+      # "Status: Pending / Bytes Read: 0" e nenhum log do DogBank chegava no Datadog
+      # (LogsProcessed: 0). Com false ele faz stream pela API do socket, que o podman
+      # implementa. No Docker Engine (arquivos presentes) qualquer um dos dois funciona.
+      DD_LOGS_CONFIG_DOCKER_CONTAINER_USE_FILE: "false"
       # Process monitoring
       DD_PROCESS_AGENT_ENABLED: "true"
       # Container monitoring
@@ -287,10 +293,12 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /proc/:/host/proc/:ro
       - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
-      # Comentado temporariamente: caminho específico do Docker Engine no Linux,
-      # não existe nesse formato na VM do podman (rootless) e quebra a criação
-      # do container com "permission denied". Reabilitar ao voltar pro Docker
-      # Desktop -- a coleta de logs via docker.sock continua funcionando sem isso.
+      # Comentado: caminho específico do Docker Engine no Linux, não existe nesse
+      # formato na VM do podman (rootless) e quebra a criação do container com
+      # "permission denied". Reabilitar ao voltar pro Docker Desktop. Enquanto
+      # estiver comentado, a coleta depende de
+      # DD_LOGS_CONFIG_DOCKER_CONTAINER_USE_FILE=false (acima) -- sem as duas coisas
+      # o agente não coleta log de container nenhum.
       # - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - ./datadog/conf.d/postgres.d/conf.yaml:/etc/datadog-agent/conf.d/postgres.d/conf.yaml:ro
       - ./datadog/conf.d/kafka.d/conf.yaml:/etc/datadog-agent/conf.d/kafka.d/conf.yaml:ro
@@ -434,6 +442,11 @@ services:
       # (/api/auth/lab/log4shell) so EvilDog's Log4Shell exfil works locally.
       DOGBANK_DEMO_LOG4SHELL_ENABLED: "true"
       LOG4J_FORMAT_MSG_NO_LOOKUPS: "false"
+      # Token dos endpoints /api/auth/admin/* (block-user, block-no-mfa), chamados
+      # pelo Workflow de auto-remediação via X-Admin-Token. Não há fallback em
+      # código: configure um valor único no .env e gere a credencial local do
+      # Private Action Runner com ./configure-datadog-par-http-credentials.sh.
+      ADMIN_BLOCK_TOKEN: ${DOGBANK_ADMIN_BLOCK_TOKEN:?DOGBANK_ADMIN_BLOCK_TOKEN must be set}
       # Datadog APM
       DD_AGENT_HOST: datadog-agent
       DD_TRACE_AGENT_PORT: 8126
@@ -452,9 +465,9 @@ services:
       DD_APPSEC_ENABLED: "true"
       DD_IAST_ENABLED: "true"
       DD_APPSEC_RULES: "https://raw.githubusercontent.com/DataDog/appsec-event-rules/main/build/recommended.json"
-      # rotação de IP do EvilDog: o IP spoofado (X-Forwarded-For) vira o
-      # @network.client.ip da denylist -- só existia nos manifests k8s,
-      # nunca tinha sido portado pro compose local.
+      # Rotação de IP do EvilDog: o IP spoofado (X-Forwarded-For) é exposto
+      # pelo tracer como @http.client_ip. @network.client.ip continua sendo
+      # apenas o peer interno da rede Docker/Podman.
       DD_REMOTE_CONFIGURATION_ENABLED: "true"
       DD_TRACE_CLIENT_IP_ENABLED: "true"
       DD_TRACE_CLIENT_IP_HEADER: "x-forwarded-for"
@@ -514,9 +527,8 @@ services:
       # Datadog ASM (Application Security) - Detecta ataques
       DD_APPSEC_ENABLED: "true"
       DD_IAST_ENABLED: "true"
-      # rotação de IP do EvilDog: o IP spoofado (X-Forwarded-For) vira o
-      # @network.client.ip da denylist -- só existia nos manifests k8s,
-      # nunca tinha sido portado pro compose local.
+      # O IP spoofado (X-Forwarded-For) é normalizado pelo tracer em
+      # @http.client_ip; o peer @network.client.ip é interno ao runtime.
       DD_REMOTE_CONFIGURATION_ENABLED: "true"
       DD_TRACE_CLIENT_IP_ENABLED: "true"
       DD_TRACE_CLIENT_IP_HEADER: "x-forwarded-for"
@@ -698,9 +710,8 @@ services:
       # Datadog ASM (Application Security) - Detecta ataques
       DD_APPSEC_ENABLED: "true"
       DD_IAST_ENABLED: "true"
-      # rotação de IP do EvilDog: o IP spoofado (X-Forwarded-For) vira o
-      # @network.client.ip da denylist -- só existia nos manifests k8s,
-      # nunca tinha sido portado pro compose local.
+      # O IP spoofado (X-Forwarded-For) é normalizado pelo tracer em
+      # @http.client_ip; o peer @network.client.ip é interno ao runtime.
       DD_REMOTE_CONFIGURATION_ENABLED: "true"
       DD_TRACE_CLIENT_IP_ENABLED: "true"
       DD_TRACE_CLIENT_IP_HEADER: "x-forwarded-for"
@@ -845,6 +856,20 @@ services:
       LOG4J_CALLBACK_LDAP_PORT: "1389"
       LOG4J_CALLBACK_HTTP_PORT: "8000"
       LOG4J_EXFIL_ENV: SPRING_DATASOURCE_PASSWORD
+      # Segredos exclusivos do controle do EvilDog. Nunca passam pelo bundle do
+      # frontend: o navegador recebe uma sessão HTTP curta do backend.
+      EVILDOG_CONTROL_TOKEN: ${EVILDOG_CONTROL_TOKEN:?EVILDOG_CONTROL_TOKEN must be set}
+      EVILDOG_AGENT_TOKEN: ${EVILDOG_AGENT_TOKEN:?EVILDOG_AGENT_TOKEN must be set}
+      # No k8s cada agente é um Job; aqui é um container efêmero real (mesma imagem,
+      # --agent-mode), criado via socket do runtime montado abaixo.
+      # Cooldown entre rodadas do enxame. O default do código é 20s, que na apresentação
+      # virava tempo morto quando se quer reescalar na hora; 8s ainda protege o backend e
+      # a UI mostra o contador. Suba de novo se precisar segurar mais.
+      EVILDOG_ESCALATE_COOLDOWN_S: "${EVILDOG_ESCALATE_COOLDOWN_S:-8}"
+      EVILDOG_DOCKER_ESCALATE: "true"
+      EVILDOG_DOCKER_NETWORK: ${EVILDOG_DOCKER_NETWORK:-dogbank_dogbank-network}
+      EVILDOG_AGENT_IMAGE: ${EVILDOG_AGENT_IMAGE:-docker.io/library/dogbank-evildog-api:latest}
+      EVILDOG_ORCHESTRATOR_URL: http://evildog-api:8092/api/evildog/agent-events
       # Datadog APM
       DD_AGENT_HOST: datadog-agent
       DD_TRACE_AGENT_PORT: 8126
@@ -854,6 +879,18 @@ services:
       DD_LOGS_INJECTION: "true"
       DD_TRACE_PROPAGATION_STYLE_EXTRACT: "tracecontext,datadog,baggage"
       DD_TRACE_PROPAGATION_STYLE_INJECT: "tracecontext,datadog,baggage"
+    volumes:
+      # Socket do runtime, para o /escalate criar os containers-agente efêmeros. É um
+      # privilégio alto (equivale a root no host) -- aceitável SÓ neste lab local e
+      # deliberadamente ausente dos manifests de k8s, onde o caminho é RBAC + Jobs.
+      # Caminho resolvido DENTRO da VM do podman; ajuste via PODMAN_SOCK se o uid diferir
+      # (veja: podman machine ssh 'echo $XDG_RUNTIME_DIR/podman/podman.sock').
+      - ${PODMAN_SOCK:-/run/user/503/podman/podman.sock}:/var/run/docker.sock
+    # A VM do podman roda SELinux em Enforcing e o socket tem label user_tmp_t, que
+    # container_t não acessa -- sem isto o mount existe mas dá EACCES. Desabilitar o
+    # label vale só para este container de lab, junto com a ressalva do socket acima.
+    security_opt:
+      - label=disable
     depends_on:
       datadog-agent:
         condition: service_started
@@ -1125,7 +1162,9 @@ services:
     networks:
       - dogbank-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      # Alpine resolve localhost como ::1, mas o nginx desta imagem escuta em
+      # IPv4. Usar o loopback explícito evita falso unhealthy.
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -1163,7 +1202,7 @@ services:
     networks:
       - dogbank-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -1306,6 +1345,54 @@ services:
       com.datadoghq.tags.version: "1.0.0"
       com.datadoghq.tags.team: "security"
       com.datadoghq.tags.owner: "red-team"
+
+  # ===========================================================================
+  # 🏃 DATADOG PRIVATE ACTION RUNNER
+  # ---------------------------------------------------------------------------
+  # Os Workflows da Datadog rodam na nuvem dela, então um step HTTP só alcança
+  # o que é público. Use este runner apenas quando a HTTP Connection precisar
+  # alcançar um hostname interno; uma connection HTTPS pública secret-backed
+  # não depende dele.
+  #
+  # Com este runner, um step HTTP executa DENTRO desta rede e passa a poder
+  # chamar serviços por nome (http://auth-service:8088/...).
+  #
+  # Passos manuais (uma vez):
+  #   1. Suba:  docker-compose -f docker-compose.full.yml up -d private-action-runner
+  #   2. Confirme em Actions Catalog > Private Action Runners que ele apareceu
+  #   3. Para uma connection vinculada ao runner, use POST
+  #        http://auth-service:8088/api/auth/admin/block-no-mfa
+  #      e selecione este runner na Connection.
+  #   4. Rode ./configure-datadog-par-http-credentials.sh e configure Token Auth
+  #      com o arquivo /etc/dd-action-runner/config/credentials/http_token.json.
+  #      A Connection usa X-Admin-Token: {{adminBlockToken}}; o valor continua
+  #      apenas no runner local e nunca entra no workflow ou no repositório.
+  # ===========================================================================
+  private-action-runner:
+    image: gcr.io/datadoghq/private-action-runner:v1.17.1
+    container_name: dogbank-action-runner
+    command: ["--with-api-key"]
+    environment:
+      DD_BASE_URL: ${DD_BASE_URL:-https://app.datadoghq.com}
+      DD_PRIVATE_RUNNER_CONFIG_DIR: /etc/dd-action-runner/config
+      DD_API_KEY: ${DD_API_KEY}
+      # App Key DEDICADA: precisa do escopo on_prem_runner_write E do toggle
+      # "Actions API Access" (só existe na UI -- a API de application_keys não expõe
+      # esse campo, testado: cria a key com o escopo certo e o enrollment ainda dá 403).
+      # Cai no DD_APP_KEY normal só para não quebrar quem não configurou a dedicada.
+      DD_APP_KEY: ${DD_APP_KEY_RUNNER:-${DD_APP_KEY}}
+      # Nomes de runner são únicos por org e não podem ser reusados: se a identidade
+      # local (volume abaixo) for apagada, o re-enrollment falha com 400 "a runner with
+      # this name already exists". Nesse caso, bump DD_RUNNER_NAME no .env.
+      RUNNER_NAME: ${DD_RUNNER_NAME:-dogbank-local-runner}
+      # Só a ação de HTTP request: é a única que o workflow de bloqueio usa.
+      ACTIONS_ALLOWLIST: com.datadoghq.http.request
+    volumes:
+      # Guarda a chave privada de enrollment do runner -- NÃO versionar.
+      - ./datadog/private-action-runner/config:/etc/dd-action-runner/config
+    networks:
+      - dogbank-network
+    restart: unless-stopped
 
 # =============================================================================
 # 🌐 NETWORKS
