@@ -27,6 +27,7 @@ DD_API="https://api.${DD_SITE}"
 WORKFLOW_ID="${DOGBANK_SECURITY_WORKFLOW_ID:-}"
 RUNNER_CONTAINER="${DOGBANK_ACTION_RUNNER_CONTAINER:-dogbank-action-runner}"
 REQUIRE_PAR="${DOGBANK_REQUIRE_PAR:-0}"
+MAX_CLOCK_DRIFT_SECONDS="${DOGBANK_MAX_CLOCK_DRIFT_SECONDS:-5}"
 COOKIE_JAR=""
 failures=0
 
@@ -119,6 +120,81 @@ check_container_health() {
   else
     bad "$name is ${state:-not found}"
     return 1
+  fi
+}
+
+podman_clock_drift() {
+  local host_epoch vm_epoch drift
+  host_epoch="$(date -u +%s)"
+  vm_epoch="$(podman machine ssh date -u +%s 2>/dev/null | tail -1)" || return 1
+  [[ "$host_epoch" =~ ^[0-9]+$ && "$vm_epoch" =~ ^[0-9]+$ ]] || return 1
+  drift=$((host_epoch - vm_epoch))
+  (( drift < 0 )) && drift=$((-drift))
+  printf '%s\n' "$drift"
+}
+
+check_podman_clock() {
+  local drift
+  if ! command -v podman >/dev/null 2>&1; then
+    bad 'podman unavailable; clock synchronization was not checked'
+    return
+  fi
+  if ! drift="$(podman_clock_drift)"; then
+    warn 'Podman VM clock could not be compared (non-machine Podman is allowed)'
+    return
+  fi
+  if (( drift <= MAX_CLOCK_DRIFT_SECONDS )); then
+    ok "Podman VM clock is synchronized (${drift}s drift)"
+  else
+    bad "Podman VM clock is ${drift}s out of sync; Datadog signals can disappear from the active time window"
+  fi
+}
+
+sync_podman_clock() {
+  local drift host_epoch attempt
+  if ! command -v podman >/dev/null 2>&1; then
+    return
+  fi
+  if ! drift="$(podman_clock_drift)"; then
+    return
+  fi
+  if (( drift <= MAX_CLOCK_DRIFT_SECONDS )); then
+    return
+  fi
+
+  printf 'Synchronizing Podman VM clock (%ss drift)...\n' "$drift"
+  host_epoch="$(date -u +%s)"
+  podman machine ssh sudo date -u -s "@$host_epoch" >/dev/null
+
+  # The trace-agent keeps retry/backoff state. Restarting only this container
+  # clears that state without interrupting the DogBank application services.
+  if podman container exists datadog-agent 2>/dev/null; then
+    podman restart datadog-agent >/dev/null
+    for attempt in {1..15}; do
+      if podman exec datadog-agent agent health >/dev/null 2>&1; then
+        break
+      fi
+      sleep 1
+    done
+  fi
+}
+
+check_datadog_transport() {
+  local result totals successes
+  if ! podman container exists datadog-agent 2>/dev/null; then
+    bad 'datadog-agent is not found'
+    return
+  fi
+  if ! result="$(podman exec datadog-agent agent diagnose --include connectivity-datadog-core-endpoints 2>&1)"; then
+    bad 'Datadog Agent connectivity diagnosis failed'
+    return
+  fi
+  totals="$(printf '%s\n' "$result" | sed -n 's/^[[:space:]]*Total:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | tail -1)"
+  successes="$(printf '%s\n' "$result" | sed -n 's/^[[:space:]]*Total:[[:space:]]*[0-9][0-9]*,[[:space:]]*Success:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | tail -1)"
+  if [[ -n "$totals" && "$totals" == "$successes" ]]; then
+    ok "Datadog Agent intake connectivity passed (${successes}/${totals})"
+  else
+    bad 'Datadog Agent cannot reach every required intake endpoint'
   fi
 }
 
@@ -258,6 +334,9 @@ check_all() {
   check_sse
   check_container_health dogbank-frontend || true
   check_container_health dogbank-nginx || true
+  check_container_health datadog-agent || true
+  check_podman_clock
+  check_datadog_transport
   check_waf_off
   check_users_unblocked
   check_ip_stability
@@ -276,6 +355,7 @@ reset() {
   require_env DOGBANK_ADMIN_BLOCK_TOKEN
   require_env EVILDOG_CONTROL_TOKEN
   printf 'Resetting deterministic EvilDog demo state...\n'
+  sync_podman_clock
   ./evildog-block.sh off >/dev/null
   DOGBANK_BASE="$BASE" DOGBANK_ADMIN_BLOCK_TOKEN="$DOGBANK_ADMIN_BLOCK_TOKEN" ./dogbank-remediate.sh unblock >/dev/null
   authenticate_evildog
