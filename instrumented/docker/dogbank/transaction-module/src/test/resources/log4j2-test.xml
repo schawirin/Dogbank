@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Config mínima só para os testes. O Log4j2 prefere log4j2-test.xml ao log4j2.xml de produção
+     (que usa o JSON layout do Datadog e variáveis de ambiente), tornando os testes determinísticos.
+     Root em INFO garante que os ERROR de falha passem; o Log4jCapture anexa um appender em memória. -->
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{HH:mm:ss.SSS} %-5level [%X{evento}] %logger{36} - %msg%n"/>
+        </Console>
+    </Appenders>
+    <Loggers>
+        <Root level="INFO">
+            <AppenderRef ref="Console"/>
+        </Root>
+    </Loggers>
+</Configuration>

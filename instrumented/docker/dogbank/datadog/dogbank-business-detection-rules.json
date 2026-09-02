@@ -1,6 +1,6 @@
 [
   {
-    "name": "[DogBank] Successful SQL Injection - PIX key validation data leak",
+    "name": "[DogBank Demo] SQL Injection bem-sucedido — resposta imediata",
     "enabled": true,
     "product": "App & API Protection",
     "type": "application_security",
@@ -8,9 +8,9 @@
     "queries": [
       {
         "name": "sqli_success",
-        "query": "service:transaction-service @appsec.type:sql_injection @http.status_code:200 @http.url:*api/transactions/validate-pix-key*",
+        "query": "@appsec.security_activity:* env:dogbank service:transaction-service @appsec.type:sql_injection @appsec.category:attack_attempt @http.status_code:200",
         "aggregation": "count",
-        "groupByFields": ["@network.client.ip"]
+        "groupByFields": ["@http.client_ip"]
       }
     ],
     "cases": [
@@ -21,9 +21,9 @@
       }
     ],
     "options": {
-      "evaluationWindow": 300,
-      "keepAlive": 3600,
-      "maxSignalDuration": 86400
+      "evaluationWindow": 60,
+      "keepAlive": 60,
+      "maxSignalDuration": 600
     },
     "message": "SQL Injection bem-sucedido no DogBank. O mesmo request foi classificado como SQLi e retornou HTTP 200 no endpoint /api/transactions/validate-pix-key, que pode vazar nome, CPF, saldo e chave PIX. Verificar trace, payload e arquivo de provas do EvilDog.",
     "tags": [
@@ -32,7 +32,8 @@
       "attack:sql-injection",
       "impact:data-exfiltration",
       "cwe:89",
-      "team:security-demo"
+      "team:security-demo",
+      "demo:evildog"
     ]
   },
   {

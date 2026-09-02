@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import accountService from '../services/accountService';
-import Card from '../components/common/Card';
+import { useBrandTheme } from '../theme/BrandThemeContext';
 import Button from '../components/common/Button';
 import Alert from '../components/common/Alert';
 import { 
@@ -11,7 +11,6 @@ import {
   Mail, 
   Phone, 
   MapPin, 
-  CreditCard, 
   Shield, 
   Key, 
   Building2, 
@@ -21,13 +20,14 @@ import {
   TrendingUp,
   Star,
   Copy,
-  Edit,
-  LogOut
+  LogOut,
+  Palette
 } from 'lucide-react';
 
 const ProfilePage = () => {
   const { user, loading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
+  const { themeId, setThemeId, themes } = useBrandTheme();
 
   const [accountData, setAccountData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -115,12 +115,6 @@ const ProfilePage = () => {
     if (score >= 700) return 'text-green-600';
     if (score >= 500) return 'text-yellow-600';
     return 'text-red-600';
-  };
-
-  const getScoreBarColor = (score) => {
-    if (score >= 700) return 'bg-green-500';
-    if (score >= 500) return 'bg-yellow-500';
-    return 'bg-red-500';
   };
 
   const handleLogout = () => {
@@ -347,6 +341,50 @@ const ProfilePage = () => {
 
         {/* Coluna Lateral */}
         <div className="space-y-6">
+          {/* Aparência */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-slate-900 mb-1 flex items-center gap-2">
+              <Palette className="w-5 h-5 text-purple-600" />
+              Aparência do aplicativo
+            </h3>
+            <p className="text-sm text-slate-500 mb-5">
+              Escolha a cor de marca usada nesta conta.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Cor do aplicativo">
+              {themes.map((theme) => {
+                const selected = theme.id === themeId;
+                return (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    data-testid={`brand-theme-${theme.id}`}
+                    onClick={() => setThemeId(theme.id)}
+                    className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-purple-200 ${
+                      selected
+                        ? 'border-purple-500 bg-purple-50 text-purple-700 ring-2 ring-purple-100'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-purple-200 hover:bg-purple-50/60'
+                    }`}
+                  >
+                    <span
+                      className="h-5 w-5 rounded-full border border-black/10 shadow-sm"
+                      style={{ backgroundColor: theme.swatch }}
+                      aria-hidden="true"
+                    />
+                    <span>{theme.label}</span>
+                    {selected && <CheckCircle className="ml-auto h-4 w-4" aria-hidden="true" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            <p className="mt-4 text-xs text-slate-500">
+              A preferência é salva só para este usuário e aplicada imediatamente.
+            </p>
+          </div>
+
           {/* Análise de Crédito */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">

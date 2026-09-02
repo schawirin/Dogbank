@@ -245,6 +245,17 @@ public class UserController {
                     .body(Map.of("error", "Senha é obrigatória"));
             }
 
+            Optional<User> user = userService.findById(id);
+            if (user.isPresent() && Boolean.TRUE.equals(user.get().getBlocked())) {
+                logData.put("status", "user_blocked");
+                logData.put("duration_ms", System.currentTimeMillis() - startTime);
+                logger.warn("Validação de senha negada para usuário bloqueado: {}", logData);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "valid", false,
+                    "reason", "USER_BLOCKED",
+                    "message", "Conta bloqueada por atividade suspeita"));
+            }
+
             boolean isValid = userService.validatePassword(id, password);
             
             logData.put("status", isValid ? "success" : "invalid_password");

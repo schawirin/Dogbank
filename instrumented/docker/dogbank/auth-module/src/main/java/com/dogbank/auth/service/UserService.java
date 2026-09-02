@@ -217,6 +217,11 @@ public class UserService {
             }
 
             User user = userOpt.get();
+            if (Boolean.TRUE.equals(user.getBlocked())) {
+                logData.put("status", "user_blocked");
+                logger.warn("Validação de senha negada para usuário bloqueado: {}", logData);
+                return false;
+            }
             String storedPassword = user.getSenha();
             // Try plain text first (most common in demo), then bcrypt as fallback
             boolean isValid = rawPassword.equals(storedPassword);

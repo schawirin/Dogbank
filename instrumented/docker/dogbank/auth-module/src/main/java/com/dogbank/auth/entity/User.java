@@ -28,6 +28,9 @@ public class User {
     @Column(name = "blocked", nullable = false)
     private Boolean blocked = false;
 
+    @Column(name = "mfa", nullable = false)
+    private Boolean mfa = false;
+
     // Construtor padrão (obrigatório para JPA)
     public User() {
     }
@@ -98,5 +101,13 @@ public class User {
 
     public void setBlocked(Boolean blocked) {
         this.blocked = blocked;
+    }
+
+    public Boolean getMfa() {
+        return mfa == null ? Boolean.FALSE : mfa;
+    }
+
+    public void setMfa(Boolean mfa) {
+        this.mfa = mfa;
     }
 }

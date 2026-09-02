@@ -7,3 +7,6 @@ target
 
 # mkcert-generated local HTTPS cert/key -- private key, machine-specific
 nginx/certs/
+
+# Chave privada de enrollment do Datadog Private Action Runner
+datadog/private-action-runner/config/

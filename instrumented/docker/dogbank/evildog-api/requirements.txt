@@ -6,3 +6,10 @@ httpx==0.26.0
 pydantic==2.5.3
 # Datadog APM (auto-injected in k8s; explicit here for compose parity)
 ddtrace>=2.6.0
+# K8s client for real escalate (spawns ephemeral attacker Jobs)
+kubernetes>=29,<31
+# Docker/Podman client: mesmo escalate real no stack local (container efêmero por
+# agente, em vez de Job) -- usado só quando EVILDOG_DOCKER_ESCALATE=true
+docker>=7,<8
+# Regressões do contrato de demo (estado/SSE/IP/classificação) executadas com pytest.
+pytest>=8,<9

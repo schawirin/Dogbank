@@ -1,6 +1,7 @@
 package com.dogbank.transaction.service;
 
 import com.dogbank.transaction.entity.Transaction;
+import com.dogbank.transaction.exception.UserBlockedException;
 import com.dogbank.transaction.repository.TransactionRepository;
 import com.dogbank.transaction.model.AccountModel;
 import com.dogbank.transaction.model.UserModel;
@@ -10,6 +11,7 @@ import com.dogbank.transaction.event.PixTransactionEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -96,11 +98,37 @@ public class TransactionService {
             
             saldoAntes = origin.getBalance();
             UserModel userOrigin = origin.getUsuarioId() != null ? getUserById(origin.getUsuarioId()) : null;
+            if (userOrigin == null && origin.getUsuarioId() != null) {
+                // 1 retry — a contenção fail-closed abaixo depende deste lookup; sob carga
+                // (ataque distribuído) o auth-service pode falhar 1 chamada esporádica.
+                userOrigin = getUserById(origin.getUsuarioId());
+            }
             String remetenteNome = firstNonBlank(userOrigin != null ? userOrigin.getNome() : null, "Cliente DogBank");
             String remetenteCpf = userOrigin != null ? maskCpf(userOrigin.getCpf()) : "";
             String remetenteChavePix = userOrigin != null ? maskCpf(userOrigin.getChavePix()) : "";
             String remetenteBanco = firstNonBlank(origin.getBanco(), "DogBank");
             String remetenteConta = firstNonBlank(origin.getAccountNumber(), origin.getId().toString());
+
+            // Contenção / auto-remediação (SOAR): NEGA o PIX se a conta de origem está bloqueada
+            // por atividade suspeita OU se o status não pôde ser verificado. É FAIL-CLOSED: sob
+            // ataque, "não consegui confirmar" = negar (não basta bloquear o login — o movimento
+            // de dinheiro também para).
+            if (origin.getUsuarioId() != null
+                    && (userOrigin == null || Boolean.TRUE.equals(userOrigin.getBlocked()))) {
+                long durationMs = calcularDuracao(startedAt);
+                boolean indeterminado = (userOrigin == null);
+                String codigo = indeterminado ? "STATUS_INDETERMINADO" : "CONTA_BLOQUEADA";
+                String msg = indeterminado
+                    ? "Status da conta de origem indeterminado (contenção fail-closed)"
+                    : "Conta de origem bloqueada por atividade suspeita";
+                pixMetrics.registrarPixFalha(accountOriginId, pixKeyDestination, amount,
+                    codigo, msg, "BLOQUEIO", durationMs,
+                    remetenteNome, remetenteCpf, remetenteBanco, remetenteConta, remetenteChavePix);
+                MDC.put("evento", "PIX_ERRO");
+                MDC.put("status_transacao", "ERRO_" + codigo);
+                log.error("Transferência PIX negada: {} (auto-remediação/contenção fail-closed)", codigo);
+                throw new RuntimeException(msg);
+            }
 
             MDC.put("remetente_id", origin.getId().toString());
             MDC.put("remetente_nome", remetenteNome);
@@ -189,9 +217,12 @@ public class TransactionService {
                 String error = (String) validation.get("error");
                 String errorCode = (String) validation.get("errorCode");
                 long durationMs = calcularDuracao(startedAt);
-                pixMetrics.registrarPixFalha(accountOriginId, pixKeyDestination, amount, 
-                    errorCode != null ? errorCode : "BC_REJEITADO", 
-                    error != null ? error : "Erro desconhecido", "BANCO_CENTRAL", durationMs,
+                // Timeout do Banco Central/SPI recebe erro_tipo=TIMEOUT (dashboards agrupam por isso)
+                String tipoErro = (errorCode != null && errorCode.toUpperCase().contains("TIMEOUT"))
+                        ? "TIMEOUT" : "BANCO_CENTRAL";
+                pixMetrics.registrarPixFalha(accountOriginId, pixKeyDestination, amount,
+                    errorCode != null ? errorCode : "BC_REJEITADO",
+                    error != null ? error : "Erro desconhecido", tipoErro, durationMs,
                     remetenteNome, remetenteCpf, remetenteBanco, remetenteConta, remetenteChavePix);
                 MDC.put("evento", "PIX_ERRO");
                 MDC.put("status_transacao", "REJEITADO_BANCO_CENTRAL");
@@ -503,6 +534,11 @@ public class TransactionService {
         // Busca transações onde a conta é origem OU destino (enviadas e recebidas)
         return transactionRepository.findAllByAccountId(accountId);
     }
+
+    public List<Transaction> listarTransacoesRecentesPorConta(Long accountId, int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 500));
+        return transactionRepository.findRecentByAccountId(accountId, PageRequest.of(0, safeLimit));
+    }
     
     public String generateAuthCode(Transaction tx) {
         return UUID.randomUUID().toString().substring(0, 8).toUpperCase();
@@ -622,18 +658,23 @@ public class TransactionService {
             
             return response.getBody() != null ? response.getBody() : Map.of("status", "APPROVED");
         } catch (HttpClientErrorException | HttpServerErrorException e) {
-            log.error("Erro HTTP do Banco Central: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            String body = e.getResponseBodyAsString();
+            log.error("Erro HTTP do Banco Central: {} - {}", e.getStatusCode(), body);
+            boolean isTimeout = e.getStatusCode().value() == 408
+                    || (body != null && body.toUpperCase().contains("TIMEOUT"));
             return Map.of(
                 "status", "REJECTED",
-                "error", "Erro de comunicação com Banco Central",
-                "errorCode", "BC_HTTP_ERROR"
+                "error", isTimeout ? "Timeout na comunicação com o Banco Central (SPI)"
+                                   : "Erro de comunicação com Banco Central",
+                "errorCode", isTimeout ? "BANCO_CENTRAL_TIMEOUT" : "BC_HTTP_ERROR"
             );
         } catch (ResourceAccessException e) {
-            log.error("Banco Central indisponível: {}", e.getMessage());
+            // Connect/read timeout na chamada ao Banco Central = timeout do SPI
+            log.error("Banco Central indisponível/timeout: {}", e.getMessage());
             return Map.of(
                 "status", "REJECTED",
-                "error", "Banco Central indisponível",
-                "errorCode", "BC_UNAVAILABLE"
+                "error", "Timeout na comunicação com o Banco Central (SPI)",
+                "errorCode", "BANCO_CENTRAL_TIMEOUT"
             );
         } catch (Exception e) {
             log.error("Erro inesperado ao validar PIX: {}", e.getMessage());
@@ -681,6 +722,11 @@ public class TransactionService {
                     return false;
                 }
             } catch (HttpClientErrorException e) {
+                if (e.getStatusCode() == HttpStatus.FORBIDDEN
+                        && e.getResponseBodyAsString().contains("USER_BLOCKED")) {
+                    log.warn("Conta bloqueada pelo auth-service para user_id={}", userId);
+                    throw new UserBlockedException();
+                }
                 if (e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
                     log.warn("⚠️ Senha incorreta para user_id={}", userId);
                     return false;
@@ -688,6 +734,8 @@ public class TransactionService {
                 throw e;
             }
 
+        } catch (UserBlockedException e) {
+            throw e;
         } catch (Exception e) {
             log.error("❌ Erro ao validar senha: {}", e.getMessage());
             return false;

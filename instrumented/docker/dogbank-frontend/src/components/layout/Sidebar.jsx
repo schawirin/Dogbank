@@ -2,18 +2,20 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Zap, FileText, TrendingUp, User, ArrowRight, Shield, Skull } from 'lucide-react';
 import Logo from '../common/dogbank-logo';
+import { useT } from '../../i18n';
 
 const menuItems = [
-  { label: 'Início', icon: Home, path: '/dashboard' },
-  { label: 'PIX', icon: Zap, path: '/dashboard/pix' },
-  { label: 'Extrato', icon: FileText, path: '/dashboard/extrato' },
-  { label: 'Investimentos', icon: TrendingUp, path: '/dashboard/investimentos' },
-  { label: 'Perfil', icon: User, path: '/dashboard/perfil' },
-  { label: 'EvilDog', icon: Skull, path: '/dashboard/evildog' },
+  { labelKey: 'nav.home', icon: Home, path: '/dashboard' },
+  { labelKey: 'nav.pix', icon: Zap, path: '/dashboard/pix' },
+  { labelKey: 'nav.extrato', icon: FileText, path: '/dashboard/extrato' },
+  { labelKey: 'nav.investimentos', icon: TrendingUp, path: '/dashboard/investimentos' },
+  { labelKey: 'nav.perfil', icon: User, path: '/dashboard/perfil' },
+  { labelKey: 'nav.evildog', icon: Skull, path: '/dashboard/evildog' },
 ];
 
 const Sidebar = () => {
   const location = useLocation();
+  const { t } = useT();
 
   return (
     <div className="flex flex-col h-full py-6">
@@ -24,7 +26,7 @@ const Sidebar = () => {
       </div>
 
       <nav className="flex-1 px-4 space-y-1.5">
-        {menuItems.map(({ label, icon: Icon, path }) => {
+        {menuItems.map(({ labelKey, icon: Icon, path }) => {
           const isActive = location.pathname === path
             || (path === '/dashboard' && location.pathname === '/dashboard/');
           return (
@@ -38,7 +40,7 @@ const Sidebar = () => {
                 }`}
             >
               <Icon className={`w-5 h-5 ${isActive ? 'text-purple-600' : 'text-slate-400'}`} />
-              {label}
+              {t(labelKey)}
               {isActive && (
                 <div className="ml-auto w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse" />
               )}
@@ -51,15 +53,15 @@ const Sidebar = () => {
         <div className="absolute top-0 right-0 p-2 opacity-10">
           <Shield className="w-16 h-16" />
         </div>
-        <h4 className="font-semibold text-purple-900 mb-1 text-sm relative z-10">Precisa de ajuda?</h4>
+        <h4 className="font-semibold text-purple-900 mb-1 text-sm relative z-10">{t('sidebar.help_title')}</h4>
         <p className="text-xs text-purple-700/80 mb-3 relative z-10 leading-relaxed">
-          Nossa equipe está sempre disponível.
+          {t('sidebar.help_text')}
         </p>
         <a
           href="#"
           className="text-xs font-semibold text-purple-600 hover:text-purple-800 transition-colors relative z-10 inline-flex items-center gap-1"
         >
-          Falar com suporte <ArrowRight className="w-3 h-3" />
+          {t('sidebar.talk_support')} <ArrowRight className="w-3 h-3" />
         </a>
       </div>
     </div>

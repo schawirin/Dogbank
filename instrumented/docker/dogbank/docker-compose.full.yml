@@ -285,6 +285,12 @@ services:
       DD_TAGS: "env:dogbank project:dogbank"
       # Dogstatsd
       DD_DOGSTATSD_NON_LOCAL_TRAFFIC: "true"
+      # AAP denylist / In-App WAF arrive through Remote Configuration. The
+      # Agent default can wait up to 60s between polls, which is too slow for
+      # the live security demo. Keep this real Datadog delivery path, but poll
+      # frequently enough for the first retry to be blocked within seconds.
+      DD_REMOTE_CONFIGURATION_ENABLED: "true"
+      DD_REMOTE_CONFIGURATION_REFRESH_INTERVAL: "5s"
       # Database Monitoring (DBM)
       DD_DBM_ENABLED: "true"
       # Data Streams Monitoring (DSM)
@@ -860,6 +866,9 @@ services:
       # frontend: o navegador recebe uma sessão HTTP curta do backend.
       EVILDOG_CONTROL_TOKEN: ${EVILDOG_CONTROL_TOKEN:?EVILDOG_CONTROL_TOKEN must be set}
       EVILDOG_AGENT_TOKEN: ${EVILDOG_AGENT_TOKEN:?EVILDOG_AGENT_TOKEN must be set}
+      # Usado apenas pelo reset autenticado de "novo take" para remover a
+      # contenção persistida do segmento sem MFA. Nunca chega ao frontend.
+      DOGBANK_ADMIN_BLOCK_TOKEN: ${DOGBANK_ADMIN_BLOCK_TOKEN:?DOGBANK_ADMIN_BLOCK_TOKEN must be set}
       # No k8s cada agente é um Job; aqui é um container efêmero real (mesma imagem,
       # --agent-mode), criado via socket do runtime montado abaixo.
       # Cooldown entre rodadas do enxame. O default do código é 20s, que na apresentação

@@ -5,12 +5,13 @@ import accountService from '../services/accountService';
 import pixService from '../services/pixService';
 import Alert from '../components/common/Alert';
 import { Zap, FileText, ArrowRight, Activity, TrendingUp, ChevronRight, Landmark } from 'lucide-react';
+import { useT } from '../i18n';
 
-const getGreeting = () => {
+const greetingKey = () => {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Bom dia';
-  if (hour < 18) return 'Boa tarde';
-  return 'Boa noite';
+  if (hour < 12) return 'greeting.morning';
+  if (hour < 18) return 'greeting.afternoon';
+  return 'greeting.evening';
 };
 
 const formatCurrency = (value) =>
@@ -27,10 +28,11 @@ const formatDate = (raw) => {
 };
 
 function TransactionItem({ tx, currentAccountId }) {
+  const { t } = useT();
   const isPositive = tx.accountDestinationId === currentAccountId;
   const name = isPositive
-    ? (tx.senderName || tx.origem || 'Recebimento')
-    : (tx.receiverName || tx.destinatario || 'Transferência');
+    ? (tx.senderName || tx.origem || t('tx.received'))
+    : (tx.receiverName || tx.destinatario || t('tx.transfer'));
   return (
     <div className="flex items-center justify-between p-4 rounded-2xl hover:bg-white/50 transition-colors border border-transparent hover:border-slate-100 cursor-pointer">
       <div className="flex items-center gap-4">
@@ -53,6 +55,7 @@ function TransactionItem({ tx, currentAccountId }) {
 
 const DashboardPage = () => {
   const { user, loading: authLoading } = useAuth();
+  const { t } = useT();
   const navigate = useNavigate();
 
   const [accountData, setAccountData] = useState(null);
@@ -78,12 +81,12 @@ const DashboardPage = () => {
         setAccountData(acct);
 
         if (acct?.id) {
-          const hx = await pixService.getTransactionHistory(acct.id);
+          const hx = await pixService.getRecentTransactionHistory(acct.id, 8);
           setTransactions(hx || []);
         }
       } catch (err) {
         console.error('Erro ao carregar dados:', err);
-        setError('Não foi possível carregar os dados. Tente novamente mais tarde.');
+        setError(t('dash.load_error'));
       } finally {
         setLoading(false);
       }
@@ -99,14 +102,14 @@ const DashboardPage = () => {
       <div className="flex justify-center items-center py-20">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-purple-200 rounded-full animate-spin border-t-purple-600 mx-auto mb-6" />
-          <p className="text-slate-600 font-medium">Carregando seus dados...</p>
+          <p className="text-slate-600 font-medium">{t('dash.loading')}</p>
         </div>
       </div>
     );
   }
 
   const recentTx = transactions.slice(0, 5);
-  const userFirstName = user?.nome?.split(' ')[0] || 'Cliente';
+  const userFirstName = user?.nome?.split(' ')[0] || t('common.client');
   const userInitial = (user?.nome || 'C').charAt(0).toUpperCase();
 
   return (
@@ -118,9 +121,9 @@ const DashboardPage = () => {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            {getGreeting()}, {userFirstName}
+            {t(greetingKey())}, {userFirstName}
           </h1>
-          <p className="text-slate-500 text-sm">Bem-vindo ao seu painel do DogBank</p>
+          <p className="text-slate-500 text-sm">{t('dash.welcome')}</p>
         </div>
       </div>
 
@@ -141,7 +144,7 @@ const DashboardPage = () => {
           </div>
 
           <p className="text-sm font-medium text-slate-500 mb-2 flex items-center gap-2">
-            Saldo disponível <Activity className="w-4 h-4 text-green-500" />
+            {t('dash.available_balance')} <Activity className="w-4 h-4 text-green-500" />
           </p>
           <div className="flex items-end gap-3 mb-6">
             <h2 className="text-4xl md:text-5xl font-extrabold text-slate-800 tracking-tight">
@@ -149,7 +152,7 @@ const DashboardPage = () => {
             </h2>
           </div>
           {accountData?.accountNumber && (
-            <p className="text-xs text-slate-400 mb-6">Conta {accountData.accountNumber}</p>
+            <p className="text-xs text-slate-400 mb-6">{t('dash.account', { n: accountData.accountNumber })}</p>
           )}
 
           <div className="flex items-center gap-3 flex-wrap">
@@ -157,13 +160,13 @@ const DashboardPage = () => {
               onClick={() => navigate('/dashboard/pix')}
               className="bg-slate-900 hover:bg-purple-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 flex items-center gap-2 shadow-lg shadow-slate-900/20 hover:shadow-purple-600/30 hover:-translate-y-0.5"
             >
-              <Zap className="w-4 h-4" /> Fazer PIX
+              <Zap className="w-4 h-4" /> {t('dash.make_pix')}
             </button>
             <button
               onClick={() => navigate('/dashboard/extrato')}
               className="bg-white hover:bg-slate-50 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 border border-slate-200 flex items-center gap-2 hover:-translate-y-0.5 shadow-sm"
             >
-              <FileText className="w-4 h-4" /> Ver extrato
+              <FileText className="w-4 h-4" /> {t('dash.view_statement')}
             </button>
           </div>
         </div>
@@ -174,15 +177,15 @@ const DashboardPage = () => {
           className="w-full md:w-80 h-48 rounded-3xl bg-slate-900 shadow-xl shadow-slate-900/15 p-6 flex flex-col justify-between text-white animate-slide-up stagger-2 transform hover:-translate-y-2 transition-transform duration-300 cursor-pointer"
         >
           <div className="flex justify-between items-start">
-            <span className="font-bold text-lg tracking-wider opacity-90">Invest</span>
+            <span className="font-bold text-lg tracking-wider opacity-90">{t('dash.invest')}</span>
             <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center">
               <TrendingUp className="w-5 h-5" />
             </div>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/60 mb-2">Carteira demo</p>
-            <p className="text-2xl font-extrabold mb-2">CDI 100% e Bitcoin</p>
-            <p className="text-xs text-white/70">Carteira com renda fixa e ativos digitais.</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/60 mb-2">{t('dash.demo_wallet')}</p>
+            <p className="text-2xl font-extrabold mb-2">{t('dash.cdi_btc')}</p>
+            <p className="text-xs text-white/70">{t('dash.wallet_desc')}</p>
           </div>
         </div>
       </div>
@@ -192,18 +195,18 @@ const DashboardPage = () => {
         {/* Latest Transactions */}
         <div className="lg:col-span-2 glass-panel rounded-3xl p-6 md:p-8 shadow-sm">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-slate-800">Últimas transações</h3>
+            <h3 className="text-lg font-bold text-slate-800">{t('dash.latest_tx')}</h3>
             <button
               onClick={() => navigate('/dashboard/extrato')}
               className="text-sm font-medium text-purple-600 hover:text-purple-800 inline-flex items-center gap-1"
             >
-              Ver todas <ChevronRight className="w-4 h-4" />
+              {t('dash.view_all')} <ChevronRight className="w-4 h-4" />
             </button>
           </div>
 
           {recentTx.length === 0 ? (
             <div className="text-center py-12 text-slate-400 text-sm">
-              Nenhuma transação encontrada ainda.
+              {t('dash.no_tx')}
             </div>
           ) : (
             <div className="space-y-2">
@@ -221,20 +224,20 @@ const DashboardPage = () => {
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
                 <Landmark className="w-5 h-5 text-white" />
               </div>
-              <h3 className="text-lg font-bold text-slate-800">Carteira de investimentos</h3>
+              <h3 className="text-lg font-bold text-slate-800">{t('dash.invest_wallet')}</h3>
             </div>
 
             <div className="mb-6">
-              <p className="text-sm text-slate-500 mb-1">Produtos ativos</p>
-              <p className="text-3xl font-bold text-slate-900">CDI 100% e Bitcoin</p>
+              <p className="text-sm text-slate-500 mb-1">{t('dash.active_products')}</p>
+              <p className="text-3xl font-bold text-slate-900">{t('dash.cdi_btc')}</p>
               <div className="w-full bg-slate-100 rounded-full h-1.5 mt-3 overflow-hidden">
                 <div className="bg-purple-600 h-1.5 rounded-full" style={{ width: '72%' }} />
               </div>
             </div>
 
             <div>
-              <p className="text-sm text-slate-500 mb-1">Resumo</p>
-              <p className="text-xl font-bold text-slate-800">Aportes e rendimento diário</p>
+              <p className="text-sm text-slate-500 mb-1">{t('dash.summary')}</p>
+              <p className="text-xl font-bold text-slate-800">{t('dash.contributions')}</p>
             </div>
           </div>
 
@@ -242,7 +245,7 @@ const DashboardPage = () => {
             onClick={() => navigate('/dashboard/investimentos')}
             className="w-full mt-8 bg-purple-100 text-purple-700 hover:bg-purple-200 py-3 rounded-xl font-semibold transition-colors"
           >
-            Ver investimentos
+            {t('dash.view_investments')}
           </button>
         </div>
       </div>

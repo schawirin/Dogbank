@@ -48,4 +48,18 @@ public class IdempotencyService {
     public String getExistingTransactionId(String idempotencyKey) {
         return redisTemplate.opsForValue().get("idempotency:pix:" + idempotencyKey);
     }
+
+    /**
+     * Releases (deletes) the idempotency key. MUST be called when the transaction FAILED,
+     * so a legitimate retry is not blocked for 24h. A claimed key only makes sense to keep
+     * after a SUCCESSFUL transaction (to dedupe double-spend on retries).
+     */
+    public void release(String idempotencyKey) {
+        try {
+            redisTemplate.delete("idempotency:pix:" + idempotencyKey);
+            log.info("🔓 [Idempotency] Key released after failure key={}", idempotencyKey);
+        } catch (Exception e) {
+            log.warn("⚠️ [Idempotency] Failed to release key={}: {}", idempotencyKey, e.getMessage());
+        }
+    }
 }

@@ -149,7 +149,7 @@ const PixReceiptPage = () => {
               <div 
                 className="w-3 h-3 rounded-sm"
                 style={{
-                  backgroundColor: ['#22c55e', '#16a34a', '#4ade80', '#86efac', '#a855f7', '#7c3aed'][Math.floor(Math.random() * 6)],
+                  backgroundColor: ['#22c55e', '#16a34a', '#4ade80', '#86efac', 'var(--brand-500)', 'var(--brand-700)'][Math.floor(Math.random() * 6)],
                   transform: `rotate(${Math.random() * 360}deg)`,
                 }}
               />

@@ -16,7 +16,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -33,7 +35,7 @@ public class AuthController {
     private final RateLimitService rateLimitService;
     private final AuthEventPublisher authEventPublisher;
 
-    @Value("${dogbank.admin.block-token:changeme-block-token}")
+    @Value("${dogbank.admin.block-token}")
     private String adminBlockToken;
 
     @Value("${dogbank.demo.log4shell.enabled:false}")
@@ -236,6 +238,52 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("status", "unblocked", "userId", user.getId()));
     }
 
+    // =====================================================================
+    // Auto-remediação em MASSA por SEGMENTO (independente de user específico):
+    // bloqueia/desbloqueia TODAS as contas SEM MFA — o "segmento vulnerável"
+    // que o ATO por senha compromete. Chamado 1x pelo Datadog Workflow.
+    // =====================================================================
+    @PostMapping("/admin/block-no-mfa")
+    public ResponseEntity<?> blockNoMfa(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token,
+            @RequestBody(required = false) Map<String, Object> body) {
+        if (!Objects.equals(token, adminBlockToken)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "invalid admin token"));
+        }
+        String reason = body != null ? String.valueOf(body.getOrDefault("reason", "auto-remediation")) : "auto-remediation";
+        List<Long> ids = new ArrayList<>();
+        for (User u : userRepository.findByMfaFalse()) {
+            u.setBlocked(true);
+            userRepository.save(u);
+            ids.add(u.getId());
+        }
+        Map<String, String> meta = new HashMap<>();
+        meta.put("segment", "no_mfa");
+        meta.put("count", String.valueOf(ids.size()));
+        meta.put("reason", reason);
+        GlobalTracer.getEventTracker().trackCustomEvent("users.segment.blocked", meta);
+        return ResponseEntity.ok(Map.of("status", "blocked", "segment", "no_mfa", "count", ids.size(), "userIds", ids));
+    }
+
+    @PostMapping("/admin/unblock-no-mfa")
+    public ResponseEntity<?> unblockNoMfa(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token) {
+        if (!Objects.equals(token, adminBlockToken)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "invalid admin token"));
+        }
+        List<Long> ids = new ArrayList<>();
+        for (User u : userRepository.findByMfaFalse()) {
+            u.setBlocked(false);
+            userRepository.save(u);
+            ids.add(u.getId());
+        }
+        Map<String, String> meta = new HashMap<>();
+        meta.put("segment", "no_mfa");
+        meta.put("count", String.valueOf(ids.size()));
+        GlobalTracer.getEventTracker().trackCustomEvent("users.segment.unblocked", meta);
+        return ResponseEntity.ok(Map.of("status", "unblocked", "segment", "no_mfa", "count", ids.size(), "userIds", ids));
+    }
+
     @PostMapping("/validate-password")
     public ResponseEntity<?> validatePassword(@RequestBody Map<String, String> request) {
         String cpf = request.get("cpf");
@@ -252,6 +300,12 @@ public class AuthController {
         }
         
         User user = userOpt.get();
+        if (Boolean.TRUE.equals(user.getBlocked())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "valid", false,
+                    "reason", "USER_BLOCKED",
+                    "message", "Conta bloqueada por atividade suspeita"));
+        }
         if (!Objects.equals(password, user.getSenha())) {
             return ResponseEntity.ok(Map.of("valid", false, "message", "Senha incorreta"));
         }

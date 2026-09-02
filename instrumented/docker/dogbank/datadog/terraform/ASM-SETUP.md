@@ -200,8 +200,11 @@ curl -X GET "https://api.datadoghq.com/api/v2/security_monitoring/rules" \
 
 1. Security Signals Dashboard:
    ```
-   https://app.datadoghq.com/security?query=@workflow.rule.name%3ADogBank
+   https://app.datadoghq.com/security/signals?query=%40workflow.rule.name%3A%2ADogBank%2A
    ```
+
+   Use uma janela de pelo menos 30 minutos e remova filtros negativos de
+   `@workflow.rule.type`; esses filtros escondem sinais de Application Security.
 
 2. Flagged Attackers Inventory:
    ```

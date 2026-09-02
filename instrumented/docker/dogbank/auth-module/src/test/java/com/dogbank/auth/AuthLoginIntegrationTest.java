@@ -2,11 +2,14 @@ package com.dogbank.auth;
 
 import com.dogbank.auth.entity.User;
 import com.dogbank.auth.repository.UserRepository;
+import com.dogbank.auth.service.AuthEventPublisher;
+import com.dogbank.auth.service.RateLimitService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,6 +24,8 @@ class AuthLoginIntegrationTest {
 
   @Autowired MockMvc mvc;
   @Autowired UserRepository userRepository;
+  @MockBean RateLimitService rateLimitService;
+  @MockBean AuthEventPublisher authEventPublisher;
 
   @BeforeEach
   void seed() {
@@ -51,5 +56,26 @@ class AuthLoginIntegrationTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"cpf\":\"12345678915\",\"password\":\"000000\"}"))
        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void validatePassword_rejeita_usuario_bloqueado() throws Exception {
+    User user = userRepository.findByCpf("12345678915").orElseThrow();
+    user.setBlocked(true);
+    userRepository.save(user);
+
+    mvc.perform(post("/api/auth/validate-password")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"cpf\":\"12345678915\",\"password\":\"123456\"}"))
+       .andExpect(status().isForbidden())
+       .andExpect(jsonPath("$.valid").value(false))
+       .andExpect(jsonPath("$.reason").value("USER_BLOCKED"));
+
+    mvc.perform(post("/api/users/" + user.getId() + "/validate-password")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"senha\":\"123456\"}"))
+       .andExpect(status().isForbidden())
+       .andExpect(jsonPath("$.valid").value(false))
+       .andExpect(jsonPath("$.reason").value("USER_BLOCKED"));
   }
 }

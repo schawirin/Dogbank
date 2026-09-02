@@ -2,22 +2,24 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useT, LanguageToggle } from '../../i18n';
 
-const routeTitleMap = {
-  '/dashboard': 'Painel Geral',
-  '/dashboard/': 'Painel Geral',
-  '/dashboard/pix': 'PIX',
-  '/dashboard/pix/confirm': 'PIX • Confirmar',
-  '/dashboard/pix/receipt': 'PIX • Comprovante',
-  '/dashboard/extrato': 'Extrato',
-  '/dashboard/investimentos': 'Investimentos',
-  '/dashboard/cartoes': 'Cartões',
-  '/dashboard/perfil': 'Perfil',
-  '/dashboard/evildog': 'EvilDog • Attack Console',
+const routeTitleKey = {
+  '/dashboard': 'title.dashboard',
+  '/dashboard/': 'title.dashboard',
+  '/dashboard/pix': 'title.pix',
+  '/dashboard/pix/confirm': 'title.pix_confirm',
+  '/dashboard/pix/receipt': 'title.pix_receipt',
+  '/dashboard/extrato': 'title.extrato',
+  '/dashboard/investimentos': 'title.investimentos',
+  '/dashboard/cartoes': 'title.cartoes',
+  '/dashboard/perfil': 'title.perfil',
+  '/dashboard/evildog': 'title.evildog',
 };
 
 const Header = () => {
   const { user, logout } = useAuth();
+  const { t } = useT();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -38,7 +40,7 @@ const Header = () => {
     navigate('/login');
   };
 
-  const breadcrumb = routeTitleMap[location.pathname] || 'Painel';
+  const breadcrumb = t(routeTitleKey[location.pathname] || 'title.default');
   const initial = (user?.nome || 'U').charAt(0).toUpperCase();
 
   return (
@@ -50,6 +52,7 @@ const Header = () => {
       </div>
 
       <div className="flex items-center gap-4 md:gap-5 ml-auto">
+        <LanguageToggle />
         <button
           className="relative p-2 rounded-full text-slate-400 hover:text-purple-600 hover:bg-slate-100 transition-colors"
           aria-label="Notificações"
@@ -67,9 +70,9 @@ const Header = () => {
           >
             <div className="text-right hidden sm:block">
               <p className="text-sm font-semibold text-slate-800 group-hover:text-purple-600 transition-colors">
-                {user?.nome || 'Usuário'}
+                {user?.nome || t('header.user')}
               </p>
-              <p className="text-xs text-slate-500">Conta Premium</p>
+              <p className="text-xs text-slate-500">{t('header.premium')}</p>
             </div>
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-md shadow-purple-500/20">
               {initial}
@@ -84,14 +87,14 @@ const Header = () => {
                 onClick={() => setMenuOpen(false)}
                 className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
               >
-                Meu perfil
+                {t('header.my_profile')}
               </Link>
               <div className="border-t border-slate-100 my-1" />
               <button
                 onClick={handleLogout}
                 className="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
               >
-                Sair
+                {t('header.logout')}
               </button>
             </div>
           )}

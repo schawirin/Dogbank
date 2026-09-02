@@ -35,7 +35,7 @@ export default function LandingPage() {
       <div 
         className="absolute inset-0 opacity-30 transition-all duration-1000 ease-out"
         style={{
-          background: `radial-gradient(circle at ${mousePosition.x}% ${mousePosition.y}%, rgba(139, 92, 246, 0.3) 0%, transparent 50%)`,
+          background: `radial-gradient(circle at ${mousePosition.x}% ${mousePosition.y}%, color-mix(in srgb, var(--brand-500) 30%, transparent) 0%, transparent 50%)`,
         }}
       />
 

@@ -40,7 +40,7 @@ const ExtractPage = () => {
         setAccountData(acct);
 
         if (acct?.id) {
-          const hx = await pixService.getTransactionHistory(acct.id);
+          const hx = await pixService.getRecentTransactionHistory(acct.id, 500);
           setTransactions(hx || []);
         }
       } catch (err) {

@@ -1,6 +1,7 @@
 package com.dogbank.transaction.repository;
 
 import com.dogbank.transaction.entity.Transaction;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,8 +20,17 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     @Query("SELECT t FROM Transaction t " +
            "WHERE t.accountOriginId = :accountId " +
            "   OR t.accountDestinationId = :accountId " +
-           "ORDER BY t.date DESC")
+           "ORDER BY t.completedAt DESC, t.startedAt DESC, t.id DESC")
     List<Transaction> findAllByAccountId(@Param("accountId") Long accountId);
+
+    /**
+     * Lista as transações mais recentes para telas de resumo, evitando respostas enormes no dashboard.
+     */
+    @Query("SELECT t FROM Transaction t " +
+           "WHERE t.accountOriginId = :accountId " +
+           "   OR t.accountDestinationId = :accountId " +
+           "ORDER BY t.completedAt DESC, t.startedAt DESC, t.id DESC")
+    List<Transaction> findRecentByAccountId(@Param("accountId") Long accountId, Pageable pageable);
 
     /**
      * Lista transações em que a conta informada é a conta de origem.

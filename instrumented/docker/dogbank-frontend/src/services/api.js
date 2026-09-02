@@ -157,7 +157,7 @@ console.log('🔧 Configurações das APIs:', {
 const sharedRequestInterceptor = api.interceptors.request.handlers[0];
 const sharedResponseInterceptor = api.interceptors.response.handlers[0];
 
-[authApi, accountApi, transactionApi, integrationApi, notificationApi, bancoCentralApi, investmentApi, evildogApi].forEach(instance => {
+[authApi, accountApi, transactionApi, integrationApi, notificationApi, bancoCentralApi, investmentApi].forEach(instance => {
   instance.interceptors.request.use(
     sharedRequestInterceptor.fulfilled,
     sharedRequestInterceptor.rejected
@@ -167,5 +167,26 @@ const sharedResponseInterceptor = api.interceptors.response.handlers[0];
     sharedResponseInterceptor.rejected
   );
 });
+
+// O EvilDog é ferramenta de lab, NÃO faz parte da sessão bancária: fica de fora do
+// interceptor compartilhado de resposta. Com ele, um 401/403 do endpoint admin-gated
+// (/escalate) era lido como "sessão do banco expirou" -> localStorage.clear() +
+// window.location.href = '/login', derrubando o usuário do app ao clicar em
+// "Escalar agentes". Aqui o erro só é logado e propagado para quem chamou.
+evildogApi.interceptors.request.use(
+  sharedRequestInterceptor.fulfilled,
+  sharedRequestInterceptor.rejected
+);
+evildogApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('❌ EvilDog (lab) erro:', {
+      url: error.config?.url,
+      status: error.response?.status,
+      responseData: error.response?.data,
+    });
+    return Promise.reject(error);
+  }
+);
 
 export default api;

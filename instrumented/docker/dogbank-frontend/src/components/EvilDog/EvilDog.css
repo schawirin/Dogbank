@@ -55,6 +55,69 @@
 .evd-feed-enter { animation: evd-feed-in .25s ease-out; }
 @keyframes evd-feed-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
+/* --- pipeline node states (loading / success glow / fail) ------------------ */
+.evd-node { transition: border-color .3s ease, box-shadow .3s ease; }
+
+/* estágio em execução: pulso na cor do grupo (--evd-glow) */
+.evd-node-active { animation: evd-node-run 1.3s ease-in-out infinite; }
+@keyframes evd-node-run {
+  0%, 100% { box-shadow: 0 0 10px 0 var(--evd-glow, #38bdf8); }
+  50%      { box-shadow: 0 0 26px 4px var(--evd-glow, #38bdf8); }
+}
+
+/* barra de "load" no rodapé do nó ativo */
+.evd-node-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; overflow: hidden; background: rgba(255,255,255,.06); }
+.evd-node-bar > i { position: absolute; top: 0; left: -40%; width: 40%; height: 100%; border-radius: 2px; animation: evd-node-bar 1.05s linear infinite; }
+@keyframes evd-node-bar { from { left: -40%; } to { left: 100%; } }
+
+/* conclusão: brilho verde de sucesso (one-shot) e depois assenta */
+.evd-node-done { animation: evd-node-done 1.1s ease-out; box-shadow: 0 0 16px 1px rgba(34,197,94,.5); }
+@keyframes evd-node-done {
+  0%   { box-shadow: 0 0 0 0 rgba(34,197,94,.95); }
+  35%  { box-shadow: 0 0 36px 9px rgba(34,197,94,.85); }
+  100% { box-shadow: 0 0 16px 1px rgba(34,197,94,.5); }
+}
+
+/* falha / bloqueio: brilho vermelho + tremor */
+/* robôs do mal (agentes) — leve bob menacing */
+.evd-bot-bob { animation: evd-bot-bob 1.6s ease-in-out infinite; }
+@keyframes evd-bot-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+
+.evd-node-fail { animation: evd-node-fail .55s ease-in-out; box-shadow: 0 0 22px 2px rgba(239,68,68,.7); }
+@keyframes evd-node-fail {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+
+/* real-pod agent swarm: spawn-in glow + reap-out collapse (AgentSwarmPanel) */
+.evd-pod-spawn { animation: evd-pod-spawn .5s ease-out both; }
+@keyframes evd-pod-spawn {
+  0%   { opacity: 0; transform: scale(.94); box-shadow: 0 0 0 0 rgba(56,189,248,0); }
+  40%  { box-shadow: 0 0 18px 2px rgba(56,189,248,.55); }
+  100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(56,189,248,0); }
+}
+.evd-pod-reap { animation: evd-pod-reap .8s ease-in forwards; overflow: hidden; }
+@keyframes evd-pod-reap {
+  0%   { opacity: 1; max-height: 260px; box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+  25%  { box-shadow: 0 0 16px 2px rgba(239,68,68,.6); }
+  100% { opacity: 0; max-height: 0; margin: 0; padding: 0; box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+}
+
+/* ataque contido/falho: respiração lenta e discreta — alerta, não sirene */
+.evd-agent-failed {
+  animation: evd-agent-failed 4.8s ease-in-out infinite;
+  background: linear-gradient(145deg, rgba(127,29,29,.07), rgba(15,21,29,.98) 42%);
+}
+@keyframes evd-agent-failed {
+  0%, 100% { box-shadow: 0 0 3px 0 rgba(239,68,68,.10); }
+  50%      { box-shadow: 0 0 10px 1px rgba(239,68,68,.22); }
+}
+.evd-agent-failed-icon { filter: drop-shadow(0 0 2px rgba(239,68,68,.35)); }
+.evd-failed-stat { box-shadow: inset 0 0 12px rgba(239,68,68,.045); }
+
 /* thin dark scrollbar inside the console */
 .evd-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
 .evd-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -63,4 +126,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .evd-blink, .evd-node-active, .evd-scan, .evd-feed-enter { animation: none; }
+  .evd-pod-spawn, .evd-pod-reap, .evd-agent-failed, .evd-agent-failed-icon { animation: none; }
 }

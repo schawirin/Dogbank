@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Radar, ListChecks, ShieldAlert, Terminal as TerminalIcon, Database, KeyRound,
-  Banknote, FileCheck, XCircle, Play, Activity, Eye, ShieldX, Shuffle, Layers, Boxes,
+  Banknote, FileCheck, XCircle, Play, Activity, Eye, ShieldX, Shuffle, Layers, Boxes, RotateCcw,
 } from 'lucide-react';
-import { levelClass, EvilBot } from './parts';
+import { levelClass, EvilBot, SwarmSizeStepper } from './parts';
 import NodeModal from './NodeModals';
 import AgentSwarmPanel from './AgentSwarmPanel';
 import { useT } from '../../i18n';
@@ -55,12 +55,16 @@ function edgePath(x1, y1, x2, y2, r = 14) {
     + `L ${midx} ${y2 - dy * r} Q ${midx} ${y2} ${midx + r} ${y2} L ${x2} ${y2}`;
 }
 
-function detailFor(id, st, address, records, blocked) {
-  // "🛡️ Bloqueado (AAP)" só quando o backend realmente levantou um BlockedError
-  // (HTTP 403/406 da AAP, refletido no estado `blocked` do pipeline) -- um nó
-  // pode falhar por outros motivos (ex.: TRANSFER com 0 contas elegíveis) sem
-  // que a Datadog tenha bloqueado nada; rotular isso como AAP era enganoso.
-  if (st === 'fail' && blocked && id !== 'DETECT' && id !== 'SKIP') return '🛡️ Bloqueado (AAP)';
+function detailFor(id, st, address, records, outcome) {
+  // A failure is not automatically an AAP block. The backend classifies the
+  // terminal result so the screen does not attribute an application user-block,
+  // rate limit, or backend incident to Datadog AAP.
+  if (st === 'fail' && id !== 'DETECT' && id !== 'SKIP') {
+    if (outcome?.kind === 'AAP_BLOCKED') return '🛡️ Bloqueado pela AAP';
+    if (outcome?.kind === 'USER_BLOCKED') return '🛡️ Contido: usuário bloqueado';
+    if (outcome?.kind === 'RATE_LIMITED') return '⏳ Rate limit aplicado';
+    if (outcome?.kind === 'BACKEND_ERROR') return '⚠️ Erro do backend';
+  }
   switch (id) {
     case 'RECON': return st === 'active' ? 'nmap -sn…' : (address || 'lab.dogbank.dog');
     case 'SCAN': return st === 'active' ? 'nmap -sV…' : st === 'idle' || !st ? '—' : 'Ports: 8088, 8084, 8089';
@@ -82,7 +86,7 @@ const StatusDot = ({ state, color }) => {
   return <span className={`w-2.5 h-2.5 rounded-full ${cls}`} style={state === 'active' ? { background: color } : undefined} />;
 };
 
-function Node({ node, state, address, records, blocked, clickable, onClick }) {
+function Node({ node, state, address, records, outcome, clickable, onClick }) {
   const c = COLORS[node.group];
   const Icon = node.icon;
   const active = state === 'active';
@@ -91,7 +95,7 @@ function Node({ node, state, address, records, blocked, clickable, onClick }) {
   const border = failed ? '#ef4444' : state === 'idle' || !state ? '#1e2733' : node.group === 'skip' ? '#26313f' : c;
   const stateCls = active ? 'evd-node-active' : done ? 'evd-node-done' : failed ? 'evd-node-fail' : '';
   const h = node.small ? 96 : NH;
-  const detail = detailFor(node.id, state, address, records, blocked);
+  const detail = detailFor(node.id, state, address, records, outcome);
   const detailColor = failed ? '#f87171' : done || active ? c : '#64748b';
   return (
     <div
@@ -176,21 +180,22 @@ function TelemetryFeed({ feed }) {
   );
 }
 
-const SWARM_SIZES = [3, 5, 8];
-
-function SwarmSizeStepper({ value, onChange }) {
+function OutcomeNotice({ outcome, error, onDismiss }) {
+  const item = error || outcome;
+  if (!item?.kind) return null;
+  const config = {
+    SUCCESS: ['border-green-500/45 bg-green-500/10 text-green-100', 'Pipeline concluído com sucesso'],
+    NO_EXPLOIT: ['border-cyan-500/45 bg-cyan-500/10 text-cyan-100', 'Alvo não vulnerável; exploração ignorada'],
+    AAP_BLOCKED: ['border-red-500/45 bg-red-500/10 text-red-200', 'AAP bloqueou a requisição'],
+    USER_BLOCKED: ['border-amber-500/45 bg-amber-500/10 text-amber-100', 'Contenção aplicada: usuário bloqueado'],
+    RATE_LIMITED: ['border-amber-500/45 bg-amber-500/10 text-amber-100', 'Rate limit interrompeu a ação'],
+    BACKEND_ERROR: ['border-orange-500/45 bg-orange-500/10 text-orange-100', 'Falha técnica no backend'],
+    RUN_ALREADY_ACTIVE: ['border-cyan-500/45 bg-cyan-500/10 text-cyan-100', 'Já existe uma execução em andamento'],
+  }[item.kind] || ['border-slate-500/45 bg-slate-500/10 text-slate-100', 'Ação não concluída'];
   return (
-    <div className="flex items-center gap-1 rounded-lg border border-[#26313f] bg-[#0f151d] p-1">
-      {SWARM_SIZES.map((n) => (
-        <button
-          key={n}
-          onClick={() => onChange(n)}
-          className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors
-            ${value === n ? 'bg-red-500/20 text-red-300 border border-red-500/40' : 'text-slate-400 border border-transparent hover:text-slate-200'}`}
-        >
-          {n}
-        </button>
-      ))}
+    <div role="alert" className={`flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${config[0]}`}>
+      <div><strong>{config[1]}.</strong>{item.message ? ` ${item.message}` : ''}</div>
+      <button onClick={onDismiss} className="text-xs opacity-70 hover:opacity-100">fechar</button>
     </div>
   );
 }
@@ -198,7 +203,11 @@ function SwarmSizeStepper({ value, onChange }) {
 function EscalationBanner({ evd }) {
   const { t } = useT();
   const [swarmSize, setSwarmSize] = useState(5);
-  const changeIp = async () => { await evd.rotateIp(); evd.runPipeline(); };
+  const busy = evd.escalating || evd.running === 'pipeline';
+  const changeIp = async () => {
+    const result = await evd.rotateIp();
+    if (result) await evd.runPipeline();
+  };
   return (
     <div className="rounded-xl border border-red-500/50 bg-red-500/10 p-4 evd-feed-enter">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -210,16 +219,16 @@ function EscalationBanner({ evd }) {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={changeIp}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 text-sm font-semibold hover:bg-amber-500/20">
+          <button onClick={changeIp} disabled={busy}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 text-sm font-semibold hover:bg-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed">
             <Shuffle className="w-4 h-4" /> {t('evd.esc_change_ip')}
           </button>
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] uppercase tracking-wider text-slate-500">{t('evd.esc_swarm_size')}</span>
             <SwarmSizeStepper value={swarmSize} onChange={setSwarmSize} />
           </div>
-          <button onClick={() => evd.escalate(swarmSize)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm font-bold hover:bg-red-400 shadow-lg shadow-red-500/20">
+          <button onClick={() => evd.escalate(swarmSize)} disabled={busy}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm font-bold hover:bg-red-400 shadow-lg shadow-red-500/20 disabled:opacity-40 disabled:cursor-not-allowed">
             <Layers className="w-4 h-4" /> {t('evd.esc_escalate')} ({swarmSize})
           </button>
         </div>
@@ -227,13 +236,18 @@ function EscalationBanner({ evd }) {
       <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-red-500/20 text-[11px] text-red-200/70">
         <Boxes className="w-3.5 h-3.5" /> {t('evd.esc_real_hint')}
       </div>
+      {evd.escalateError && (
+        <div role="alert" className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+          Não foi possível iniciar o enxame: {evd.escalateError.detail || evd.escalateError.kind}.
+        </div>
+      )}
     </div>
   );
 }
 
 export default function AttackOrchestrator({ evd }) {
   const { t } = useT();
-  const { nodeStates, feed, runPipeline, running, target, loot, blocked, escalating, agents, swarmMeta } = evd;
+  const { nodeStates, feed, runPipeline, running, target, loot, blocked, pipelineOutcome, operationError, escalating, agents, swarmMeta } = evd;
   const wrapRef = useRef(null);
   const [scale, setScale] = useState(1);
   const [modal, setModal] = useState(null);
@@ -254,6 +268,7 @@ export default function AttackOrchestrator({ evd }) {
   const failed = NODES.some((n) => nodeStates[n.id] === 'fail' && n.id !== 'DETECT');
   const address = target?.address;
   const records = loot?.summary?.records;
+  const hasSwarm = Object.keys(agents || {}).length > 0 || swarmMeta?.active || escalating;
 
   return (
     <div className="space-y-4">
@@ -264,6 +279,14 @@ export default function AttackOrchestrator({ evd }) {
           <p className="text-sm text-slate-400 mt-0.5">{t('evd.orch_subtitle')}</p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => evd.prepareNewTake({ rotate: false })}
+            disabled={isRunning || evd.preparing}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-600/50 bg-slate-800/50 text-slate-300 text-xs font-bold hover:bg-slate-700/60 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <RotateCcw className={`w-4 h-4 ${evd.preparing ? 'animate-spin' : ''}`} />
+            {evd.preparing ? t('evd.preparing_take') : t('evd.new_take')}
+          </button>
           <span className={`px-3 py-1.5 rounded-lg border text-xs font-bold tracking-wider
             ${failed ? 'text-red-400 border-red-500/40 bg-red-500/10'
               : done === total ? 'text-green-400 border-green-500/40 bg-green-500/10'
@@ -284,9 +307,23 @@ export default function AttackOrchestrator({ evd }) {
         </div>
       </div>
 
+      <OutcomeNotice outcome={pipelineOutcome} error={operationError} onDismiss={evd.clearOutcome} />
+
       {/* escalation: on AAP block, offer change-IP / escalate to N simultaneous IPs */}
-      {blocked && !escalating && <EscalationBanner evd={evd} />}
-      {escalating && <AgentSwarmPanel agents={agents} swarmMeta={swarmMeta} feed={feed} />}
+      {blocked && !hasSwarm && <EscalationBanner evd={evd} />}
+      {/* Antes o painel era gated em `escalating`, que virava false ao rodar o pipeline de
+          novo -- o enxame sumia da tela levando o relatório. Agora ele fica enquanto
+          houver agentes (ou rodada ativa) e só sai quando o usuário fecha. */}
+      {hasSwarm && (
+        <AgentSwarmPanel
+          agents={agents}
+          swarmMeta={swarmMeta}
+          feed={feed}
+          escalateError={evd.escalateError}
+          onRerun={(n) => evd.escalate(n)}
+          onDismiss={evd.dismissSwarm}
+        />
+      )}
 
       {/* pipeline canvas (scaled to fit) */}
       <div ref={wrapRef} className="rounded-xl border border-[#1e2733] bg-[#0a0e14] evd-grid overflow-hidden">
@@ -320,7 +357,7 @@ export default function AttackOrchestrator({ evd }) {
             {/* nodes */}
             {NODES.map((n) => (
               <Node key={n.id} node={n} state={nodeStates[n.id]} address={address} records={records}
-                blocked={blocked} clickable={CLICKABLE.has(n.id)} onClick={() => setModal(n.id)} />
+                outcome={pipelineOutcome} clickable={CLICKABLE.has(n.id)} onClick={() => setModal(n.id)} />
             ))}
             <Diamond state={nodeStates.DETECT} />
           </div>

@@ -8,7 +8,7 @@ import React from 'react';
 const SadDogIcon = () => (
   <svg viewBox="0 0 100 100" className="w-20 h-20 mx-auto">
     {/* Corpo principal */}
-    <g fill="none" stroke="#7C3AED" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <g fill="none" stroke="var(--brand-600)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       {/* Cabeça */}
       <ellipse cx="50" cy="45" rx="28" ry="25" fill="white" />
       
@@ -24,11 +24,11 @@ const SadDogIcon = () => (
       <ellipse cx="50" cy="55" rx="12" ry="8" fill="white" />
       
       {/* Nariz */}
-      <ellipse cx="50" cy="52" rx="5" ry="3.5" fill="#7C3AED" />
+      <ellipse cx="50" cy="52" rx="5" ry="3.5" fill="var(--brand-600)" />
       
       {/* Olhos tristes (olhando para baixo) */}
-      <circle cx="38" cy="40" r="4" fill="#7C3AED" />
-      <circle cx="62" cy="40" r="4" fill="#7C3AED" />
+      <circle cx="38" cy="40" r="4" fill="var(--brand-600)" />
+      <circle cx="62" cy="40" r="4" fill="var(--brand-600)" />
       
       {/* Sobrancelhas tristes */}
       <path d="M 30 32 L 42 36" strokeWidth="2" />

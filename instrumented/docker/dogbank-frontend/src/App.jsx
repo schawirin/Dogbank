@@ -1,6 +1,7 @@
 import React, { useContext } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
+import { BrandThemeProvider } from './theme/BrandThemeContext';
 
 // Layout
 import MainLayout from './components/layout/MainLayout';
@@ -69,7 +70,9 @@ const AppContent = () => {
 
 const App = () => (
   <AuthProvider>
-    <AppContent />
+    <BrandThemeProvider>
+      <AppContent />
+    </BrandThemeProvider>
   </AuthProvider>
 );
 

@@ -3,10 +3,12 @@ package com.dogbank.transaction.controller;
 import com.dogbank.transaction.dto.TransactionRequest;
 import com.dogbank.transaction.dto.TransactionResponse;
 import com.dogbank.transaction.entity.Transaction;
+import com.dogbank.transaction.exception.UserBlockedException;
 import com.dogbank.transaction.service.IdempotencyService;
 import com.dogbank.transaction.service.TransactionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -43,10 +45,12 @@ public class TransactionController {
         String txId = UUID.randomUUID().toString();
         if (!idempotencyService.tryConsume(effectiveKey, txId)) {
             String existing = idempotencyService.getExistingTransactionId(effectiveKey);
+            logPixFalhaIdempotencia(request, effectiveKey);
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(Map.of("error", "Duplicate request", "transactionId", existing != null ? existing : ""));
         }
 
+        try {
         // Validação de senha obrigatória
         if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
             log.error("❌ Tentativa de PIX sem senha! Account: {}", request.getAccountOriginId());
@@ -54,7 +58,16 @@ public class TransactionController {
         }
 
         // Validar senha com auth-service
-        boolean senhaValida = transactionService.validarSenha(request.getAccountOriginId(), request.getPassword());
+        boolean senhaValida;
+        try {
+            senhaValida = transactionService.validarSenha(request.getAccountOriginId(), request.getPassword());
+        } catch (UserBlockedException e) {
+            idempotencyService.release(effectiveKey);
+            log.warn("PIX negado para conta bloqueada: {}", request.getAccountOriginId());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "error", e.getMessage(),
+                    "reason", "USER_BLOCKED"));
+        }
         if (!senhaValida) {
             log.error("❌ Senha inválida para PIX! Account: {}", request.getAccountOriginId());
             throw new RuntimeException("Senha incorreta");
@@ -87,6 +100,38 @@ public class TransactionController {
         resp.setSenderAccount(tx.getSenderAccountNumber());
 
         return ResponseEntity.ok(resp);
+        } catch (RuntimeException e) {
+            // PIX falhou (timeout do BC/SPI, saldo, chave inválida, etc.): libera a chave de
+            // idempotência para NÃO bloquear um retry legítimo por 24h.
+            idempotencyService.release(effectiveKey);
+            throw e;
+        }
+    }
+
+    /** Emite os eventos de falha por idempotência (dashboard: @evento:pix.transferencia.falha / PIX_ERRO). */
+    private void logPixFalhaIdempotencia(TransactionRequest request, String key) {
+        try {
+            MDC.put("evento", "pix.transferencia.falha");
+            MDC.put("erro_tipo", "IDEMPOTENCIA");
+            MDC.put("erro_codigo", "DUPLICATE_REQUEST");
+            MDC.put("status_transacao", "FALHA");
+            MDC.put("pix_falha", "true");
+            MDC.put("pix_sucesso", "false");
+            MDC.put("chave_pix", String.valueOf(request.getPixKeyDestination()));
+            MDC.put("conta_origem_id", String.valueOf(request.getAccountOriginId()));
+            if (request.getAmount() != null) {
+                MDC.put("valor_numerico", request.getAmount().toString());
+            }
+            log.error("PIX_FALHA erro=IDEMPOTENCIA codigo=DUPLICATE_REQUEST key={}", key);
+            MDC.put("evento", "PIX_ERRO");
+            MDC.put("status_transacao", "REJEITADO_IDEMPOTENCIA");
+            log.error("Requisicao PIX duplicada bloqueada por idempotencia (key={})", key);
+        } finally {
+            for (String k : new String[]{"evento", "erro_tipo", "erro_codigo", "status_transacao",
+                    "pix_falha", "pix_sucesso", "chave_pix", "conta_origem_id", "valor_numerico"}) {
+                MDC.remove(k);
+            }
+        }
     }
 
     @GetMapping("/validate-pix-key")
@@ -146,5 +191,12 @@ public class TransactionController {
     @GetMapping("/account/{accountId}")
     public ResponseEntity<List<Transaction>> getTransactionsByAccountId(@PathVariable Long accountId) {
         return ResponseEntity.ok(transactionService.listarTransacoesPorConta(accountId));
+    }
+
+    @GetMapping("/account/{accountId}/recent")
+    public ResponseEntity<List<Transaction>> getRecentTransactionsByAccountId(
+            @PathVariable Long accountId,
+            @RequestParam(defaultValue = "20") Integer limit) {
+        return ResponseEntity.ok(transactionService.listarTransacoesRecentesPorConta(accountId, limit));
     }
 }

@@ -182,6 +182,20 @@ INSERT INTO transacoes_pix (conta_origem, conta_destino, valor_transacionado, ch
 ((SELECT id FROM contas WHERE numero_conta='0004-3'), (SELECT id FROM contas WHERE numero_conta='0005-4'), 350.00, 'eliane.oliveira@dogbank.com', 'CONCLUIDA');
 
 -- =============================================================================
+-- EVILDOG MULE / CONTA-LARANJA (demo de salami slicing / money mule)
+-- =============================================================================
+-- Destino dos micro-PIX do robô do EvilDog; chave 'evildog@dogbank.com' (DRAIN_KEY).
+-- Existia só no seed do RDS (datadog/terraform/init-rds.sql) e nunca foi portado para
+-- cá: sem ela TODO PIX do robô morria com "Chave Pix de destino não encontrada" (HTTP
+-- 500), o que aparecia na UI como se o ataque tivesse sido bloqueado.
+INSERT INTO usuarios (cpf, senha, nome, email, chave_pix) VALUES
+('11199988877', '123456', 'EvilDog Mule', 'evildog@dogbank.com', 'evildog@dogbank.com')
+ON CONFLICT (cpf) DO NOTHING;
+INSERT INTO contas (usuario_id, numero_conta, saldo, banco, user_name) VALUES
+((SELECT id FROM usuarios WHERE cpf='11199988877'), '9999-9', 0.00, 'DOG BANK', 'EvilDog Mule')
+ON CONFLICT (numero_conta) DO NOTHING;
+
+-- =============================================================================
 -- CRIAR ÍNDICES PARA PERFORMANCE
 -- =============================================================================
 CREATE INDEX IF NOT EXISTS idx_usuarios_cpf ON usuarios(cpf);

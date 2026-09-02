@@ -75,70 +75,46 @@ const pixService = {
     console.log('🔐 Autenticando usuário:', cpf);
     await authService.login(cpf, password);
 
-    // 2) Validação da transação junto ao Banco Central (AQUI pode dar timeout!)
-    console.log('🏦 Validando transação no Banco Central...');
-    console.log('💰 Valor da transação:', amount);
-    
-    try {
-      const bcResponse = await bancoCentralApi.post('/pix/validate', { pixKey, amount });
-      console.log('✅ Resposta do Banco Central:', bcResponse.data);
-      
-      if (bcResponse.data.status !== 'APPROVED') {
-        const errorMsg = bcResponse.data.error || 'Transação não aprovada pelo Banco Central';
-        console.error('❌ Banco Central rejeitou:', errorMsg);
-        throw new Error(errorMsg);
-      }
-    } catch (bcError) {
-      console.error('❌ Erro do Banco Central:', bcError);
-      
-      // Verifica se é timeout
-      if (bcError.code === 'ECONNABORTED' || bcError.response?.status === 408) {
-        throw new Error('Não foi possível realizar o PIX. O Banco Central não respondeu a tempo. Tente novamente mais tarde.');
-      }
-      
-      // Verifica se é erro de resposta do BC
-      if (bcError.response?.data?.error) {
-        throw new Error(bcError.response.data.error);
-      }
-      
-      // Se o erro já tem mensagem, propaga
-      if (bcError.message && !bcError.message.includes('status code')) {
-        throw bcError;
-      }
-      
-      throw new Error('Não foi possível realizar o PIX. Tente novamente mais tarde.');
-    }
-
-    // 3) Envio para o serviço de transações
+    // 2) Envia DIRETO para o transaction-service, que é o ORQUESTRADOR:
+    //    ele chama o Banco Central → SPI internamente (o timeout acontece lá) e
+    //    registra a falha (pix.transferencia.falha / PIX_ERRO). NÃO chamamos o
+    //    bancocentral direto do frontend — isso criava um "ponto cego" no
+    //    observability (o transaction-service nunca era notificado do timeout).
     const payload = {
       accountOriginId: sourceAccountId,
       pixKeyDestination: pixKey,
       amount,
       description,
-      password
+      password,
     };
 
+    // Chave de idempotência ÚNICA por tentativa (padrão real: o cliente gera a
+    // chave por requisição). Assim dois PIX distintos entre as MESMAS contas não
+    // colidem — o double-click é evitado pela UI (botão desabilitado no submit).
+    // Sem isso, o backend cairia na chave grosseira auto-{origem}-{destino}, que
+    // dedupe por 24h e bloqueava, por ex., repetir Emiliano→Pedro (timeout do BC).
+    const idempotencyKey =
+      (typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID)
+        ? window.crypto.randomUUID()
+        : `pix-${sourceAccountId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
     try {
-      // DEBUG: Verificar URL completa
-      const fullUrl = transactionApi.defaults.baseURL + '/pix';
-      console.log('🔍 URL completa do PIX:', fullUrl);
-      console.log('🔍 BaseURL do transactionApi:', transactionApi.defaults.baseURL);
-      console.log('🔍 Payload do PIX:', payload);
-      
-      const { data } = await transactionApi.post('/pix', payload);
-      
+      console.log('🏦 Enviando PIX ao transaction-service (orquestra BC → SPI)...', payload);
+      const { data } = await transactionApi.post('/pix', payload, {
+        headers: { 'X-Idempotency-Key': idempotencyKey },
+      });
       console.log('✅ PIX executado com sucesso:', data);
       return data;
     } catch (error) {
-      console.error('❌ Erro detalhado PIX:', {
-        message: error.message,
-        url: error.config?.url,
-        baseURL: error.config?.baseURL,
-        fullURL: `${error.config?.baseURL || ''}${error.config?.url || ''}`,
+      console.error('❌ Erro no PIX (transaction-service):', {
         status: error.response?.status,
-        responseData: error.response?.data
+        responseData: error.response?.data,
       });
-      throw error;
+      if (error.code === 'ECONNABORTED') {
+        throw new Error('Não foi possível realizar o PIX. O Banco Central não respondeu a tempo. Tente novamente mais tarde.');
+      }
+      const serverMsg = error.response?.data?.error || error.response?.data?.message;
+      throw new Error(serverMsg || 'Não foi possível realizar o PIX. Tente novamente mais tarde.');
     }
   },
 
@@ -147,16 +123,21 @@ const pixService = {
    * @param {number} accountId
    * @returns {Promise<Array>} lista de transações
    */
-  async getTransactionHistory(accountId) {
+  async getTransactionHistory(accountId, options = {}) {
     try {
+      const limit = Number(options.limit || 0);
+      const endpoint = limit > 0
+        ? `/account/${accountId}/recent?limit=${Math.min(Math.max(limit, 1), 500)}`
+        : `/account/${accountId}`;
+
       // DEBUG: Verificar URL completa
-      const fullUrl = transactionApi.defaults.baseURL + `/account/${accountId}`;
+      const fullUrl = transactionApi.defaults.baseURL + endpoint;
       console.log('🔍 URL completa da requisição de histórico:', fullUrl);
       console.log('🔍 BaseURL do transactionApi:', transactionApi.defaults.baseURL);
       console.log('🔍 URL atual da página:', window.location.href);
       console.log('🔍 AccountId:', accountId);
       
-      const { data } = await transactionApi.get(`/account/${accountId}`);
+      const { data } = await transactionApi.get(endpoint);
       
       console.log('✅ Histórico de transações obtido:', data);
       
@@ -167,6 +148,8 @@ const pixService = {
         
         return {
           id: tx.id,
+          accountOriginId: tx.accountOriginId,
+          accountDestinationId: tx.accountDestinationId,
           tipo: isEnviado ? 'enviado' : 'recebido',
           valor: tx.amount,
           amount: tx.amount,
@@ -183,6 +166,11 @@ const pixService = {
           receiverBank: tx.receiverBank,
           senderBank: tx.senderBankCode
         };
+      }).sort((a, b) => {
+        const dateA = new Date(a.completedAt || a.createdAt || a.data || 0).getTime();
+        const dateB = new Date(b.completedAt || b.createdAt || b.data || 0).getTime();
+        if (dateB !== dateA) return dateB - dateA;
+        return (b.id || 0) - (a.id || 0);
       });
       
       console.log('✅ Transações transformadas:', transformedData);
@@ -200,5 +188,8 @@ const pixService = {
     }
   }
 };
+
+pixService.getRecentTransactionHistory = (accountId, limit = 20) =>
+  pixService.getTransactionHistory(accountId, { limit });
 
 export default pixService;

@@ -1,7 +1,9 @@
 services:
   frontend:
     build:
-      context: ../dogbank-mobile-app
+      # The security demo lives in dogbank-frontend. Pointing the local profile
+      # at dogbank-mobile-app silently served a build without /dashboard/evildog.
+      context: ../dogbank-frontend
       dockerfile: Dockerfile
     healthcheck: !override
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80"]
@@ -9,6 +11,13 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
+  evildog-api:
+    environment:
+      # A demo local já é limitada aos alvos internos do DogBank. Não interrompa
+      # a apresentação com uma segunda autenticação exclusiva do EvilDog.
+      # O compose base continua fail-closed em qualquer outro ambiente.
+      EVILDOG_ALLOW_UNAUTHENTICATED: "true"
 
   postgres:
     ports: !reset []
@@ -108,3 +117,4 @@ services:
       retries: 3
     ports: !override
       - "8080:80"
+      - "8443:443"

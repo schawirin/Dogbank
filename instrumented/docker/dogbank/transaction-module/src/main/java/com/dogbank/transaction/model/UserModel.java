@@ -6,7 +6,8 @@ public class UserModel {
     private String chavePix;
     private String cpf;
     private String email;
-    
+    private Boolean blocked;
+
     public Long getId() {
         return id;
     }
@@ -45,5 +46,13 @@ public class UserModel {
     
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public Boolean getBlocked() {
+        return blocked;
+    }
+
+    public void setBlocked(Boolean blocked) {
+        this.blocked = blocked;
     }
 }
