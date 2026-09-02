@@ -39,7 +39,7 @@ jobs:
             dockerfile: ./instrumented/docker/dogbank/fraud-detection-module/Dockerfile
             image: schawirin/dogbank-fraud-detection-service
           - name: pix-worker
-            context: ./instrumented/docker/dogbank
+            context: ./instrumented/docker/dogbank/pix-worker-module
             dockerfile: ./instrumented/docker/dogbank/pix-worker-module/Dockerfile
             image: schawirin/dogbank-pix-worker
           - name: chatbot
