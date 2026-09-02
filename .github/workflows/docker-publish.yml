@@ -35,7 +35,7 @@ jobs:
             dockerfile: ./instrumented/docker/dogbank/investment-registry-mock/Dockerfile
             image: schawirin/dogbank-investment-registry-mock
           - name: fraud-detection
-            context: ./instrumented/docker/dogbank
+            context: ./instrumented/docker/dogbank/fraud-detection-module
             dockerfile: ./instrumented/docker/dogbank/fraud-detection-module/Dockerfile
             image: schawirin/dogbank-fraud-detection-service
           - name: pix-worker
