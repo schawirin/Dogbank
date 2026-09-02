@@ -918,6 +918,11 @@ class RateLimitedError(PipelineOutcomeError):
     outcome = "RATE_LIMITED"
 
 
+class AapEnforcementTimeoutError(PipelineOutcomeError):
+    """O operador esperava denylist, mas o tracer continuou permitindo o IP."""
+    outcome = "AAP_NOT_ENFORCED"
+
+
 class BackendError(PipelineOutcomeError):
     outcome = "BACKEND_ERROR"
 
@@ -1113,12 +1118,13 @@ def _ensure_available_source_ip() -> dict:
 
 
 def _await_aap_enforcement(source_ip: str, grace_s: float = BLOCK_SYNC_GRACE_S,
-                           poll_s: float = BLOCK_SYNC_POLL_S) -> bool:
+                           poll_s: float = BLOCK_SYNC_POLL_S) -> None:
     """Dá tempo para a denylist remota chegar ao tracer antes de repetir o ataque.
 
     A verificação continua sendo real: somente um 403 com evidência AAP interrompe
     a pipeline. Não existe bloqueio local simulado. Se a configuração ainda não
-    estiver ativa ao fim da janela, a execução segue normalmente.
+    estiver ativa ao fim da janela, a execução falha fechada no RECON; continuar
+    para SQLi/ATO esconderia uma ação do Datadog que não chegou ao tracer.
     """
     deadline = time.monotonic() + max(0.0, grace_s)
     attempts = 0
@@ -1131,7 +1137,11 @@ def _await_aap_enforcement(source_ip: str, grace_s: float = BLOCK_SYNC_GRACE_S,
             timeout=8,
         )
         if time.monotonic() >= deadline:
-            return False
+            raise AapEnforcementTimeoutError(
+                f"o endpoint continuou respondendo HTTP 200 para o IP {source_ip} "
+                f"após {grace_s:g}s; o bloqueio solicitado no Datadog não chegou ao tracer "
+                "ou já expirou"
+            )
         # Keep retry details in backend diagnostics. Repeating one line per
         # probe in the presenter feed made a real Remote Configuration wait
         # look like a mocked animation.
@@ -1391,6 +1401,14 @@ def _run_pipeline(run_id: str, source_ip: Optional[str] = None,
         _finish_pipeline_state("error", exc.outcome, detail)
         bus.publish({"type": "pipeline", "state": "error", "run_id": run_id, "source_ip": src,
                      "outcome": exc.outcome, "level": "critical", "message": detail})
+        return "error"
+    except AapEnforcementTimeoutError as exc:
+        active = next((n for n in PIPELINE_NODES if API_STATE["last_pipeline"].get(n) == "active"), "RECON")
+        _node(active, "fail", f"[AAP NÃO CONFIRMADA] {exc}")
+        detail = f"Bloqueio AAP não confirmado — {exc}. O ataque foi interrompido antes da exploração."
+        _finish_pipeline_state("error", exc.outcome, detail)
+        bus.publish({"type": "pipeline", "state": "error", "run_id": run_id, "source_ip": src,
+                     "outcome": exc.outcome, "level": "warn", "message": detail})
         return "error"
     except BackendError as exc:
         active = next((n for n in PIPELINE_NODES if API_STATE["last_pipeline"].get(n) == "active"), None)

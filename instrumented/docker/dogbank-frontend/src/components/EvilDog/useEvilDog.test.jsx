@@ -52,6 +52,7 @@ function HookProbe() {
       <output data-testid="run">{evd.currentRunId || 'none'}</output>
       <output data-testid="recon">{evd.nodeStates.RECON || 'idle'}</output>
       <output data-testid="running">{evd.running || 'idle'}</output>
+      <output data-testid="outcome">{evd.pipelineOutcome?.kind || 'none'}</output>
       <output data-testid="preparing">{String(evd.preparing)}</output>
       <output data-testid="auth-required">{String(evd.authRequired)}</output>
     </>
@@ -136,6 +137,21 @@ describe('useEvilDog run isolation', () => {
     await waitFor(() => expect(screen.getByTestId('run')).toHaveTextContent('run-current'));
     await waitFor(() => expect(screen.getByTestId('running')).toHaveTextContent('idle'), { timeout: 2000 });
     expect(screen.getByTestId('recon')).toHaveTextContent('success');
+  });
+
+  it('keeps the AAP not-enforced diagnosis instead of relabeling it as a backend error', async () => {
+    render(<HookProbe />);
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+
+    fireEvent.click(screen.getByText('start'));
+    await waitFor(() => expect(screen.getByTestId('run')).toHaveTextContent('run-current'));
+
+    act(() => FakeEventSource.instances[0].emit({
+      type: 'pipeline', run_id: 'run-current', state: 'error', outcome: 'AAP_NOT_ENFORCED',
+    }));
+
+    await waitFor(() => expect(screen.getByTestId('running')).toHaveTextContent('idle'));
+    expect(screen.getByTestId('outcome')).toHaveTextContent('AAP_NOT_ENFORCED');
   });
 
   it('exchanges the operator token for a session and resumes the pending swarm', async () => {

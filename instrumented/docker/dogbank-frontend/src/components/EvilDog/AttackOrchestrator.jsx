@@ -63,6 +63,7 @@ function detailFor(id, st, address, records, outcome) {
     if (outcome?.kind === 'AAP_BLOCKED') return '🛡️ Bloqueado pela AAP';
     if (outcome?.kind === 'USER_BLOCKED') return '🛡️ Contido: usuário bloqueado';
     if (outcome?.kind === 'RATE_LIMITED') return '⏳ Rate limit aplicado';
+    if (outcome?.kind === 'AAP_NOT_ENFORCED') return '⚠️ Bloqueio AAP não aplicado';
     if (outcome?.kind === 'BACKEND_ERROR') return '⚠️ Erro do backend';
   }
   switch (id) {
@@ -189,6 +190,7 @@ function OutcomeNotice({ outcome, error, onDismiss }) {
     AAP_BLOCKED: ['border-red-500/45 bg-red-500/10 text-red-200', 'AAP bloqueou a requisição'],
     USER_BLOCKED: ['border-amber-500/45 bg-amber-500/10 text-amber-100', 'Contenção aplicada: usuário bloqueado'],
     RATE_LIMITED: ['border-amber-500/45 bg-amber-500/10 text-amber-100', 'Rate limit interrompeu a ação'],
+    AAP_NOT_ENFORCED: ['border-amber-500/45 bg-amber-500/10 text-amber-100', 'Bloqueio AAP não confirmado'],
     BACKEND_ERROR: ['border-orange-500/45 bg-orange-500/10 text-orange-100', 'Falha técnica no backend'],
     RUN_ALREADY_ACTIVE: ['border-cyan-500/45 bg-cyan-500/10 text-cyan-100', 'Já existe uma execução em andamento'],
   }[item.kind] || ['border-slate-500/45 bg-slate-500/10 text-slate-100', 'Ação não concluída'];

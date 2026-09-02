@@ -18,6 +18,7 @@ const outcomeFrom = (event = {}) => {
   if (kind === 'AAP_BLOCKED' || event.state === 'blocked') return 'AAP_BLOCKED';
   if (kind === 'USER_BLOCKED' || kind === 'CONTAINED' || event.state === 'contained') return 'USER_BLOCKED';
   if (kind === 'RATE_LIMITED') return 'RATE_LIMITED';
+  if (kind === 'AAP_NOT_ENFORCED') return 'AAP_NOT_ENFORCED';
   if (kind === 'BACKEND_ERROR' || event.state === 'error') return 'BACKEND_ERROR';
   return kind || null;
 };
@@ -223,10 +224,8 @@ export default function useEvilDog() {
   const pollPipelineUntilTerminal = useCallback((runId) => {
     if (!runId) return undefined;
     let cancelled = false;
-    let attempts = 0;
     const poll = async () => {
       if (cancelled || currentRunIdRef.current !== runId || !pipelineActiveRef.current) return;
-      attempts += 1;
       try {
         const state = await evilDogService.getPipelineState();
         const stateRunId = state?.run_id || state?.runId;
@@ -235,13 +234,11 @@ export default function useEvilDog() {
         requireOperatorSession(error);
       }
       if (!cancelled && pipelineActiveRef.current && currentRunIdRef.current === runId) {
-        if (attempts >= 180) {
-          pipelineActiveRef.current = false;
-          setRunning(null);
-          setOperationError({ kind: 'BACKEND_ERROR', message: 'O acompanhamento do pipeline expirou; consulte o estado antes de repetir.' });
-          return;
-        }
-        pipelinePollTimerRef.current = window.setTimeout(poll, 500);
+        // Enquanto o backend responde `running`, ele é a fonte de verdade. A
+        // espera real pela Remote Configuration pode passar de 90s; encerrar o
+        // acompanhamento por contagem local criava um falso erro na UI embora
+        // o processo continuasse executando no servidor.
+        pipelinePollTimerRef.current = window.setTimeout(poll, 1000);
       }
     };
     pipelinePollTimerRef.current = window.setTimeout(poll, 250);

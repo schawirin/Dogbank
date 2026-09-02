@@ -144,6 +144,44 @@ def test_aap_enforcement_wait_retries_same_ip_until_real_block(monkeypatch):
     assert calls == ["203.0.113.77", "203.0.113.77", "203.0.113.77"]
 
 
+def test_aap_enforcement_wait_fails_closed_when_block_never_arrives(monkeypatch):
+    calls = []
+    clock = iter([0.0, 0.0, 1.0])
+
+    def probe(method, url, xff=None, **kwargs):
+        calls.append(xff)
+        return Response(200, "allowed", url=url)
+
+    monkeypatch.setattr(main, "_pipe_request", probe)
+    monkeypatch.setattr(main.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(main.time, "sleep", lambda *_: None)
+
+    with pytest.raises(main.AapEnforcementTimeoutError, match="continuou respondendo HTTP 200"):
+        main._await_aap_enforcement("203.0.113.77", grace_s=0.5, poll_s=0.01)
+
+    assert calls == ["203.0.113.77", "203.0.113.77"]
+
+
+def test_expected_aap_block_stops_before_attack_tools_when_not_enforced(monkeypatch):
+    monkeypatch.setattr(main, "_stage", lambda *_: 0.0)
+    monkeypatch.setattr(
+        main,
+        "_await_aap_enforcement",
+        lambda *_: (_ for _ in ()).throw(main.AapEnforcementTimeoutError("HTTP 200 após a janela")),
+    )
+    tool_calls = []
+    monkeypatch.setattr(main, "_run_tool", lambda *args, **kwargs: tool_calls.append(args) or (0, ""))
+
+    main._start_pipeline_state("run-aap-timeout", "203.0.113.77")
+    result = main._run_pipeline("run-aap-timeout", "203.0.113.77", verify_enforcement=True)
+
+    assert result == "error"
+    assert tool_calls == []
+    assert main.API_STATE["last_pipeline"]["RECON"] == "fail"
+    assert main.API_STATE["pipeline"]["outcome"] == "AAP_NOT_ENFORCED"
+    assert "antes da exploração" in main.API_STATE["pipeline"]["detail"]
+
+
 def test_pipeline_state_contains_recovery_contract():
     main._start_pipeline_state("run-demo", "203.0.113.8")
     main.API_STATE["last_pipeline"]["RECON"] = "success"
