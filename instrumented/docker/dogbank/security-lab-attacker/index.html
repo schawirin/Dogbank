@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Security Lab — Attacker Simulator</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <div>
+          <p class="eyebrow">SECURITY LAB - ATTACKER SIMULATOR</p>
+          <h1>postMessage("*") + framing</h1>
+          <p>Ambiente controlado - dados fictícios</p>
+        </div>
+        <div class="hero-actions">
+          <div class="mode-switch" role="group" aria-label="Modo da demonstração">
+            <button id="vulnerable-mode" class="selected">VULNERABLE MODE</button>
+            <button id="fixed-mode">FIXED MODE</button>
+          </div>
+          <span id="pipeline-status" class="pipeline-status idle"><i></i> OCIOSO (0/6)</span>
+          <button id="run-pipeline" class="run-pipeline">▶ RODAR PIPELINE</button>
+        </div>
+      </header>
+
+      <section class="explanation">
+        <strong>O que esta PoC demonstra?</strong>
+        Esta demonstração mostra que uma aplicação incorporada em um iframe pode enviar dados para a página pai quando utiliza
+        <code>window.parent.postMessage(..., '*')</code>.
+        <br />Os dados apresentados são inteiramente fictícios e existem exclusivamente para demonstração acadêmica.
+      </section>
+
+      <section class="pipeline-shell" aria-label="Browser attack orchestrator">
+        <div class="orchestrator-title">
+          <div><strong>EVILDOG :: BROWSER ATTACK ORCHESTRATOR</strong><span>Fluxo ativo: trust-boundary abuse (execução sintética ao vivo)</span></div>
+          <small>Clique em qualquer etapa para ver as evidências</small>
+        </div>
+        <div class="pipeline" aria-label="Pipeline da exploração">
+          <button type="button" class="node" data-node="LOAD"><small>1</small><b></b><strong>LOAD</strong><span>carregar alvo</span><em>detalhes</em></button>
+          <i>→</i>
+          <button type="button" class="node" data-node="FRAME"><small>2</small><b></b><strong>FRAME</strong><span>iframe externo</span><em>detalhes</em></button>
+          <i>→</i>
+          <button type="button" class="node" data-node="PIX"><small>3</small><b></b><strong>PIX</strong><span>ação sintética</span><em>detalhes</em></button>
+          <i>→</i>
+          <button type="button" class="node" data-node="POST"><small>4</small><b></b><strong>POSTMESSAGE</strong><span>target origin</span><em>detalhes</em></button>
+          <i>→</i>
+          <button type="button" class="node" data-node="CAPTURE"><small>5</small><b></b><strong>CAPTURE</strong><span>external parent</span><em>detalhes</em></button>
+          <i>→</i>
+          <button type="button" class="node" data-node="REPORT"><small>6</small><b></b><strong>REPORT</strong><span>impacto</span><em>detalhes</em></button>
+        </div>
+      </section>
+
+      <section id="outcome" class="outcome waiting">Aguardando o handshake real com o iframe…</section>
+
+      <section id="impact-report" class="impact-report" hidden>
+        <div><small>RESULTADO DA EXECUÇÃO</small><strong id="impact-title">CADEIA CONCLUÍDA</strong></div>
+        <dl>
+          <div><dt>Origem observada</dt><dd id="impact-origin">—</dd></div>
+          <div><dt>Evento capturado</dt><dd id="impact-event">—</dd></div>
+          <div><dt>Impacto potencial</dt><dd id="impact-value">—</dd></div>
+        </dl>
+      </section>
+
+      <div class="workspace">
+        <section class="frame-panel">
+          <div class="panel-title"><span>DogBank em outra origem</span><code id="frame-url"></code></div>
+          <iframe id="dogbank-frame" title="DogBank synthetic PIX security lab"></iframe>
+          <div id="frame-blocked" class="frame-blocked" hidden>
+            <strong>Attack blocked</strong>
+            <span>O iframe não respondeu ao handshake. Em FIXED MODE, CSP <code>frame-ancestors 'self'</code> impede esta origem.</span>
+          </div>
+        </section>
+
+        <aside class="capture-panel">
+          <div class="panel-title"><span>SECURITY LAB — Captured Messages</span><b id="counter">Messages captured: 0</b></div>
+          <div id="empty-state" class="empty-state">No messages captured.</div>
+          <div id="messages" class="messages"></div>
+        </aside>
+      </div>
+
+      <section class="flow-note">
+        <span>DogBank</span><b>↓</b><span>postMessage("*")</span><b>↓</b><span>External Parent</span><b>↓</b><span>Message captured</span>
+      </section>
+
+      <section class="telemetry">
+        <div class="panel-title"><span>Feed de execução ao vivo</span><button id="reset">Limpar take</button></div>
+        <pre id="log"></pre>
+      </section>
+
+      <div id="node-detail" class="node-detail" hidden>
+        <section role="dialog" aria-modal="true" aria-labelledby="detail-title">
+          <header><div><small id="detail-step">ETAPA</small><h2 id="detail-title">Detalhes</h2></div><button id="close-detail" aria-label="Fechar detalhes">×</button></header>
+          <p id="detail-summary"></p>
+          <div class="evidence-title">EVIDÊNCIA OBSERVADA</div>
+          <pre id="detail-evidence"></pre>
+        </section>
+      </div>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

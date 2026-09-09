@@ -188,6 +188,28 @@ String sql = "SELECT u.nome, u.email, u.cpf, c.saldo, c.banco, u.chave_pix " +
              "WHERE u.chave_pix = '" + pixKey + "'";  // ⚠️ VULNERABLE!
 ```
 
+### Browser Messaging Lab (`postMessage` + framing)
+
+O laboratório também inclui uma segunda pipeline, totalmente separada da SQL
+Injection, para demonstrar de forma controlada o risco de combinar framing com
+`postMessage(..., "*")`. A PoC usa apenas dados PIX fictícios e não persiste nem
+envia os dados capturados para serviços externos.
+
+- Pipeline: `LOAD → FRAME → PIX → POSTMESSAGE → CAPTURE → REPORT`
+- Execução: botão **RODAR PIPELINE**, progresso `0/6 → 6/6` e detalhes clicáveis
+  com a evidência de cada etapa
+- Catálogo integrado: `https://lab.dogbank.dog:8443/dashboard/evildog`
+- Simulador atacante HTTPS: `https://lab.dogbank.dog:3001`
+- Alternativa HTTP local: `http://localhost:3002`
+- Página DogBank sintética: `http://localhost:3000/security-lab/pix-demo?mode=vulnerable`
+- Modo corrigido: CSP `frame-ancestors 'self'`, target origin explícito e validação
+  de `event.origin`/`event.source`
+- Guia completo: [`instrumented/docker/dogbank/SECURITY-LAB-POSTMESSAGE.md`](instrumented/docker/dogbank/SECURITY-LAB-POSTMESSAGE.md)
+
+> Este cenário representa impacto potencial em um laboratório acadêmico. Ele não
+> afirma que dados pessoais ou financeiros reais foram observados no ambiente
+> original analisado.
+
 ### What Data Can Be Extracted?
 
 The vulnerable endpoint returns these fields from the database:
@@ -1132,4 +1154,3 @@ DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED: "true"
                         │   pix.fraud     │     │   (Consumer)    │
                         └─────────────────┘     └─────────────────┘
 ```
-

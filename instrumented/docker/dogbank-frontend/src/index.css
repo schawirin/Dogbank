@@ -78,6 +78,17 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
+@keyframes security-lab-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.security-lab-progress {
+  width: 100%;
+  transform-origin: left;
+  animation: security-lab-progress 1.8s ease-in-out forwards;
+}
+
 /* ===== CUSTOM ANIMATIONS ===== */
 
 /* Slow pulse for orbs */

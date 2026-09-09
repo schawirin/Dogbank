@@ -1,5 +1,5 @@
 import React, { useContext } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { BrandThemeProvider } from './theme/BrandThemeContext';
 
@@ -20,20 +20,26 @@ import PixReceiptPage from './pages/PixReceiptPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ProfilePage from './pages/ProfilePage';
 import EvilDogPage from './pages/EvilDogPage';
+import SecurityLabPixDemoPage from './pages/SecurityLabPixDemoPage';
+import SecurityLabTrustedReceiverPage from './pages/SecurityLabTrustedReceiverPage';
 import Chatbot from './components/Chatbot';
 
 const AppContent = () => {
   const { user } = useContext(AuthContext);
+  const location = useLocation();
+  const securityLabRoute = location.pathname.startsWith('/security-lab/');
 
   return (
     <>
       {/* Chatbot - Assistente Virtual com vulnerabilidade de Prompt Injection */}
-      <Chatbot accountId={user?.accountId} />
+      {!securityLabRoute && <Chatbot accountId={user?.accountId} />}
       <Routes>
         {/* Rotas públicas */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/password" element={<PasswordPage />} />
+        <Route path="/security-lab/pix-demo" element={<SecurityLabPixDemoPage />} />
+        <Route path="/security-lab/trusted-receiver" element={<SecurityLabTrustedReceiverPage />} />
 
         {/* Rotas protegidas dentro do MainLayout */}
         <Route path="/dashboard" element={<MainLayout />}>

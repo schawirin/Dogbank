@@ -2,11 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Skull, LayoutDashboard, GitBranch, Terminal, Wifi, WifiOff,
   Maximize2, Minimize2, Crosshair, Globe, Network, ChevronDown, Plus, Shuffle,
+  ShieldAlert, Database, ArrowRight,
 } from 'lucide-react';
 import useEvilDog from '../components/EvilDog/useEvilDog';
 import ControlPanel from '../components/EvilDog/ControlPanel';
 import AttackOrchestrator from '../components/EvilDog/AttackOrchestrator';
 import PostExploitPanel from '../components/EvilDog/PostExploitPanel';
+import BrowserAttackLab from '../components/EvilDog/BrowserAttackLab';
 import { useT } from '../i18n';
 import '../components/EvilDog/EvilDog.css';
 
@@ -133,8 +135,66 @@ function OperatorLogin({ evd }) {
   );
 }
 
+function ModuleCatalog({ onSelect }) {
+  const modules = [
+    {
+      id: 'sqli',
+      eyebrow: 'API ATTACK CHAIN',
+      title: 'SQL Injection',
+      description: 'Reconhecimento, scan, detecção, exploração, tomada de conta e transferência PIX.',
+      pipeline: 'RECON → SCAN → DETECT → INJECT → ATO → TRANSFER',
+      icon: Database,
+      accent: 'cyan',
+    },
+    {
+      id: 'browser',
+      eyebrow: 'BROWSER TRUST',
+      title: 'postMessage + Framing',
+      description: 'Exploração da fronteira de confiança do navegador com dados PIX inteiramente sintéticos.',
+      pipeline: 'LOAD → FRAME → PIX → POSTMESSAGE → CAPTURE → REPORT',
+      icon: ShieldAlert,
+      accent: 'red',
+    },
+  ];
+
+  return (
+    <section aria-label="Catálogo de módulos EvilDog">
+      <div className="mb-5 rounded-2xl border border-[#253140] bg-[#0d141d] p-5">
+        <div className="font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-green-400">Attack module catalog</div>
+        <h2 className="mt-2 font-mono text-2xl font-black text-slate-100">Escolha um cenário</h2>
+        <p className="mt-2 max-w-3xl text-sm text-slate-400">Cada módulo possui pipeline, telemetria e estado próprios. Selecione um cenário para iniciar um novo take.</p>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        {modules.map(({ id, eyebrow, title, description, pipeline, icon: Icon, accent }) => {
+          const red = accent === 'red';
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onSelect(id)}
+              className={`group relative min-h-[310px] overflow-hidden rounded-2xl border bg-[#0d141d] p-6 text-left transition duration-300 hover:-translate-y-1 ${red ? 'border-red-500/30 hover:border-red-400/70 hover:shadow-[0_18px_60px_rgba(239,68,68,0.14)]' : 'border-cyan-500/30 hover:border-cyan-400/70 hover:shadow-[0_18px_60px_rgba(34,211,238,0.14)]'}`}
+            >
+              <div className={`absolute inset-x-0 top-0 h-1 ${red ? 'bg-gradient-to-r from-red-600 via-orange-400 to-transparent' : 'bg-gradient-to-r from-cyan-500 via-blue-500 to-transparent'}`} />
+              <div className={`mb-8 flex h-14 w-14 items-center justify-center rounded-2xl border ${red ? 'border-red-500/35 bg-red-500/10 text-red-400' : 'border-cyan-500/35 bg-cyan-500/10 text-cyan-400'}`}>
+                <Icon className="h-7 w-7" />
+              </div>
+              <div className={`font-mono text-[10px] font-black uppercase tracking-[0.22em] ${red ? 'text-red-400' : 'text-cyan-400'}`}>{eyebrow}</div>
+              <h3 className="mt-2 font-mono text-3xl font-black text-slate-100">{title}</h3>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-slate-400">{description}</p>
+              <div className="mt-6 rounded-lg border border-[#253140] bg-[#080d13] px-3 py-2 font-mono text-[11px] text-slate-500">{pipeline}</div>
+              <div className={`mt-5 flex items-center gap-2 text-sm font-bold ${red ? 'text-red-400' : 'text-cyan-400'}`}>Abrir módulo <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" /></div>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export default function EvilDogPage() {
   const { t } = useT();
+  const [module, setModule] = useState('catalog');
   const [tab, setTab] = useState('orchestrator');
   const [maximized, setMaximized] = useState(false);
   const evd = useEvilDog();
@@ -169,26 +229,38 @@ export default function EvilDogPage() {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          <TargetSelector evd={evd} />
-          <SourceIp evd={evd} />
-          <span className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs
-            ${external ? 'border-green-500/40 bg-green-500/10 text-green-400' : 'border-amber-500/40 bg-amber-500/10 text-amber-400'}`}>
-            {external ? <Globe className="w-3.5 h-3.5" /> : <Network className="w-3.5 h-3.5" />}
-            {external ? t('evd.internet') : t('evd.internal')}
-          </span>
-          <div className={`flex items-center gap-1.5 text-xs ${evd.connected ? 'text-green-400' : 'text-slate-500'}`}>
-            {evd.connected ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
-            {evd.connected ? t('evd.telemetry_live') : t('evd.offline')}
-          </div>
-          <div className="flex items-center gap-1 rounded-lg border border-[#1e2733] bg-[#0f151d] p-1">
-            {TABS.map(({ id, key, icon: Icon }) => (
-              <button key={id} onClick={() => setTab(id)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors
-                  ${tab === id ? 'bg-green-500/15 text-green-400' : 'text-slate-400 hover:text-slate-200'}`}>
-                <Icon className="w-4 h-4" /> <span className="hidden sm:inline">{t(key)}</span>
-              </button>
-            ))}
-          </div>
+          {module === 'sqli' && (
+            <>
+              <TargetSelector evd={evd} />
+              <SourceIp evd={evd} />
+              <span className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs
+                ${external ? 'border-green-500/40 bg-green-500/10 text-green-400' : 'border-amber-500/40 bg-amber-500/10 text-amber-400'}`}>
+                {external ? <Globe className="w-3.5 h-3.5" /> : <Network className="w-3.5 h-3.5" />}
+                {external ? t('evd.internet') : t('evd.internal')}
+              </span>
+              <div className={`flex items-center gap-1.5 text-xs ${evd.connected ? 'text-green-400' : 'text-slate-500'}`}>
+                {evd.connected ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
+                {evd.connected ? t('evd.telemetry_live') : t('evd.offline')}
+              </div>
+            </>
+          )}
+          {module !== 'catalog' && (
+            <button onClick={() => setModule('catalog')}
+              className="flex items-center gap-2 rounded-lg border border-[#26313f] bg-[#0f151d] px-3 py-2 text-xs font-bold text-slate-300 hover:border-green-500/40 hover:text-green-400">
+              <LayoutDashboard className="h-4 w-4" /> Módulos
+            </button>
+          )}
+          {module === 'sqli' && (
+            <div className="flex items-center gap-1 rounded-lg border border-[#1e2733] bg-[#0f151d] p-1">
+              {TABS.map(({ id, key, icon: Icon }) => (
+                <button key={id} onClick={() => setTab(id)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors
+                    ${tab === id ? 'bg-green-500/15 text-green-400' : 'text-slate-400 hover:text-slate-200'}`}>
+                  <Icon className="w-4 h-4" /> <span className="hidden sm:inline">{t(key)}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <LangToggleDark />
           <button onClick={() => setMaximized((m) => !m)}
             title={maximized ? t('evd.restore') : t('evd.maximize')}
@@ -198,11 +270,13 @@ export default function EvilDogPage() {
         </div>
       </div>
 
-      {tab === 'control' && <ControlPanel evd={evd} />}
-      {tab === 'orchestrator' && <AttackOrchestrator evd={evd} />}
-      {tab === 'postexploit' && <PostExploitPanel evd={evd} />}
+      {module === 'catalog' && <ModuleCatalog onSelect={setModule} />}
+      {module === 'sqli' && tab === 'control' && <ControlPanel evd={evd} />}
+      {module === 'sqli' && tab === 'orchestrator' && <AttackOrchestrator evd={evd} />}
+      {module === 'sqli' && tab === 'postexploit' && <PostExploitPanel evd={evd} />}
+      {module === 'browser' && <BrowserAttackLab />}
 
-      <OperatorLogin evd={evd} />
+      {module === 'sqli' && <OperatorLogin evd={evd} />}
 
       <div className="mt-6 text-center text-[11px] text-slate-600">{t('evd.footer')}</div>
     </div>

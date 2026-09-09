@@ -11,6 +11,26 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    ports:
+      # Origem dedicada ao DogBank da PoC de framing/postMessage. A aplicação
+      # principal continua disponível normalmente pelo gateway HTTPS.
+      - "127.0.0.1:3000:80"
+
+  security-lab-attacker:
+    build:
+      context: ./security-lab-attacker
+      dockerfile: Dockerfile
+    container_name: dogbank-security-lab-attacker
+    ports:
+      # HTTPS is used by lab.dogbank.dog to avoid mixed-content/HSTS failures.
+      - "127.0.0.1:3001:443"
+      # HTTP remains available for a localhost-only frontend session.
+      - "127.0.0.1:3002:80"
+    volumes:
+      - ./nginx/certs:/etc/nginx/certs:ro
+    networks:
+      - dogbank-network
+    restart: unless-stopped
 
   evildog-api:
     environment:
