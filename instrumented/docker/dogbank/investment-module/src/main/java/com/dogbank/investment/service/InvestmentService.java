@@ -7,6 +7,7 @@ import com.dogbank.investment.entity.InvestmentPosition;
 import com.dogbank.investment.repository.InvestmentPositionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.ResponseEntity;
@@ -35,7 +36,7 @@ import java.util.stream.Collectors;
 @Service
 public class InvestmentService {
 
-    private static final Logger log = LoggerFactory.getLogger(InvestmentService.class);
+    private static final Logger auditLog = LoggerFactory.getLogger("investment.audit");
     private static final ZoneId SAO_PAULO = ZoneId.of("America/Sao_Paulo");
     private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
 
@@ -168,32 +169,28 @@ public class InvestmentService {
         BigDecimal expectedValue = expectedValue(saved);
         BigDecimal driftAmount = expectedValue.subtract(saved.getCurrentValue()).setScale(2, RoundingMode.HALF_UP);
 
-        log.info(
-            "INVESTMENT_CONTRACTED account_id={} cpf={} user_name={} position_id={} product={} amount={} reference_rate={} reference_price={} contracted_by={} audit_correlation_id={}",
-            saved.getAccountId(),
-            saved.getCpf(),
-            saved.getUserName(),
-            saved.getPositionId(),
-            saved.getProductCode(),
-            saved.getPrincipalAmount(),
-            product.annualRate,
-            product.referencePrice,
-            saved.getContractedBy(),
-            saved.getAuditCorrelationId()
-        );
+        try {
+            putInvestmentAuditContext("investment.contracted", saved, product);
+            putMdc("investment.expected_value", expectedValue);
+            putMdc("expected_value", expectedValue);
+            putMdc("drift.amount", driftAmount);
+            putMdc("drift_amount", driftAmount);
+            auditLog.info("INVESTMENT_CONTRACTED");
+        } finally {
+            clearInvestmentAuditContext();
+        }
 
         if ("DRIFT".equals(saved.getStatus())) {
-            log.warn(
-                "INVESTMENT_DRIFT_DETECTED account_id={} position_id={} product={} expected_value={} booked_value={} drift_amount={} reason={} audit_correlation_id={}",
-                saved.getAccountId(),
-                saved.getPositionId(),
-                saved.getProductCode(),
-                expectedValue,
-                saved.getCurrentValue(),
-                driftAmount,
-                saved.getSyncReason(),
-                saved.getAuditCorrelationId()
-            );
+            try {
+                putInvestmentAuditContext("investment.drift_detected", saved, product);
+                putMdc("investment.expected_value", expectedValue);
+                putMdc("expected_value", expectedValue);
+                putMdc("drift.amount", driftAmount);
+                putMdc("drift_amount", driftAmount);
+                auditLog.warn("INVESTMENT_DRIFT_DETECTED");
+            } finally {
+                clearInvestmentAuditContext();
+            }
         }
 
         return toPositionResponse(saved);
@@ -212,17 +209,20 @@ public class InvestmentService {
             BigDecimal expectedValue = expectedValue(position);
             BigDecimal driftAmount = expectedValue.subtract(position.getCurrentValue()).setScale(2, RoundingMode.HALF_UP);
 
-            log.error(
-                "INVESTMENT_SYNC_FAILED account_id={} position_id={} product={} expected_value={} booked_value={} drift_amount={} reason={} audit_correlation_id={}",
-                position.getAccountId(),
-                position.getPositionId(),
-                position.getProductCode(),
-                expectedValue,
-                position.getCurrentValue(),
-                driftAmount,
-                position.getSyncReason(),
-                position.getAuditCorrelationId()
-            );
+            try {
+                putInvestmentAuditContext("investment.sync_failed", position, requireProduct(position.getProductCode()));
+                putMdc("investment.expected_value", expectedValue);
+                putMdc("expected_value", expectedValue);
+                putMdc("drift.amount", driftAmount);
+                putMdc("drift_amount", driftAmount);
+                putMdc("error.code", "INVESTMENT_QUOTE_STALE");
+                putMdc("error_code", "INVESTMENT_QUOTE_STALE");
+                putMdc("error.message", "Cotacao Bitcoin desatualizada no provedor de precos.");
+                putMdc("error_message", "Cotacao Bitcoin desatualizada no provedor de precos.");
+                auditLog.error("INVESTMENT_SYNC_FAILED");
+            } finally {
+                clearInvestmentAuditContext();
+            }
             throw new SyncFailureException("INVESTMENT_QUOTE_STALE", "Cotacao Bitcoin desatualizada no provedor de precos.");
         }
 
@@ -233,15 +233,18 @@ public class InvestmentService {
         position.setSyncAttempts(position.getSyncAttempts() + 1);
         InvestmentPosition saved = positionRepository.save(position);
 
-        log.info(
-            "INVESTMENT_SYNC_SUCCESS account_id={} position_id={} product={} synced_value={} sync_attempts={} audit_correlation_id={}",
-            saved.getAccountId(),
-            saved.getPositionId(),
-            saved.getProductCode(),
-            saved.getCurrentValue(),
-            saved.getSyncAttempts(),
-            saved.getAuditCorrelationId()
-        );
+        try {
+            putInvestmentAuditContext("investment.sync_success", saved, requireProduct(saved.getProductCode()));
+            putMdc("investment.expected_value", saved.getCurrentValue());
+            putMdc("expected_value", saved.getCurrentValue());
+            putMdc("drift.amount", BigDecimal.ZERO.setScale(2));
+            putMdc("drift_amount", BigDecimal.ZERO.setScale(2));
+            putMdc("drift.percent", BigDecimal.ZERO.setScale(2));
+            putMdc("drift_percent", BigDecimal.ZERO.setScale(2));
+            auditLog.info("INVESTMENT_SYNC_SUCCESS");
+        } finally {
+            clearInvestmentAuditContext();
+        }
 
         return toPositionResponse(saved);
     }
@@ -320,18 +323,20 @@ public class InvestmentService {
     private InvestmentPositionResponse toPositionResponseWithAudit(InvestmentPosition position) {
         InvestmentPositionResponse response = toPositionResponse(position);
         if ("DRIFT".equals(response.status)) {
-            log.warn(
-                "INVESTMENT_DRIFT_DETECTED account_id={} position_id={} product={} expected_value={} booked_value={} drift_amount={} drift_percent={} reason={} audit_correlation_id={}",
-                response.accountId,
-                response.positionId,
-                response.productCode,
-                response.expectedValue,
-                response.currentValue,
-                response.driftAmount,
-                response.driftPercent,
-                response.syncReason,
-                response.auditCorrelationId
-            );
+            try {
+                putInvestmentAuditContext("investment.drift_detected", position, requireProduct(position.getProductCode()));
+                putMdc("investment.expected_value", response.expectedValue);
+                putMdc("expected_value", response.expectedValue);
+                putMdc("investment.current_value", response.currentValue);
+                putMdc("current_value", response.currentValue);
+                putMdc("drift.amount", response.driftAmount);
+                putMdc("drift_amount", response.driftAmount);
+                putMdc("drift.percent", response.driftPercent);
+                putMdc("drift_percent", response.driftPercent);
+                auditLog.warn("INVESTMENT_DRIFT_DETECTED");
+            } finally {
+                clearInvestmentAuditContext();
+            }
         }
         return response;
     }
@@ -393,16 +398,20 @@ public class InvestmentService {
         payload.put("units", position.getUnits());
         payload.put("requestedBy", position.getContractedBy());
 
-        log.info(
-            "INVESTMENT_REGISTRY_CALL_STARTED account_id={} position_id={} product={} amount={} registry_order_id={}",
-            position.getAccountId(),
-            position.getPositionId(),
-            position.getProductCode(),
-            position.getPrincipalAmount(),
-            registryOrderId
-        );
+        ProductDefinition product = requireProduct(position.getProductCode());
+        try {
+            putInvestmentAuditContext("investment.registry_call_started", position, product);
+            putMdc("registry.order_id", registryOrderId);
+            putMdc("registry_order_id", registryOrderId);
+            putMdc("registry.status", "STARTED");
+            putMdc("registry_status", "STARTED");
+            auditLog.info("INVESTMENT_REGISTRY_CALL_STARTED");
+        } finally {
+            clearInvestmentAuditContext();
+        }
 
         try {
+            long registryStart = System.currentTimeMillis();
             ResponseEntity<Map> response = restTemplate.postForEntity(
                 registryBaseUrl + "/api/investment-registry/register",
                 payload,
@@ -418,26 +427,182 @@ public class InvestmentService {
             position.setRegistryVenue(String.valueOf(body.get("registryVenue")));
             position.setRegistryStatus(String.valueOf(body.get("status")));
 
-            log.info(
-                "INVESTMENT_REGISTRY_ACCEPTED account_id={} position_id={} product={} registry_id={} registry_protocol={} registry_venue={}",
-                position.getAccountId(),
-                position.getPositionId(),
-                position.getProductCode(),
-                position.getRegistryId(),
-                position.getRegistryProtocol(),
-                position.getRegistryVenue()
-            );
+            try {
+                putInvestmentAuditContext("investment.registry_accepted", position, product);
+                putMdc("registry.order_id", registryOrderId);
+                putMdc("registry_order_id", registryOrderId);
+                putMdc("registry.duration_ms", System.currentTimeMillis() - registryStart);
+                putMdc("registry_duration_ms", System.currentTimeMillis() - registryStart);
+                auditLog.info("INVESTMENT_REGISTRY_ACCEPTED");
+            } finally {
+                clearInvestmentAuditContext();
+            }
+        } catch (RegistryFailureException ex) {
+            try {
+                putInvestmentAuditContext("investment.registry_failed", position, product);
+                putMdc("registry.order_id", registryOrderId);
+                putMdc("registry_order_id", registryOrderId);
+                putMdc("registry.status", "FAILED");
+                putMdc("registry_status", "FAILED");
+                putMdc("error.code", ex.errorCode);
+                putMdc("error_code", ex.errorCode);
+                putMdc("error.message", ex.getMessage());
+                putMdc("error_message", ex.getMessage());
+                auditLog.error("INVESTMENT_REGISTRY_FAILED");
+            } finally {
+                clearInvestmentAuditContext();
+            }
+            throw ex;
         } catch (RestClientException ex) {
-            log.error(
-                "INVESTMENT_REGISTRY_FAILED account_id={} position_id={} product={} registry_order_id={} error_message={}",
-                position.getAccountId(),
-                position.getPositionId(),
-                position.getProductCode(),
-                registryOrderId,
-                ex.getMessage()
-            );
+            try {
+                putInvestmentAuditContext("investment.registry_failed", position, product);
+                putMdc("registry.order_id", registryOrderId);
+                putMdc("registry_order_id", registryOrderId);
+                putMdc("registry.status", "FAILED");
+                putMdc("registry_status", "FAILED");
+                putMdc("error.code", "REGISTRY_UNAVAILABLE");
+                putMdc("error_code", "REGISTRY_UNAVAILABLE");
+                putMdc("error.message", ex.getMessage());
+                putMdc("error_message", ex.getMessage());
+                auditLog.error("INVESTMENT_REGISTRY_FAILED", ex);
+            } finally {
+                clearInvestmentAuditContext();
+            }
             throw new RegistryFailureException("REGISTRY_UNAVAILABLE", "Nao foi possivel registrar a aplicacao no depositario externo.", ex);
         }
+    }
+
+    private void putInvestmentAuditContext(String eventType, InvestmentPosition position, ProductDefinition product) {
+        putMdc("event_type", eventType);
+        putMdc("audit.correlation_id", position.getAuditCorrelationId());
+        putMdc("audit_correlation_id", position.getAuditCorrelationId());
+        putMdc("audit.actor", position.getContractedBy());
+        putMdc("audit.channel", position.getContractedBy());
+        putMdc("account.id", position.getAccountId());
+        putMdc("account_id", position.getAccountId());
+        putMdc("cpf", position.getCpf());
+        putMdc("customer.name", position.getUserName());
+        putMdc("customer.document_masked", maskDocument(position.getCpf()));
+        putMdc("cpf_masked", maskDocument(position.getCpf()));
+        putMdc("user_name", position.getUserName());
+        putMdc("investment.position_id", position.getPositionId());
+        putMdc("position_id", position.getPositionId());
+        putMdc("investment.product_code", position.getProductCode());
+        putMdc("product_code", position.getProductCode());
+        putMdc("investment.product_name", product.name);
+        putMdc("product_name", product.name);
+        putMdc("investment.status", position.getStatus());
+        putMdc("investment_status", position.getStatus());
+        putMdc("investment.amount", position.getPrincipalAmount());
+        putMdc("amount", position.getPrincipalAmount());
+        putMdc("investment.current_value", position.getCurrentValue());
+        putMdc("current_value", position.getCurrentValue());
+        putMdc("investment.units", position.getUnits());
+        putMdc("units", position.getUnits());
+        putMdc("investment.reference_rate", product.annualRate);
+        putMdc("reference_rate", product.annualRate);
+        putMdc("investment.reference_price", product.referencePrice);
+        putMdc("reference_price", product.referencePrice);
+        putMdc("investment.contracted_at", position.getContractedAt());
+        putMdc("contracted_at", position.getContractedAt());
+        putMdc("contracted_by", position.getContractedBy());
+        putMdc("sync.reason", position.getSyncReason());
+        putMdc("sync_reason", position.getSyncReason());
+        putMdc("sync.attempts", position.getSyncAttempts());
+        putMdc("sync_attempts", position.getSyncAttempts());
+        putMdc("sync.last_synced_at", position.getLastSyncedAt());
+        putMdc("last_synced_at", position.getLastSyncedAt());
+        putMdc("registry.id", position.getRegistryId());
+        putMdc("registry_id", position.getRegistryId());
+        putMdc("registry.protocol", position.getRegistryProtocol());
+        putMdc("registry_protocol", position.getRegistryProtocol());
+        putMdc("registry.venue", position.getRegistryVenue());
+        putMdc("registry_venue", position.getRegistryVenue());
+        putMdc("registry.status", position.getRegistryStatus());
+        putMdc("registry_status", position.getRegistryStatus());
+    }
+
+    private void putMdc(String key, Object value) {
+        if (value != null) {
+            MDC.put(key, String.valueOf(value));
+        }
+    }
+
+    private void clearInvestmentAuditContext() {
+        List.of(
+            "event_type",
+            "audit.correlation_id",
+            "audit_correlation_id",
+            "audit.actor",
+            "audit.channel",
+            "account.id",
+            "account_id",
+            "cpf",
+            "customer.name",
+            "customer.document_masked",
+            "cpf_masked",
+            "user_name",
+            "investment.position_id",
+            "position_id",
+            "investment.product_code",
+            "product_code",
+            "investment.product_name",
+            "product_name",
+            "investment.status",
+            "investment_status",
+            "investment.amount",
+            "amount",
+            "investment.current_value",
+            "current_value",
+            "investment.expected_value",
+            "expected_value",
+            "investment.units",
+            "units",
+            "investment.reference_rate",
+            "reference_rate",
+            "investment.reference_price",
+            "reference_price",
+            "investment.contracted_at",
+            "contracted_at",
+            "contracted_by",
+            "drift.amount",
+            "drift_amount",
+            "drift.percent",
+            "drift_percent",
+            "sync.reason",
+            "sync_reason",
+            "sync.attempts",
+            "sync_attempts",
+            "sync.last_synced_at",
+            "last_synced_at",
+            "registry.order_id",
+            "registry_order_id",
+            "registry.id",
+            "registry_id",
+            "registry.protocol",
+            "registry_protocol",
+            "registry.venue",
+            "registry_venue",
+            "registry.status",
+            "registry_status",
+            "registry.duration_ms",
+            "registry_duration_ms",
+            "error.code",
+            "error_code",
+            "error.message",
+            "error_message"
+        ).forEach(MDC::remove);
+    }
+
+    private String maskDocument(String value) {
+        if (value == null || value.isBlank()) {
+            return "***";
+        }
+        String digits = value.replaceAll("\\D", "");
+        if (digits.length() < 5) {
+            return "***";
+        }
+        return digits.substring(0, 3) + "*****" + digits.substring(digits.length() - 2);
     }
 
     private BigDecimal expectedValue(InvestmentPosition position) {

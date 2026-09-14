@@ -1,0 +1,166 @@
+{
+  "timestamp": {
+    "$resolver": "timestamp",
+    "pattern": {
+      "format": "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+    }
+  },
+  "level": {
+    "$resolver": "level",
+    "field": "name"
+  },
+  "logger": {
+    "$resolver": "logger",
+    "field": "name"
+  },
+  "message": {
+    "$resolver": "message",
+    "stringified": true
+  },
+  "thread": {
+    "$resolver": "thread",
+    "field": "name"
+  },
+  "exception": {
+    "$resolver": "exception",
+    "field": "stackTrace",
+    "stackTrace": {
+      "stringified": true
+    }
+  },
+  "dd.trace_id": {
+    "$resolver": "mdc",
+    "key": "dd.trace_id"
+  },
+  "dd.span_id": {
+    "$resolver": "mdc",
+    "key": "dd.span_id"
+  },
+  "service": "${env:DD_SERVICE:-b3-investment-registry}",
+  "version": "${env:DD_VERSION:-1.0.0}",
+  "env": "${env:DD_ENV:-dogbank}",
+  "event_type": {
+    "$resolver": "mdc",
+    "key": "event_type"
+  },
+  "audit_correlation_id": {
+    "$resolver": "mdc",
+    "key": "audit_correlation_id"
+  },
+  "account_id": {
+    "$resolver": "mdc",
+    "key": "account_id"
+  },
+  "cpf": {
+    "$resolver": "mdc",
+    "key": "cpf"
+  },
+  "cpf_masked": {
+    "$resolver": "mdc",
+    "key": "cpf_masked"
+  },
+  "user_name": {
+    "$resolver": "mdc",
+    "key": "user_name"
+  },
+  "audit.correlation_id": {
+    "$resolver": "mdc",
+    "key": "audit.correlation_id"
+  },
+  "account.id": {
+    "$resolver": "mdc",
+    "key": "account.id"
+  },
+  "customer.document_masked": {
+    "$resolver": "mdc",
+    "key": "customer.document_masked"
+  },
+  "investment.product_code": {
+    "$resolver": "mdc",
+    "key": "investment.product_code"
+  },
+  "product_code": {
+    "$resolver": "mdc",
+    "key": "product_code"
+  },
+  "investment.amount": {
+    "$resolver": "mdc",
+    "key": "investment.amount"
+  },
+  "amount": {
+    "$resolver": "mdc",
+    "key": "amount"
+  },
+  "investment.units": {
+    "$resolver": "mdc",
+    "key": "investment.units"
+  },
+  "units": {
+    "$resolver": "mdc",
+    "key": "units"
+  },
+  "registry.id": {
+    "$resolver": "mdc",
+    "key": "registry.id"
+  },
+  "registry_id": {
+    "$resolver": "mdc",
+    "key": "registry_id"
+  },
+  "registry.protocol": {
+    "$resolver": "mdc",
+    "key": "registry.protocol"
+  },
+  "registry_protocol": {
+    "$resolver": "mdc",
+    "key": "registry_protocol"
+  },
+  "registry.venue": {
+    "$resolver": "mdc",
+    "key": "registry.venue"
+  },
+  "registry_venue": {
+    "$resolver": "mdc",
+    "key": "registry_venue"
+  },
+  "registry.status": {
+    "$resolver": "mdc",
+    "key": "registry.status"
+  },
+  "registry_status": {
+    "$resolver": "mdc",
+    "key": "registry_status"
+  },
+  "registry.participant": {
+    "$resolver": "mdc",
+    "key": "registry.participant"
+  },
+  "registry_participant": {
+    "$resolver": "mdc",
+    "key": "registry_participant"
+  },
+  "registry.duration_ms": {
+    "$resolver": "mdc",
+    "key": "registry.duration_ms"
+  },
+  "registry_duration_ms": {
+    "$resolver": "mdc",
+    "key": "registry_duration_ms"
+  },
+  "error.code": {
+    "$resolver": "mdc",
+    "key": "error.code"
+  },
+  "error_code": {
+    "$resolver": "mdc",
+    "key": "error_code"
+  },
+  "error.message": {
+    "$resolver": "mdc",
+    "key": "error.message"
+  },
+  "error_message": {
+    "$resolver": "mdc",
+    "key": "error_message"
+  }
+}

@@ -38,8 +38,15 @@ Thumbs.db
 
 # Tool artifacts (not project code)
 .playwright-cli/
+.codex-tmp/
 finops-output/
 instrumented/docker/dogbank/data-observability-poc/
+
+# Local build outputs
+instrumented/docker/build/
+instrumented/docker/dogbank-ios-native/build/
+instrumented/docker/dogbank-flutter/isrgrootx2.pem
+**/xcuserdata/
 
 # Python bytecode cache
 __pycache__/

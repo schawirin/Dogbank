@@ -15,10 +15,10 @@
 # both trees agree on.)
 terraform {
   backend "s3" {
-    bucket         = "REPLACE_WITH_BOOTSTRAP_BUCKET_OUTPUT" # expect ~ "dogbank-terraform-state"
+    bucket         = "dogbank-terraform-state"
     key            = "dogbank/aws/terraform.tfstate"
-    region         = "REPLACE_WITH_REGION"                 # e.g. "us-east-1"
-    dynamodb_table = "REPLACE_WITH_BOOTSTRAP_TABLE_OUTPUT" # expect ~ "dogbank-terraform-locks"
+    region         = "us-east-1"
+    dynamodb_table = "dogbank-terraform-locks"
     encrypt        = true
   }
 }

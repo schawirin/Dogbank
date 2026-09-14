@@ -1,4 +1,5 @@
 import UIKit
+import Darwin
 import DatadogCore
 import DatadogRUM
 import DatadogSessionReplay
@@ -297,7 +298,9 @@ private final class DogBankAPI {
         return items.map(position(from:))
     }
 
-    func subscribeInvestment(session: DogBankSession, productCode: String, amount: Double) async throws -> DogBankInvestmentPosition {
+    func subscribeInvestment(session: DogBankSession, productCode: String, amount: Double, password: String) async throws -> DogBankInvestmentPosition {
+        _ = try await login(cpf: session.cpf, password: password)
+
         let json = try await request(
             path: "/api/investments/subscribe",
             method: "POST",
@@ -370,6 +373,9 @@ private final class DogBankAPI {
         let txJSON = try await request(
             path: "/api/transactions/pix",
             method: "POST",
+            headers: [
+                "X-Idempotency-Key": "ios-pix-\(session.accountID)-\(UUID().uuidString)"
+            ],
             body: [
                 "accountOriginId": session.accountID,
                 "pixKeyDestination": pixKey,
@@ -395,6 +401,7 @@ private final class DogBankAPI {
         path: String,
         method: String,
         queryItems: [URLQueryItem] = [],
+        headers: [String: String] = [:],
         body: [String: Any]? = nil,
         timeout: TimeInterval = 10
     ) async throws -> Any {
@@ -411,6 +418,9 @@ private final class DogBankAPI {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("dogbank-ios-native", forHTTPHeaderField: "x-dogbank-client")
+        headers.forEach { key, value in
+            request.setValue(value, forHTTPHeaderField: key)
+        }
 
         if let body {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -2898,7 +2908,7 @@ private final class InvestmentsViewController: UIViewController {
     private let productsStack = UIStackView()
     private let positionsStack = UIStackView()
     private let portfolioValueLabel = label("R$ --", style: .title1, color: .white, weight: .bold)
-    private let portfolioDriftLabel = label("Calculando drift...", style: .subheadline, color: UIColor.white.withAlphaComponent(0.84), lines: 0)
+    private let portfolioSummaryLabel = label("Calculando carteira...", style: .subheadline, color: UIColor.white.withAlphaComponent(0.84), lines: 0)
     private let statusLabel = label("", style: .footnote, color: DogBankTheme.muted, lines: 0)
     private var products: [DogBankInvestmentProduct] = []
     private var positions: [DogBankInvestmentPosition] = []
@@ -2929,7 +2939,7 @@ private final class InvestmentsViewController: UIViewController {
     private func configureLayout() {
         let (_, stack) = makeScrollStack(in: view)
         stack.addArrangedSubview(label("Investimentos", style: .largeTitle, weight: .bold))
-        stack.addArrangedSubview(label("Contratacoes, auditoria e sincronizacao de posicoes em tempo real.", style: .body, color: DogBankTheme.muted, lines: 0))
+        stack.addArrangedSubview(label("Contratacoes e posicoes em tempo real.", style: .body, color: DogBankTheme.muted, lines: 0))
         stack.addArrangedSubview(makePortfolioHeader())
 
         productsStack.axis = .vertical
@@ -2942,7 +2952,7 @@ private final class InvestmentsViewController: UIViewController {
             productsStack
         ]))
         stack.addArrangedSubview(card([
-            label("Carteira e drift", style: .headline, weight: .semibold),
+            label("Carteira", style: .headline, weight: .semibold),
             positionsStack,
             statusLabel
         ]))
@@ -2959,7 +2969,7 @@ private final class InvestmentsViewController: UIViewController {
         let textStack = UIStackView(arrangedSubviews: [
             label("Valor esperado da carteira", style: .caption1, color: UIColor.white.withAlphaComponent(0.82), weight: .semibold),
             portfolioValueLabel,
-            portfolioDriftLabel
+            portfolioSummaryLabel
         ])
         textStack.axis = .vertical
         textStack.spacing = 5
@@ -3058,13 +3068,12 @@ private final class InvestmentsViewController: UIViewController {
 
     private func renderPortfolioSummary() {
         let expectedTotal = positions.reduce(0) { $0 + $1.expectedValue }
-        let driftTotal = positions.reduce(0) { $0 + $1.driftAmount }
-        let driftedCount = positions.filter(\.isDrifted).count
+        let positionCount = positions.count
         portfolioValueLabel.text = money(expectedTotal)
-        if driftedCount == 0 {
-            portfolioDriftLabel.text = "Todas as posicoes sincronizadas."
+        if positionCount == 0 {
+            portfolioSummaryLabel.text = "Nenhuma posicao contratada."
         } else {
-            portfolioDriftLabel.text = "Drift de \(money(abs(driftTotal))) em \(driftedCount) posicao\(driftedCount == 1 ? "" : "es")."
+            portfolioSummaryLabel.text = "\(positionCount) posicao\(positionCount == 1 ? "" : "es") ativa\(positionCount == 1 ? "" : "s")."
         }
     }
 
@@ -3147,20 +3156,12 @@ private final class InvestmentsViewController: UIViewController {
             investmentMetricRow(title: "Aplicado", value: money(position.principalAmount), tint: DogBankTheme.purple),
             investmentMetricRow(title: "Valor contabilizado", value: money(position.currentValue), tint: DogBankTheme.blue),
             investmentMetricRow(title: "Valor esperado", value: money(position.expectedValue), tint: DogBankTheme.green),
-            investmentMetricRow(title: "Drift", value: "\(money(abs(position.driftAmount))) | \(String(format: "%.2f", abs(position.driftPercent)))%", tint: tint),
             investmentMetricRow(title: "Ultimo sync", value: dateText(position.lastSyncedAt), tint: DogBankTheme.muted),
             InfoRowView(icon: "doc.text.magnifyingglass", title: "Audit ID", value: position.auditCorrelationID, tint: DogBankTheme.amber)
         ]
 
         if !position.message.isEmpty {
             rows.append(label(position.message, style: .footnote, color: DogBankTheme.muted, lines: 0))
-        }
-
-        if position.isDrifted {
-            let sync = DogBankButton(title: "Sincronizar posicao", systemImage: "arrow.triangle.2.circlepath", filled: false)
-            sync.accessibilityIdentifier = position.positionID
-            sync.addTarget(self, action: #selector(syncTapped(_:)), for: .touchUpInside)
-            rows.append(sync)
         }
 
         let stack = UIStackView(arrangedSubviews: rows)
@@ -3200,7 +3201,7 @@ private final class InvestmentsViewController: UIViewController {
     }
 
     private func statusPill(_ text: String, tint: UIColor) -> UIView {
-        let pillLabel = label(text == "SYNCED" ? "OK" : "DRIFT", style: .caption1, color: tint, weight: .bold, lines: 1)
+        let pillLabel = label("ATIVO", style: .caption1, color: tint, weight: .bold, lines: 1)
         pillLabel.textAlignment = .center
         pillLabel.translatesAutoresizingMaskIntoConstraints = false
 
@@ -3226,9 +3227,44 @@ private final class InvestmentsViewController: UIViewController {
         }
 
         let amount = productCode == "BTC" ? 50_000.0 : 1_000_000.0
+        requestInvestmentPassword(productCode: productCode, amount: amount) { [weak self, weak sender] password in
+            guard let self, let sender else {
+                return
+            }
+            self.performInvestmentSubscription(productCode: productCode, amount: amount, password: password, sender: sender)
+        }
+    }
+
+    private func requestInvestmentPassword(productCode: String, amount: Double, completion: @escaping (String) -> Void) {
+        let productName = products.first { $0.code == productCode }?.name ?? (productCode == "BTC" ? "Bitcoin" : "100% CDI")
+        let alert = UIAlertController(
+            title: "Confirmar investimento",
+            message: "\(productName) • \(money(amount))\nDigite sua senha bancaria para validar a contratacao.",
+            preferredStyle: .alert
+        )
+        alert.addTextField { field in
+            field.placeholder = "Senha de 6 digitos"
+            field.isSecureTextEntry = true
+            field.keyboardType = .numberPad
+            field.textContentType = .password
+        }
+        alert.addAction(UIAlertAction(title: "Cancelar", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Validar e aplicar", style: .default) { [weak alert, weak self] _ in
+            let password = alert?.textFields?.first?.text ?? ""
+            guard password.count >= 6 else {
+                self?.statusLabel.textColor = DogBankTheme.red
+                self?.statusLabel.text = "Informe sua senha de 6 digitos."
+                return
+            }
+            completion(password)
+        })
+        present(alert, animated: true)
+    }
+
+    private func performInvestmentSubscription(productCode: String, amount: Double, password: String, sender: UIButton) {
         sender.isEnabled = false
         statusLabel.textColor = DogBankTheme.purple
-        statusLabel.text = "Contratando \(productCode == "BTC" ? "Bitcoin" : "100% CDI")..."
+        statusLabel.text = "Validando senha e contratando \(productCode == "BTC" ? "Bitcoin" : "100% CDI")..."
 
         dogbankTrack("dogbank.native.investments.subscription.started", attributes: [
             "account_id": session.accountID,
@@ -3238,7 +3274,7 @@ private final class InvestmentsViewController: UIViewController {
 
         Task {
             do {
-                let position = try await api.subscribeInvestment(session: session, productCode: productCode, amount: amount)
+                let position = try await api.subscribeInvestment(session: session, productCode: productCode, amount: amount, password: password)
                 dogbankTrack("dogbank.native.investments.subscription.completed", attributes: [
                     "position_id": position.positionID,
                     "product_code": position.productCode,
@@ -3248,9 +3284,10 @@ private final class InvestmentsViewController: UIViewController {
                 await MainActor.run {
                     self.positions.insert(position, at: 0)
                     self.renderPositions()
-                    self.statusLabel.textColor = position.isDrifted ? DogBankTheme.amber : DogBankTheme.green
-                    self.statusLabel.text = position.isDrifted ? "Investimento contratado com drift para investigar." : "Investimento contratado e sincronizado."
+                    self.statusLabel.textColor = DogBankTheme.green
+                    self.statusLabel.text = "Investimento concluido com sucesso."
                     sender.isEnabled = true
+                    self.navigationController?.pushViewController(InvestmentReceiptViewController(position: position, session: self.session), animated: true)
                 }
             } catch {
                 dogbankError(error, attributes: [
@@ -3349,10 +3386,7 @@ private final class InvestmentsViewController: UIViewController {
     }
 
     private func color(for position: DogBankInvestmentPosition) -> UIColor {
-        if !position.isDrifted {
-            return DogBankTheme.green
-        }
-        return abs(position.driftAmount) > 10_000 ? DogBankTheme.red : DogBankTheme.amber
+        position.productCode == "BTC" ? DogBankTheme.amber : DogBankTheme.green
     }
 
     private func clear(_ stack: UIStackView) {
@@ -3360,6 +3394,173 @@ private final class InvestmentsViewController: UIViewController {
             stack.removeArrangedSubview(view)
             view.removeFromSuperview()
         }
+    }
+}
+
+private final class InvestmentReceiptViewController: UIViewController {
+    private let position: DogBankInvestmentPosition
+    private let session: DogBankSession
+    private let successIcon = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
+
+    init(position: DogBankInvestmentPosition, session: DogBankSession) {
+        self.position = position
+        self.session = session
+        super.init(nibName: nil, bundle: nil)
+        title = "Comprovante"
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = DogBankTheme.background
+        configureLayout()
+        dogbankTrack("dogbank.native.investments.receipt.viewed", attributes: [
+            "position_id": position.positionID,
+            "product_code": position.productCode,
+            "amount": position.principalAmount
+        ])
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        animateSuccess()
+    }
+
+    private func configureLayout() {
+        let (_, stack) = makeScrollStack(in: view)
+        stack.addArrangedSubview(makeSuccessHeader())
+        stack.addArrangedSubview(makeReceiptCard())
+
+        let another = DogBankButton(title: "Fazer outro investimento", systemImage: "plus.circle.fill")
+        another.addTarget(self, action: #selector(newInvestmentTapped), for: .touchUpInside)
+        let home = DogBankButton(title: "Voltar ao inicio", systemImage: "house.fill", filled: false)
+        home.addTarget(self, action: #selector(homeTapped), for: .touchUpInside)
+        stack.addArrangedSubview(card([another, home], spacing: 10))
+    }
+
+    private func makeSuccessHeader() -> UIView {
+        successIcon.tintColor = .white
+        successIcon.contentMode = .center
+        successIcon.translatesAutoresizingMaskIntoConstraints = false
+
+        let iconHost = UIView()
+        iconHost.backgroundColor = UIColor.white.withAlphaComponent(0.20)
+        iconHost.layer.cornerRadius = 32
+        iconHost.translatesAutoresizingMaskIntoConstraints = false
+        iconHost.addSubview(successIcon)
+
+        let title = label("Investimento concluido!", style: .title1, color: .white, weight: .bold)
+        let subtitle = label("Sua aplicacao foi realizada com sucesso.", style: .subheadline, color: UIColor.white.withAlphaComponent(0.86), lines: 0)
+        let amount = label(money(position.principalAmount), style: .title2, color: .white, weight: .bold)
+        let textStack = UIStackView(arrangedSubviews: [title, subtitle, amount])
+        textStack.axis = .vertical
+        textStack.spacing = 5
+
+        let row = UIStackView(arrangedSubviews: [iconHost, textStack])
+        row.axis = .horizontal
+        row.alignment = .center
+        row.spacing = 14
+        row.translatesAutoresizingMaskIntoConstraints = false
+
+        let header = UIView()
+        header.backgroundColor = DogBankTheme.green
+        header.layer.cornerRadius = 20
+        header.addSubview(row)
+
+        NSLayoutConstraint.activate([
+            iconHost.widthAnchor.constraint(equalToConstant: 64),
+            iconHost.heightAnchor.constraint(equalToConstant: 64),
+            successIcon.centerXAnchor.constraint(equalTo: iconHost.centerXAnchor),
+            successIcon.centerYAnchor.constraint(equalTo: iconHost.centerYAnchor),
+            successIcon.widthAnchor.constraint(equalToConstant: 38),
+            successIcon.heightAnchor.constraint(equalToConstant: 38),
+            row.topAnchor.constraint(equalTo: header.topAnchor, constant: 20),
+            row.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: 18),
+            row.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -18),
+            row.bottomAnchor.constraint(equalTo: header.bottomAnchor, constant: -20)
+        ])
+
+        return header
+    }
+
+    private func makeReceiptCard() -> UIView {
+        let completedAt = position.contractedAt ?? Date()
+        let authCode = "DBI-\(position.positionID)-\(Int(completedAt.timeIntervalSince1970))"
+
+        let header = UIStackView(arrangedSubviews: [
+            label("DogBank", style: .title2, color: .white, weight: .bold),
+            label("Comprovante de investimento", style: .subheadline, color: UIColor.white.withAlphaComponent(0.82), weight: .semibold)
+        ])
+        header.axis = .vertical
+        header.spacing = 4
+        header.translatesAutoresizingMaskIntoConstraints = false
+
+        let purpleHeader = UIView()
+        purpleHeader.backgroundColor = DogBankTheme.purple
+        purpleHeader.layer.cornerRadius = 16
+        purpleHeader.addSubview(header)
+        NSLayoutConstraint.activate([
+            header.topAnchor.constraint(equalTo: purpleHeader.topAnchor, constant: 18),
+            header.leadingAnchor.constraint(equalTo: purpleHeader.leadingAnchor, constant: 18),
+            header.trailingAnchor.constraint(equalTo: purpleHeader.trailingAnchor, constant: -18),
+            header.bottomAnchor.constraint(equalTo: purpleHeader.bottomAnchor, constant: -18)
+        ])
+
+        let valueCard = UIView()
+        valueCard.backgroundColor = DogBankTheme.green.withAlphaComponent(0.10)
+        valueCard.layer.cornerRadius = 14
+        let valueStack = UIStackView(arrangedSubviews: [
+            label("Valor aplicado", style: .caption1, color: DogBankTheme.green, weight: .semibold),
+            label(money(position.principalAmount), style: .largeTitle, color: DogBankTheme.green, weight: .bold)
+        ])
+        valueStack.axis = .vertical
+        valueStack.spacing = 4
+        valueStack.translatesAutoresizingMaskIntoConstraints = false
+        valueCard.addSubview(valueStack)
+        NSLayoutConstraint.activate([
+            valueStack.topAnchor.constraint(equalTo: valueCard.topAnchor, constant: 16),
+            valueStack.leadingAnchor.constraint(equalTo: valueCard.leadingAnchor, constant: 16),
+            valueStack.trailingAnchor.constraint(equalTo: valueCard.trailingAnchor, constant: -16),
+            valueStack.bottomAnchor.constraint(equalTo: valueCard.bottomAnchor, constant: -16)
+        ])
+
+        var rows = [
+            makeKeyValueRow(title: "Cliente", value: session.name),
+            makeKeyValueRow(title: "Conta", value: "\(session.accountID) | DOG BANK"),
+            makeKeyValueRow(title: "Produto", value: position.productName),
+            makeKeyValueRow(title: "Posicao", value: position.positionID, mono: true),
+            makeKeyValueRow(title: "Autenticacao", value: authCode, valueColor: DogBankTheme.purple, mono: true),
+            makeKeyValueRow(title: "Data", value: dateFormatter.string(from: completedAt)),
+            makeKeyValueRow(title: "Status", value: "Concluido", valueColor: DogBankTheme.green)
+        ]
+
+        if !position.auditCorrelationID.isEmpty {
+            rows.append(makeKeyValueRow(title: "Audit ID", value: position.auditCorrelationID, mono: true))
+        }
+
+        return card([purpleHeader, valueCard] + rows, spacing: 14)
+    }
+
+    private func animateSuccess() {
+        successIcon.transform = CGAffineTransform(scaleX: 0.6, y: 0.6)
+        successIcon.alpha = 0.2
+        UIView.animate(withDuration: 0.45, delay: 0, usingSpringWithDamping: 0.58, initialSpringVelocity: 0.8, options: [], animations: {
+            self.successIcon.transform = .identity
+            self.successIcon.alpha = 1
+        }, completion: nil)
+    }
+
+    @objc private func newInvestmentTapped() {
+        navigationController?.popToRootViewController(animated: true)
+    }
+
+    @objc private func homeTapped() {
+        let tabBar = tabBarController
+        navigationController?.popToRootViewController(animated: false)
+        tabBar?.selectedIndex = 0
     }
 }
 
@@ -3798,6 +3999,7 @@ private final class ProfileViewController: UIViewController {
 
         guard let window = view.window else {
             present(login, animated: true)
+            closeAppAfterLogout()
             return
         }
 
@@ -3805,6 +4007,16 @@ private final class ProfileViewController: UIViewController {
             window.rootViewController = login
         } completion: { _ in
             window.makeKeyAndVisible()
+            self.closeAppAfterLogout()
+        }
+    }
+
+    private func closeAppAfterLogout() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            UIApplication.shared.perform(Selector(("suspend")))
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                exit(0)
+            }
         }
     }
 

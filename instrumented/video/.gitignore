@@ -1,0 +1,8 @@
+node_modules/
+out/
+demo.mp4
+demo-narrated.mp4
+demo-final.mp4
+demo.pt.srt
+demo.en.srt
+package-lock.json

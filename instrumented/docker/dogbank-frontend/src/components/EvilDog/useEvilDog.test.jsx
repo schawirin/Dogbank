@@ -51,6 +51,7 @@ function HookProbe() {
       <button onClick={() => evd.prepareNewTake()}>new take</button>
       <output data-testid="run">{evd.currentRunId || 'none'}</output>
       <output data-testid="recon">{evd.nodeStates.RECON || 'idle'}</output>
+      <output data-testid="recon-artifact">{evd.nodeArtifacts.RECON?.summary || 'none'}</output>
       <output data-testid="running">{evd.running || 'idle'}</output>
       <output data-testid="outcome">{evd.pipelineOutcome?.kind || 'none'}</output>
       <output data-testid="preparing">{String(evd.preparing)}</output>
@@ -124,6 +125,21 @@ describe('useEvilDog run isolation', () => {
 
     act(() => FakeEventSource.instances[0].emit({ type: 'pipeline', run_id: 'run-current', state: 'done' }));
     await waitFor(() => expect(screen.getByTestId('running')).toHaveTextContent('idle'));
+  });
+
+  it('hydrates and updates the public artifact passed between pipeline stages', async () => {
+    evilDogService.getPipelineState.mockResolvedValueOnce({
+      run_id: 'run-current', status: 'running', nodes: { RECON: 'success' },
+      artifacts: { RECON: { summary: '3 hosts ativos descobertos' } },
+    });
+    render(<HookProbe />);
+
+    await waitFor(() => expect(screen.getByTestId('recon-artifact')).toHaveTextContent('3 hosts ativos descobertos'));
+    act(() => FakeEventSource.instances[0].emit({
+      type: 'handoff', run_id: 'run-current', node: 'RECON', from: 'RECON', to: 'SCAN',
+      artifact: { summary: '4 hosts ativos descobertos' },
+    }));
+    expect(screen.getByTestId('recon-artifact')).toHaveTextContent('4 hosts ativos descobertos');
   });
 
   it('finishes from the state polling fallback when SSE is unavailable', async () => {

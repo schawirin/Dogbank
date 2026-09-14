@@ -42,6 +42,7 @@ export default function useEvilDog() {
   const [connected, setConnected] = useState(false);
   const [feed, setFeed] = useState([]);
   const [nodeStates, setNodeStates] = useState({});
+  const [nodeArtifacts, setNodeArtifacts] = useState({});
   const [cards, setCards] = useState(DEFAULT_CARDS);
   const [target, setTarget] = useState(null);
   const [config, setConfig] = useState({ target: '', targets: [] });
@@ -125,6 +126,7 @@ export default function useEvilDog() {
     pipelinePollTimerRef.current = null;
     setFeed([]);
     setNodeStates({});
+    setNodeArtifacts({});
     setCards(DEFAULT_CARDS);
     setLoot(DEFAULT_LOOT);
     setRunning(null);
@@ -174,6 +176,7 @@ export default function useEvilDog() {
 
   const applyPipelineState = useCallback((state = {}, { hydrate = false } = {}) => {
     if (state.nodes && typeof state.nodes === 'object') setNodeStates(state.nodes);
+    if (state.artifacts && typeof state.artifacts === 'object') setNodeArtifacts(state.artifacts);
     const runId = state.run_id || state.runId || null;
     const status = String(state.status || state.state || '').toLowerCase();
     const outcome = outcomeFrom(state);
@@ -293,10 +296,13 @@ export default function useEvilDog() {
         return next.length > MAX_FEED ? next.slice(next.length - MAX_FEED) : next;
       });
 
-      const pipelineEvent = ev.type === 'node' || ev.type === 'pipeline';
+      const pipelineEvent = ev.type === 'node' || ev.type === 'pipeline' || ev.type === 'handoff';
       if (pipelineEvent && acceptsPipelineEvent(ev)) {
         if (ev.type === 'node' && ev.node) {
           setNodeStates((prev) => ({ ...prev, [ev.node]: ev.state }));
+        }
+        if ((ev.type === 'node' || ev.type === 'handoff') && ev.node && ev.artifact) {
+          setNodeArtifacts((prev) => ({ ...prev, [ev.node]: ev.artifact }));
         }
         if (ev.type === 'pipeline') applyPipelineState(ev);
       }
@@ -392,6 +398,7 @@ export default function useEvilDog() {
     setRunning('pipeline');
     setOperationError(null);
     setNodeStates({});
+    setNodeArtifacts({});
     setBlocked(false);
     setPipelineOutcome(null);
     try {
@@ -538,7 +545,7 @@ export default function useEvilDog() {
   }, [refreshTarget]);
 
   return {
-    connected, feed, nodeStates, cards, target, config, vectors, loot, running, lastResult,
+    connected, feed, nodeStates, nodeArtifacts, cards, target, config, vectors, loot, running, lastResult,
     sourceIp: target?.source_ip, blocked, pipelineOutcome, operationError, currentRunId,
     escalating, agents, swarmMeta, escalateError, authRequired, authError, authLoading, preparing,
     fireAttack, runPipeline, runPostExploit, changeTarget, refreshStats, refreshLoot, rotateIp,

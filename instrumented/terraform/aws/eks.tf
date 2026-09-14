@@ -18,8 +18,8 @@ module "eks" {
   name               = var.cluster_name
   kubernetes_version = "1.31"
 
-  vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.private_subnets
+  vpc_id     = local.vpc_id
+  subnet_ids = local.private_subnet_ids
 
   # GitHub-hosted runners need public reachability to the API server; there is
   # no private connectivity path (VPN/Direct Connect/self-hosted runner) today.

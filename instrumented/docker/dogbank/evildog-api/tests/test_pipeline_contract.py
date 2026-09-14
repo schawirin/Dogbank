@@ -4,6 +4,7 @@ These tests do not invoke attack tools or a real bank.  They validate the state,
 identity and response-classification boundaries that make the UI truthful.
 """
 import asyncio
+import json
 from pathlib import Path
 import sys
 
@@ -17,11 +18,17 @@ from app import main  # noqa: E402
 
 
 class Response:
-    def __init__(self, status_code, text="", headers=None, url="http://bank.test/api"):
+    def __init__(self, status_code, text="", headers=None, url="http://bank.test/api", json_data=None):
         self.status_code = status_code
         self.text = text
         self.headers = headers or {}
         self.url = url
+        self._json_data = json_data
+
+    def json(self):
+        if self._json_data is None:
+            raise ValueError("not json")
+        return self._json_data
 
 
 @pytest.fixture(autouse=True)
@@ -43,6 +50,8 @@ def reset_pipeline_state(monkeypatch):
         "detail": None,
         "started_at": None,
         "finished_at": None,
+        "artifacts": {},
+        "transitions": [],
     })
     main.API_STATE["findings"] = 0
     main.API_STATE["compromised"].clear()
@@ -194,6 +203,121 @@ def test_pipeline_state_contains_recovery_contract():
     assert snapshot["nodes"]["RECON"] == "success"
     assert snapshot["outcome"] == "AAP_BLOCKED"
     assert snapshot["detail"] == "Datadog blocked request"
+
+
+NMAP_DISCOVERY_XML = """<?xml version="1.0"?>
+<nmaprun>
+  <host><status state="up"/><address addr="10.89.0.115" addrtype="ipv4"/>
+    <hostnames><hostname name="auth-service"/></hostnames></host>
+  <host><status state="up"/><address addr="10.89.0.164" addrtype="ipv4"/>
+    <hostnames><hostname name="transaction-service"/></hostnames></host>
+  <host><status state="up"/><address addr="10.89.0.158" addrtype="ipv4"/>
+    <hostnames><hostname name="account-service"/></hostnames></host>
+</nmaprun>"""
+
+NMAP_SERVICES_XML = """<?xml version="1.0"?>
+<nmaprun>
+  <host><status state="up"/><address addr="10.89.0.115" addrtype="ipv4"/>
+    <hostnames><hostname name="auth-service"/></hostnames>
+    <ports><port protocol="tcp" portid="8088"><state state="open"/>
+      <service name="http" product="Apache Tomcat"/></port></ports></host>
+  <host><status state="up"/><address addr="10.89.0.164" addrtype="ipv4"/>
+    <hostnames><hostname name="transaction-service"/></hostnames>
+    <ports><port protocol="tcp" portid="8084"><state state="open"/>
+      <service name="http" product="Apache Tomcat"/></port>
+      <port protocol="tcp" portid="8088"><state state="closed"/></port></ports></host>
+  <host><status state="up"/><address addr="10.89.0.158" addrtype="ipv4"/>
+    <hostnames><hostname name="account-service"/></hostnames>
+    <ports><port protocol="tcp" portid="8089"><state state="open"/>
+      <service name="http" product="Apache Tomcat"/></port></ports></host>
+</nmaprun>"""
+
+
+def test_nmap_xml_is_parsed_into_real_hosts_and_only_open_services():
+    hosts = main._parse_nmap_discovery(NMAP_DISCOVERY_XML)
+    services = main._parse_nmap_services(NMAP_SERVICES_XML, hosts)
+
+    assert [host["host"] for host in hosts] == [
+        "auth-service", "transaction-service", "account-service",
+    ]
+    assert {(service["host"], service["port"]) for service in services} == {
+        ("auth-service", 8088),
+        ("transaction-service", 8084),
+        ("account-service", 8089),
+    }
+
+
+def test_pipeline_hands_real_stage_outputs_to_the_next_stage(monkeypatch):
+    tool_commands = []
+    http_calls = []
+
+    def fake_tool(command, *args, **kwargs):
+        tool_commands.append(command)
+        if command[0] == "nmap" and "-sn" in command:
+            return 0, NMAP_DISCOVERY_XML
+        if command[0] == "nmap":
+            return 0, NMAP_SERVICES_XML
+        return 0, "parameter 'pixKey' is injectable"
+
+    credentials = [
+        {"nome": "Sem MFA", "cpf": "11111111111", "senha": "stolen-one",
+         "mfa": False, "chave_pix": "victim@dogbank.com", "saldo": "R$ 100,00"},
+        {"nome": "Com MFA", "cpf": "22222222222", "senha": "stolen-two",
+         "mfa": True, "chave_pix": "safe@dogbank.com", "saldo": "R$ 200,00"},
+    ]
+
+    def fake_pipe_request(method, url, **kwargs):
+        http_calls.append((method, url, kwargs))
+        params = kwargs.get("params") or {}
+        value = params.get("pixKey")
+        json_headers = {"content-type": "application/json"}
+        if value == main.SQLI_EXFIL_PAYLOAD:
+            return Response(200, headers=json_headers, url=url, json_data={
+                "records_leaked": len(credentials), "leaked_data": [dict(row) for row in credentials],
+                "query_executed": "SELECT ... UNION SELECT ...",
+            })
+        if value and "' AND '1'='2'" in value:
+            return Response(400, headers=json_headers, url=url, json_data={"valid": False})
+        if value and "' OR '1'='1'" in value:
+            return Response(200, headers=json_headers, url=url,
+                            json_data={"records_leaked": 3, "valid": True})
+        if url.endswith("/api/auth/login"):
+            assert kwargs["json"] == {"cpf": "11111111111", "senha": "stolen-one"}
+            return Response(200, headers=json_headers, url=url,
+                            json_data={"accountId": 77, "nome": "Sem MFA"})
+        if url.endswith("/api/transactions/pix"):
+            assert kwargs["json"]["accountOriginId"] == 77
+            assert kwargs["json"]["password"] == "stolen-one"
+            return Response(200, headers=json_headers, url=url, json_data={"ok": True})
+        return Response(200, headers=json_headers, url=url, json_data={"valid": True})
+
+    monkeypatch.setattr(main, "_run_tool", fake_tool)
+    monkeypatch.setattr(main, "_pipe_request", fake_pipe_request)
+    monkeypatch.setattr(main, "_stage", lambda *_: 0.0)
+    monkeypatch.setattr(main, "_dwell", lambda *_: None)
+
+    main._start_pipeline_state("run-handoff", "203.0.113.88")
+    result = main._run_pipeline("run-handoff", "203.0.113.88")
+    snapshot = main._pipeline_snapshot()
+
+    assert result == "done"
+    assert snapshot["outcome"] == "SUCCESS"
+    assert [(item["from"], item["to"]) for item in snapshot["transitions"]] == [
+        ("RECON", "SCAN"), ("SCAN", "DETECT"), ("DETECT", "PAYLOAD"),
+        ("PAYLOAD", "INJECT"), ("INJECT", "ATO"), ("ATO", "TRANSFER"),
+        ("TRANSFER", "REPORT"),
+    ]
+    assert snapshot["artifacts"]["SCAN"]["candidates"][0]["parameter"] == "pixKey"
+    assert snapshot["artifacts"]["DETECT"]["finding"]["url"] == (
+        "http://transaction-service:8084/api/transactions/validate-pix-key"
+    )
+    assert snapshot["artifacts"]["ATO"]["account_ids"] == [77]
+    serialized = json.dumps(snapshot)
+    assert "stolen-one" not in serialized
+    assert "stolen-two" not in serialized
+    service_scan = next(command for command in tool_commands if command[0] == "nmap" and "-sT" in command)
+    assert {"auth-service", "transaction-service", "account-service"}.issubset(service_scan)
+    assert any(url.endswith("/api/transactions/pix") for _, url, _ in http_calls)
 
 
 def test_ephemeral_agent_exit_code_reflects_attack_outcome():

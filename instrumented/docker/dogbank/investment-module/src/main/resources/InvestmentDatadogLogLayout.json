@@ -1,0 +1,286 @@
+{
+  "timestamp": {
+    "$resolver": "timestamp",
+    "pattern": {
+      "format": "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+    }
+  },
+  "level": {
+    "$resolver": "level",
+    "field": "name"
+  },
+  "logger": {
+    "$resolver": "logger",
+    "field": "name"
+  },
+  "message": {
+    "$resolver": "message",
+    "stringified": true
+  },
+  "thread": {
+    "$resolver": "thread",
+    "field": "name"
+  },
+  "exception": {
+    "$resolver": "exception",
+    "field": "stackTrace",
+    "stackTrace": {
+      "stringified": true
+    }
+  },
+  "dd.trace_id": {
+    "$resolver": "mdc",
+    "key": "dd.trace_id"
+  },
+  "dd.span_id": {
+    "$resolver": "mdc",
+    "key": "dd.span_id"
+  },
+  "service": "${env:DD_SERVICE:-investment-service}",
+  "version": "${env:DD_VERSION:-1.0.0}",
+  "env": "${env:DD_ENV:-dogbank}",
+  "event_type": {
+    "$resolver": "mdc",
+    "key": "event_type"
+  },
+  "audit_correlation_id": {
+    "$resolver": "mdc",
+    "key": "audit_correlation_id"
+  },
+  "account_id": {
+    "$resolver": "mdc",
+    "key": "account_id"
+  },
+  "cpf": {
+    "$resolver": "mdc",
+    "key": "cpf"
+  },
+  "cpf_masked": {
+    "$resolver": "mdc",
+    "key": "cpf_masked"
+  },
+  "user_name": {
+    "$resolver": "mdc",
+    "key": "user_name"
+  },
+  "contracted_by": {
+    "$resolver": "mdc",
+    "key": "contracted_by"
+  },
+  "audit.correlation_id": {
+    "$resolver": "mdc",
+    "key": "audit.correlation_id"
+  },
+  "audit.actor": {
+    "$resolver": "mdc",
+    "key": "audit.actor"
+  },
+  "audit.channel": {
+    "$resolver": "mdc",
+    "key": "audit.channel"
+  },
+  "account.id": {
+    "$resolver": "mdc",
+    "key": "account.id"
+  },
+  "customer.name": {
+    "$resolver": "mdc",
+    "key": "customer.name"
+  },
+  "customer.document_masked": {
+    "$resolver": "mdc",
+    "key": "customer.document_masked"
+  },
+  "investment.position_id": {
+    "$resolver": "mdc",
+    "key": "investment.position_id"
+  },
+  "position_id": {
+    "$resolver": "mdc",
+    "key": "position_id"
+  },
+  "investment.product_code": {
+    "$resolver": "mdc",
+    "key": "investment.product_code"
+  },
+  "product_code": {
+    "$resolver": "mdc",
+    "key": "product_code"
+  },
+  "investment.product_name": {
+    "$resolver": "mdc",
+    "key": "investment.product_name"
+  },
+  "product_name": {
+    "$resolver": "mdc",
+    "key": "product_name"
+  },
+  "investment.status": {
+    "$resolver": "mdc",
+    "key": "investment.status"
+  },
+  "investment_status": {
+    "$resolver": "mdc",
+    "key": "investment_status"
+  },
+  "investment.amount": {
+    "$resolver": "mdc",
+    "key": "investment.amount"
+  },
+  "amount": {
+    "$resolver": "mdc",
+    "key": "amount"
+  },
+  "investment.current_value": {
+    "$resolver": "mdc",
+    "key": "investment.current_value"
+  },
+  "current_value": {
+    "$resolver": "mdc",
+    "key": "current_value"
+  },
+  "investment.expected_value": {
+    "$resolver": "mdc",
+    "key": "investment.expected_value"
+  },
+  "expected_value": {
+    "$resolver": "mdc",
+    "key": "expected_value"
+  },
+  "investment.units": {
+    "$resolver": "mdc",
+    "key": "investment.units"
+  },
+  "units": {
+    "$resolver": "mdc",
+    "key": "units"
+  },
+  "investment.reference_rate": {
+    "$resolver": "mdc",
+    "key": "investment.reference_rate"
+  },
+  "reference_rate": {
+    "$resolver": "mdc",
+    "key": "reference_rate"
+  },
+  "investment.reference_price": {
+    "$resolver": "mdc",
+    "key": "investment.reference_price"
+  },
+  "reference_price": {
+    "$resolver": "mdc",
+    "key": "reference_price"
+  },
+  "investment.contracted_at": {
+    "$resolver": "mdc",
+    "key": "investment.contracted_at"
+  },
+  "contracted_at": {
+    "$resolver": "mdc",
+    "key": "contracted_at"
+  },
+  "drift.amount": {
+    "$resolver": "mdc",
+    "key": "drift.amount"
+  },
+  "drift_amount": {
+    "$resolver": "mdc",
+    "key": "drift_amount"
+  },
+  "drift.percent": {
+    "$resolver": "mdc",
+    "key": "drift.percent"
+  },
+  "drift_percent": {
+    "$resolver": "mdc",
+    "key": "drift_percent"
+  },
+  "sync.reason": {
+    "$resolver": "mdc",
+    "key": "sync.reason"
+  },
+  "sync_reason": {
+    "$resolver": "mdc",
+    "key": "sync_reason"
+  },
+  "sync.attempts": {
+    "$resolver": "mdc",
+    "key": "sync.attempts"
+  },
+  "sync_attempts": {
+    "$resolver": "mdc",
+    "key": "sync_attempts"
+  },
+  "sync.last_synced_at": {
+    "$resolver": "mdc",
+    "key": "sync.last_synced_at"
+  },
+  "last_synced_at": {
+    "$resolver": "mdc",
+    "key": "last_synced_at"
+  },
+  "registry.order_id": {
+    "$resolver": "mdc",
+    "key": "registry.order_id"
+  },
+  "registry_order_id": {
+    "$resolver": "mdc",
+    "key": "registry_order_id"
+  },
+  "registry.id": {
+    "$resolver": "mdc",
+    "key": "registry.id"
+  },
+  "registry_id": {
+    "$resolver": "mdc",
+    "key": "registry_id"
+  },
+  "registry.protocol": {
+    "$resolver": "mdc",
+    "key": "registry.protocol"
+  },
+  "registry_protocol": {
+    "$resolver": "mdc",
+    "key": "registry_protocol"
+  },
+  "registry.venue": {
+    "$resolver": "mdc",
+    "key": "registry.venue"
+  },
+  "registry_venue": {
+    "$resolver": "mdc",
+    "key": "registry_venue"
+  },
+  "registry.status": {
+    "$resolver": "mdc",
+    "key": "registry.status"
+  },
+  "registry_status": {
+    "$resolver": "mdc",
+    "key": "registry_status"
+  },
+  "registry.duration_ms": {
+    "$resolver": "mdc",
+    "key": "registry.duration_ms"
+  },
+  "registry_duration_ms": {
+    "$resolver": "mdc",
+    "key": "registry_duration_ms"
+  },
+  "error.code": {
+    "$resolver": "mdc",
+    "key": "error.code"
+  },
+  "error_code": {
+    "$resolver": "mdc",
+    "key": "error_code"
+  },
+  "error.message": {
+    "$resolver": "mdc",
+    "key": "error.message"
+  },
+  "error_message": {
+    "$resolver": "mdc",
+    "key": "error_message"
+  }
+}

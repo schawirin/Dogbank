@@ -133,7 +133,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
                 firstPartyHostsTracing: .traceWithHeaders(
                     hostsWithHeaders: [
                         "127.0.0.1": [.datadog, .tracecontext],
-                        "localhost": [.datadog, .tracecontext]
+                        "localhost": [.datadog, .tracecontext],
+                        "lab.dogbank.dog": [.datadog, .tracecontext]
                     ]
                 )
             )

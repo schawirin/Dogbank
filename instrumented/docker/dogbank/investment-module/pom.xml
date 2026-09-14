@@ -19,6 +19,7 @@
 
     <properties>
         <java.version>21</java.version>
+        <log4j2.version>2.20.0</log4j2.version>
     </properties>
 
     <dependencies>
@@ -36,6 +37,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-log4j2</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-layout-template-json</artifactId>
+            <version>${log4j2.version}</version>
         </dependency>
 
         <dependency>

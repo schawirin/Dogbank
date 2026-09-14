@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="ConsoleJson" target="SYSTEM_OUT">
+            <JsonTemplateLayout eventTemplateUri="classpath:RegistryDatadogLogLayout.json"/>
+        </Console>
+    </Appenders>
+
+    <Loggers>
+        <Logger name="investment.registry.audit" level="info" additivity="false">
+            <AppenderRef ref="ConsoleJson"/>
+        </Logger>
+
+        <Logger name="com.dogbank.registry" level="info" additivity="false">
+            <AppenderRef ref="ConsoleJson"/>
+        </Logger>
+
+        <Root level="info">
+            <AppenderRef ref="ConsoleJson"/>
+        </Root>
+
+        <Logger name="org.springframework.web" level="info"/>
+        <Logger name="org.springframework.security" level="warn"/>
+        <Logger name="org.apache.catalina" level="warn"/>
+        <Logger name="org.apache.tomcat" level="warn"/>
+    </Loggers>
+</Configuration>

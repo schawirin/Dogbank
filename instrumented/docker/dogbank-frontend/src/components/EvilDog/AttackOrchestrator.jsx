@@ -55,7 +55,7 @@ function edgePath(x1, y1, x2, y2, r = 14) {
     + `L ${midx} ${y2 - dy * r} Q ${midx} ${y2} ${midx + r} ${y2} L ${x2} ${y2}`;
 }
 
-function detailFor(id, st, address, records, outcome) {
+function detailFor(id, st, address, records, outcome, artifact) {
   // A failure is not automatically an AAP block. The backend classifies the
   // terminal result so the screen does not attribute an application user-block,
   // rate limit, or backend incident to Datadog AAP.
@@ -66,11 +66,14 @@ function detailFor(id, st, address, records, outcome) {
     if (outcome?.kind === 'AAP_NOT_ENFORCED') return '⚠️ Bloqueio AAP não aplicado';
     if (outcome?.kind === 'BACKEND_ERROR') return '⚠️ Erro do backend';
   }
+  // O resumo é produzido pelo próprio estágio e transportado no handoff. Assim
+  // o canvas mostra a evidência desta execução em vez de portas/valores fixos.
+  if (st === 'success' && artifact?.summary) return artifact.summary;
   switch (id) {
     case 'RECON': return st === 'active' ? 'nmap -sn…' : (address || 'lab.dogbank.dog');
     case 'SCAN': return st === 'active' ? 'nmap -sV…' : st === 'idle' || !st ? '—' : 'Ports: 8088, 8084, 8089';
     case 'DETECT': return st === 'active' ? 'sqlmap…' : st === 'success' ? 'SQLi confirmada' : st === 'fail' ? 'Target secure' : '—';
-    case 'PAYLOAD': return 'UNION SELECT cpf:senha…';
+    case 'PAYLOAD': return st === 'active' ? 'montando a partir do finding…' : '—';
     case 'INJECT': return st === 'active' ? 'exfiltrando…' : st === 'success' ? 'senhas roubadas' : '—';
     case 'ATO': return st === 'active' ? 'login c/ senha roubada…' : st === 'success' ? 'conta comprometida!' : '—';
     case 'TRANSFER': return st === 'active' ? 'PIX indevido…' : st === 'success' ? 'PIX executado' : records != null && records > 0 ? `${records} vazados` : '—';
@@ -87,7 +90,7 @@ const StatusDot = ({ state, color }) => {
   return <span className={`w-2.5 h-2.5 rounded-full ${cls}`} style={state === 'active' ? { background: color } : undefined} />;
 };
 
-function Node({ node, state, address, records, outcome, clickable, onClick }) {
+function Node({ node, state, address, records, outcome, artifact, clickable, onClick }) {
   const c = COLORS[node.group];
   const Icon = node.icon;
   const active = state === 'active';
@@ -96,7 +99,7 @@ function Node({ node, state, address, records, outcome, clickable, onClick }) {
   const border = failed ? '#ef4444' : state === 'idle' || !state ? '#1e2733' : node.group === 'skip' ? '#26313f' : c;
   const stateCls = active ? 'evd-node-active' : done ? 'evd-node-done' : failed ? 'evd-node-fail' : '';
   const h = node.small ? 96 : NH;
-  const detail = detailFor(node.id, state, address, records, outcome);
+  const detail = detailFor(node.id, state, address, records, outcome, artifact);
   const detailColor = failed ? '#f87171' : done || active ? c : '#64748b';
   return (
     <div
@@ -249,7 +252,7 @@ function EscalationBanner({ evd }) {
 
 export default function AttackOrchestrator({ evd }) {
   const { t } = useT();
-  const { nodeStates, feed, runPipeline, running, target, loot, blocked, pipelineOutcome, operationError, escalating, agents, swarmMeta } = evd;
+  const { nodeStates, nodeArtifacts, feed, runPipeline, running, target, loot, blocked, pipelineOutcome, operationError, escalating, agents, swarmMeta } = evd;
   const wrapRef = useRef(null);
   const [scale, setScale] = useState(1);
   const [modal, setModal] = useState(null);
@@ -359,7 +362,8 @@ export default function AttackOrchestrator({ evd }) {
             {/* nodes */}
             {NODES.map((n) => (
               <Node key={n.id} node={n} state={nodeStates[n.id]} address={address} records={records}
-                outcome={pipelineOutcome} clickable={CLICKABLE.has(n.id)} onClick={() => setModal(n.id)} />
+                outcome={pipelineOutcome} artifact={nodeArtifacts?.[n.id]}
+                clickable={CLICKABLE.has(n.id)} onClick={() => setModal(n.id)} />
             ))}
             <Diamond state={nodeStates.DETECT} />
           </div>

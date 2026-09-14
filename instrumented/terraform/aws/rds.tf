@@ -6,9 +6,10 @@
 # That version located its VPC/subnets via a fragile chain of data sources
 # (data.aws_eks_cluster -> data.aws_vpc -> data.aws_subnets filtered on a
 # manually-applied "RDS-Pvt-subnet-*" tag) against the old ClickOps'd cluster.
-# Here, VPC/subnets come directly from this same root module's own module.vpc
-# outputs instead -- no external lookups, no manually-applied tags to keep in
-# sync by hand.
+# Here, VPC/subnets come from this root module's own network.tf instead --
+# this account's shared sandbox VPC (see network.tf for why a dedicated VPC
+# isn't possible here) and the dedicated subnets this project carves out of
+# it, referenced via local.vpc_id / local.private_subnet_ids.
 #
 # This instance is the single consolidated Postgres target for the migration
 # (see max_connections override below); the actual data migration off the
@@ -17,14 +18,17 @@
 resource "aws_security_group" "rds_dogbank" {
   name_prefix = "rds-dogbank-"
   description = "Security group for DogBank RDS PostgreSQL"
-  vpc_id      = module.vpc.vpc_id
+  vpc_id      = local.vpc_id
 
   ingress {
-    description = "PostgreSQL from within the VPC"
+    # Scoped to this project's own new subnets, NOT the whole VPC -- this VPC
+    # is shared with several other teams' subnets/resources (see network.tf),
+    # so "from within the VPC" would be far broader than intended here.
+    description = "PostgreSQL from this project own subnets"
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    cidr_blocks = [module.vpc.vpc_cidr_block]
+    cidr_blocks = concat(var.new_private_subnet_cidrs, var.new_public_subnet_cidrs)
   }
 
   ingress {
@@ -50,7 +54,7 @@ resource "aws_security_group" "rds_dogbank" {
 resource "aws_db_subnet_group" "dogbank" {
   name_prefix = "dogbank-"
   description = "Subnet group for DogBank RDS"
-  subnet_ids  = module.vpc.private_subnets
+  subnet_ids  = local.private_subnet_ids
 
   tags = merge(local.common_tags, {
     Name = "dogbank-db-subnet-group"

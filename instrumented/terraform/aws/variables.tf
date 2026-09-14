@@ -14,10 +14,28 @@ variable "cluster_name" {
   default     = "eks-sandbox-datadog"
 }
 
-variable "vpc_cidr" {
-  description = "CIDR block for the new VPC"
+variable "existing_vpc_id" {
+  description = "ID of the account's existing shared default VPC to deploy into (this account is at its 5-VPC-per-region quota, shared by other teams -- see network.tf)"
   type        = string
-  default     = "10.0.0.0/16"
+  default     = "vpc-0f8d443ba6e668bed"
+}
+
+variable "existing_nat_gateway_id" {
+  description = "ID of the existing NAT Gateway (in var.existing_vpc_id) that this project's new private subnets route through, shared with other teams' private subnets in the same VPC"
+  type        = string
+  default     = "nat-06672820db9842a1c"
+}
+
+variable "new_private_subnet_cidrs" {
+  description = "CIDR blocks for the new dedicated private subnets this project creates inside the existing VPC -- verified free of collision with every subnet already in that VPC"
+  type        = list(string)
+  default     = ["172.31.192.0/20", "172.31.208.0/20"]
+}
+
+variable "new_public_subnet_cidrs" {
+  description = "CIDR blocks for the new dedicated public subnets this project creates inside the existing VPC -- verified free of collision with every subnet already in that VPC"
+  type        = list(string)
+  default     = ["172.31.224.0/20", "172.31.240.0/20"]
 }
 
 variable "node_instance_types" {

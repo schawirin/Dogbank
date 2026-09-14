@@ -1,0 +1,13 @@
+{
+  "name": "dogbank-demo-recorder",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Playwright recorder for the DogBank / EvilDog security masterclass demo (app-side).",
+  "scripts": {
+    "record": "node record-demo.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
+}

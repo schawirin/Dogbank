@@ -63,10 +63,6 @@ data:
   DD_TRACE_CLIENT_IP_ENABLED: "true"
   DD_TRACE_CLIENT_IP_HEADER: "x-forwarded-for"
 
-  # Admin endpoint protection (Datadog ATO Response Workflow -> /api/auth/admin/*)
-  # Demo: valor fixo. Producao real -> mover para secret.
-  ADMIN_BLOCK_TOKEN: "dogbank-admin-token-demo"
-
 ---
 apiVersion: v1
 kind: ConfigMap

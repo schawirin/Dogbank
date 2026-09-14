@@ -38,6 +38,7 @@ spec:
         admission.datadoghq.com/php-lib.config.v1: '{"disabled":true}'
         ad.datadoghq.com/evildog-api.logs: '[{"source": "python", "service": "evildog-api"}]'
     spec:
+      serviceAccountName: evildog-api
       containers:
         - name: evildog-api
           image: schawirin/dogbank-evildog-api:latest
@@ -72,6 +73,25 @@ spec:
               value: "8000"
             - name: LOG4J_EXFIL_ENV
               value: "SPRING_DATASOURCE_PASSWORD"
+            # Control token for the EvilDog operator session. This is separate
+            # from the auth-service remediation credential and never reaches
+            # the frontend bundle.
+            - name: EVILDOG_CONTROL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: EVILDOG_CONTROL_TOKEN
+            # Bearer token the ephemeral agent Jobs use to POST telemetry back here.
+            - name: EVILDOG_AGENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: EVILDOG_AGENT_TOKEN
+            - name: DOGBANK_ADMIN_BLOCK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dogbank-secrets
+                  key: ADMIN_BLOCK_TOKEN
             # Datadog APM
             - name: DD_AGENT_HOST
               valueFrom:
@@ -93,13 +113,18 @@ spec:
                   fieldPath: metadata.labels['tags.datadoghq.com/version']
             - name: DD_LOGS_INJECTION
               value: "true"
+            # IP de origem que a AAP enxerga (o RECON informa "bloqueie ESTE IP")
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
           resources:
             requests:
-              memory: "128Mi"
+              memory: "192Mi"
               cpu: "100m"
             limits:
-              memory: "256Mi"
-              cpu: "500m"
+              memory: "512Mi"
+              cpu: "700m"
           livenessProbe:
             httpGet:
               path: /api/evildog/health

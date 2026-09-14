@@ -191,6 +191,12 @@ spec:
                 configMapKeyRef:
                   name: dogbank-config
                   key: DD_APPSEC_ENABLED
+            # Faz a AAP usar o X-Forwarded-For como client_ip — necessário para o bloqueio/
+            # rotação de IP do EvilDog: o IP spoofado vira o @network.client.ip da denylist.
+            - name: DD_TRACE_CLIENT_IP_ENABLED
+              value: "true"
+            - name: DD_TRACE_CLIENT_IP_HEADER
+              value: "x-forwarded-for"
             - name: DD_IAST_ENABLED
               valueFrom:
                 configMapKeyRef:

@@ -28,7 +28,7 @@ spec:
         admission.datadoghq.com/java-lib.version: "latest"
         admission.datadoghq.com/js-lib.config.v1: '{"disabled":true}'
         admission.datadoghq.com/python-lib.config.v1: '{"disabled":true}'
-        ad.datadoghq.com/investment-registry-mock.logs: '[{"source":"java","service":"b3-investment-registry"}]'
+        ad.datadoghq.com/investment-registry-mock.logs: '[{"type":"json","source":"java","service":"b3-investment-registry"}]'
     spec:
       containers:
         - name: investment-registry-mock

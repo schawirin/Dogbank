@@ -11,6 +11,7 @@ import logging
 import os
 import random
 import time
+import uuid
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -168,6 +169,10 @@ class PixScenarioWorker:
             "description": f"dogbank-load:{scenario}",
             "password": source.password,
         }
+        idempotency_key = (
+            f"{RUN_ID}-{self.sequence}-{scenario}-{source.account_id}-"
+            f"{uuid.uuid4().hex[:12]}"
+        )
 
         try:
             response = self.session.post(
@@ -179,6 +184,7 @@ class PixScenarioWorker:
                     "X-DogBank-Load-Run-Id": RUN_ID,
                     "X-DogBank-Source-Account": str(source.account_id),
                     "X-DogBank-Expected-Success": str(expected_success).lower(),
+                    "X-Idempotency-Key": idempotency_key,
                 },
             )
             observed_success = 200 <= response.status_code < 300

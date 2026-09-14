@@ -17,6 +17,7 @@ import random
 import time
 import logging
 import os
+import uuid
 from datetime import datetime
 from dataclasses import dataclass
 from typing import Optional
@@ -33,6 +34,7 @@ logger = logging.getLogger(__name__)
 AUTH_SERVICE_URL = os.getenv('AUTH_SERVICE_URL', 'http://auth-service:8088')
 TRANSACTION_SERVICE_URL = os.getenv('TRANSACTION_SERVICE_URL', 'http://transaction-service:8084')
 ACCOUNT_SERVICE_URL = os.getenv('ACCOUNT_SERVICE_URL', 'http://account-service:8089')
+RUN_ID = os.getenv('DOGBANK_LOAD_RUN_ID') or datetime.utcnow().strftime('dogbank-load-%Y%m%d-%H%M%S')
 
 # Intervalo entre transações (segundos) - Ajustado para não sobrecarregar o sistema
 MIN_INTERVAL = float(os.getenv('MIN_INTERVAL', '60'))
@@ -165,7 +167,15 @@ class LoadGenerator:
             response = self.session.post(
                 f"{TRANSACTION_SERVICE_URL}/api/transactions/pix",
                 json=payload,
-                timeout=30
+                timeout=30,
+                headers={
+                    "X-DogBank-Load-Run-Id": RUN_ID,
+                    "X-DogBank-Client": "legacy-load-generator",
+                    "X-Idempotency-Key": (
+                        f"{RUN_ID}-{account_id}-{to_account.pix_key}-"
+                        f"{uuid.uuid4().hex[:12]}"
+                    ),
+                },
             )
 
             return {
